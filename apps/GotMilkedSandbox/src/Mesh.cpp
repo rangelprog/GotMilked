@@ -145,6 +145,65 @@ Mesh Mesh::fromIndexedPUV(const std::vector<float> &positions,
   return m;
 }
 
+Mesh Mesh::fromIndexedPNU(const std::vector<float> &positions,
+                          const std::vector<float> &normals,
+                          const std::vector<float> &uvs,
+                          const std::vector<unsigned int> &indices) {
+  const size_t vertCount = positions.size() / 3;
+
+  Mesh m;
+  m.m_indexed = true;
+  m.m_hasUV = true;
+  m.m_indexCount = static_cast<GLsizei>(indices.size());
+
+  // Interleave: [Px,Py,Pz, Nx,Ny,Nz, U, V] * N  -> stride = 8 floats
+  std::vector<float> interleaved;
+  interleaved.reserve(vertCount * 8);
+  for (size_t i = 0; i < vertCount; ++i) {
+    interleaved.push_back(positions[i * 3 + 0]);
+    interleaved.push_back(positions[i * 3 + 1]);
+    interleaved.push_back(positions[i * 3 + 2]);
+
+    interleaved.push_back(normals[i * 3 + 0]);
+    interleaved.push_back(normals[i * 3 + 1]);
+    interleaved.push_back(normals[i * 3 + 2]);
+
+    interleaved.push_back(uvs[i * 2 + 0]);
+    interleaved.push_back(uvs[i * 2 + 1]);
+  }
+
+  glGenVertexArrays(1, &m.m_vao);
+  glBindVertexArray(m.m_vao);
+
+  glGenBuffers(1, &m.m_vbo);
+  glBindBuffer(GL_ARRAY_BUFFER, m.m_vbo);
+  glBufferData(GL_ARRAY_BUFFER, interleaved.size() * sizeof(float),
+               interleaved.data(), GL_STATIC_DRAW);
+
+  glGenBuffers(1, &m.m_ebo);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.m_ebo);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int),
+               indices.data(), GL_STATIC_DRAW);
+
+  const GLsizei stride = 8 * sizeof(float);
+  // location 0: position (vec3)
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void *)0);
+
+  // location 1: normal (vec3)  offset = 3 floats
+  glEnableVertexAttribArray(1);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride,
+                        (void *)(3 * sizeof(float)));
+
+  // location 2: uv (vec2)      offset = 6 floats
+  glEnableVertexAttribArray(2);
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride,
+                        (void *)(6 * sizeof(float)));
+
+  glBindVertexArray(0);
+  return m;
+}
+
 void Mesh::draw() const {
   glBindVertexArray(m_vao);
   if (m_indexed) {

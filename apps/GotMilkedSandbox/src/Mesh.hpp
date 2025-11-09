@@ -25,6 +25,14 @@ public:
                              const std::vector<float> &uvs,
                              const std::vector<unsigned int> &indices);
 
+  // ... dein Header oben bleibt gleich ...
+  // Position + Normal + UV (separate Arrays) + Indizes
+  // positions: 3 floats/vertex, normals: 3 floats/vertex, uvs: 2 floats/vertex
+  static Mesh fromIndexedPNU(const std::vector<float> &positions,
+                             const std::vector<float> &normals,
+                             const std::vector<float> &uvs,
+                             const std::vector<unsigned int> &indices);
+
   void draw() const;
 
 private:

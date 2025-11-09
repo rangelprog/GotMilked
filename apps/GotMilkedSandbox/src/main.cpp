@@ -14,8 +14,17 @@
 #include "Camera.hpp"
 #include "Mesh.hpp"
 #include "Shader.hpp"
-#include "Texture.hpp"
 #include "Transform.hpp"
+
+// --- helpers ---
+static void setVSync(bool on) { glfwSwapInterval(on ? 1 : 0); }
+static const char *boolStr(bool v) { return v ? "ON" : "OFF"; }
+struct FovState {
+  static float &ref() {
+    static float f = 60.0f;
+    return f;
+  }
+};
 
 const char *NAME{"GotMilked:"};
 
@@ -23,22 +32,12 @@ const char *NAME{"GotMilked:"};
 #error GM_ASSETS_DIR must be defined (see CMakeLists.txt)
 #endif
 
-// helpers
 static void error_callback(int code, const char *desc) {
   std::fprintf(stderr, "%s GLFW error %d: %s\n", NAME, code, desc);
 }
-static void setVSync(bool on) { glfwSwapInterval(on ? 1 : 0); }
-static const char *boolStr(bool v) { return v ? "ON" : "OFF"; }
-
-// FOV store for scroll callback
-struct FovState {
-  static float &ref() {
-    static float fov = 60.0f;
-    return fov;
-  }
-};
 
 int main() {
+  // Init
   glfwSetErrorCallback(error_callback);
   if (!glfwInit()) {
     std::fprintf(stderr, "%s GLFW init failed\n", NAME);
@@ -51,7 +50,6 @@ int main() {
 #ifdef __APPLE__
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
-
   GLFWwindow *window =
       glfwCreateWindow(1280, 720, "GotMilked", nullptr, nullptr);
   if (!window) {
@@ -70,7 +68,6 @@ int main() {
 
   bool vsyncOn = true;
   setVSync(vsyncOn);
-
   glfwSetScrollCallback(window, [](GLFWwindow *, double, double yoff) {
     float &fov = FovState::ref();
     fov -= static_cast<float>(yoff) * 2.0f;
@@ -82,7 +79,17 @@ int main() {
 
   glEnable(GL_DEPTH_TEST);
 
-  // shader
+  // --- Meshes ---
+  std::vector<float> triVerts = {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f,
+                                 0.0f,  0.0f,  0.5f, 0.0f};
+  Mesh tri = Mesh::fromPositions(triVerts);
+
+  std::vector<float> quadPos = {-0.5f, -0.5f, 0.0f, 0.5f,  -0.5f, 0.0f,
+                                0.5f,  0.5f,  0.0f, -0.5f, 0.5f,  0.0f};
+  std::vector<unsigned int> quadIdx = {0, 1, 2, 2, 3, 0};
+  Mesh quad = Mesh::fromIndexed(quadPos, quadIdx);
+
+  // --- Shader ---
   const std::string shaderDir = std::string(GM_ASSETS_DIR) + "/shaders";
   Shader shader;
   if (!shader.loadFromFiles(shaderDir + "/simple.vert.glsl",
@@ -90,41 +97,30 @@ int main() {
     std::fprintf(stderr, "%s Shader setup failed\n", NAME);
     return 1;
   }
-
-  // meshes
-  // triangle (positions only)
-  std::vector<float> triVerts = {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f,
-                                 0.0f,  0.0f,  0.5f, 0.0f};
-  Mesh tri = Mesh::fromPositions(triVerts);
-
-  // textured quad (positions + uvs + indices)
-  std::vector<float> quadPos = {
-      -0.5f, -0.5f, 0.0f, // 0
-      0.5f,  -0.5f, 0.0f, // 1
-      0.5f,  0.5f,  0.0f, // 2
-      -0.5f, 0.5f,  0.0f  // 3
-  };
-  std::vector<float> quadUV = {
-      0.0f, 0.0f, // 0
-      1.0f, 0.0f, // 1
-      1.0f, 1.0f, // 2
-      0.0f, 1.0f  // 3
-  };
-  std::vector<unsigned int> quadIdx = {0, 1, 2, 2, 3, 0};
-  Mesh quad = Mesh::fromIndexedPUV(quadPos, quadUV, quadIdx);
-
-  // checker texture
-  Texture checker = Texture::makeChecker(256, 256, 16);
-
-  // static uniforms
   shader.use();
-  shader.setInt("uTex", 0); // sampler unit
 
-  // camera & input
+  // Uniform locations (einmal holen)
+  const GLint uModelLoc = glGetUniformLocation(shader.id(), "uModel");
+  const GLint uViewLoc = glGetUniformLocation(shader.id(), "uView");
+  const GLint uProjLoc = glGetUniformLocation(shader.id(), "uProj");
+  const GLint uNormalMatLoc = glGetUniformLocation(shader.id(), "uNormalMat");
+  const GLint uViewPosLoc = glGetUniformLocation(shader.id(), "uViewPos");
+  const GLint uLightDirLoc = glGetUniformLocation(shader.id(), "uLightDir");
+  const GLint uLightColLoc = glGetUniformLocation(shader.id(), "uLightColor");
+  const GLint uUseTexLoc = glGetUniformLocation(shader.id(), "uUseTex");
+  const GLint uSolidColLoc = glGetUniformLocation(shader.id(), "uSolidColor");
+  // (uTex brauchst du erst, wenn du Texturen bindest)
+
+  // Static lighting defaults
+  const glm::vec3 lightDir = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.3f));
+  const glm::vec3 lightColor = glm::vec3(1.0f);
+  glUniform3fv(uLightDirLoc, 1, glm::value_ptr(lightDir));
+  glUniform3fv(uLightColLoc, 1, glm::value_ptr(lightColor));
+
+  // --- Camera & input ---
   Camera cam;
   float mouseSensitivity = 0.12f;
-  bool mouseCaptured = false, firstCapture = true;
-  bool wireframe = false;
+  bool mouseCaptured = false, firstCapture = true, wireframe = false;
   double lastMouseX = 0.0, lastMouseY = 0.0;
 
   // timing / fps
@@ -151,7 +147,6 @@ int main() {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
       mouseCaptured = false;
     }
-
     // mouse look
     if (mouseCaptured) {
       double mx, my;
@@ -161,14 +156,13 @@ int main() {
         lastMouseY = my;
         firstCapture = false;
       }
-      const double dx = mx - lastMouseX;
-      const double dy = lastMouseY - my;
+      double dx = mx - lastMouseX;
+      double dy = lastMouseY - my;
       lastMouseX = mx;
       lastMouseY = my;
       cam.addYawPitch(static_cast<float>(dx) * mouseSensitivity,
                       static_cast<float>(dy) * mouseSensitivity);
     }
-
     // movement + speed boost
     float baseSpeed = 3.0f;
     float speedMul =
@@ -187,7 +181,7 @@ int main() {
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
       cam.moveDown(step);
 
-    // toggles: F(wireframe), V(vsync)
+    // toggles: F (wireframe), V (vsync)
     {
       static bool prevF = false, prevV = false;
       bool fNow = (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS);
@@ -214,40 +208,62 @@ int main() {
     glClearColor(0.10f, 0.10f, 0.12f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    // View/Proj & common uniforms
     const float aspect = static_cast<float>(fbw) / static_cast<float>(fbh);
-    const float fovNow = FovState::ref();
+    const float fov = FovState::ref();
     const glm::mat4 proj =
-        glm::perspective(glm::radians(fovNow), aspect, 0.1f, 100.0f);
+        glm::perspective(glm::radians(fov), aspect, 0.1f, 100.0f);
     const glm::mat4 view = cam.view();
-    const glm::mat4 viewProj = proj * view;
+    glUniformMatrix4fv(uViewLoc, 1, GL_FALSE, glm::value_ptr(view));
+    glUniformMatrix4fv(uProjLoc, 1, GL_FALSE, glm::value_ptr(proj));
+    // camera position needed for specular
+    // (wir extrahieren sie aus deiner Camera, hier simple Annahme: du hast
+    // position() Getter – falls nicht, setz eine konstante oder speichere sie
+    // in Camera) Quick & dirty: rechne sie aus view-Matrix (inverse):
+    const glm::vec3 camPos = glm::vec3(glm::inverse(view)[3]);
+    glUniform3fv(uViewPosLoc, 1, glm::value_ptr(camPos));
 
     const float t = static_cast<float>(now);
 
-    shader.use();
-
-    // A) untexturiertes Dreieck
+    // ========== Objekt A: Dreieck (ohne UV/Normal -> nur Ambient+Minimal)
+    // ==========
     {
-      Transform A;
-      A.rotationDeg.z = t * 45.0f;
-      shader.setMat4("uMVP", viewProj * A.toMat4());
-      shader.setInt("uUseTex", 0);
+      Transform T;
+      T.rotationDeg.z = t * 45.0f;
+      const glm::mat4 model = T.toMat4();
+      const glm::mat3 normalMat =
+          glm::transpose(glm::inverse(glm::mat3(model)));
+
+      glUniformMatrix4fv(uModelLoc, 1, GL_FALSE, glm::value_ptr(model));
+      glUniformMatrix3fv(uNormalMatLoc, 1, GL_FALSE, glm::value_ptr(normalMat));
+      glUniform1i(uUseTexLoc, 0);
+      const glm::vec3 solidA(1.0f, 0.5f, 0.2f); // orange
+      glUniform3fv(uSolidColLoc, 1, glm::value_ptr(solidA));
+
       tri.draw();
     }
 
-    // B) texturiertes Quad (Checker)
+    // ========== Objekt B: Quad (ohne UV -> ebenfalls solid) ==========
     {
-      Transform B;
-      B.position = {1.2f, 0.0f, 0.0f};
-      B.scale = {0.8f, 0.8f, 0.8f};
-      B.rotationDeg.z = -t * 60.0f;
+      Transform T;
+      T.position = {1.2f, 0.0f, 0.0f};
+      T.scale = {0.8f, 0.8f, 0.8f};
+      T.rotationDeg.z = -t * 60.0f;
 
-      checker.bind(0);
-      shader.setMat4("uMVP", viewProj * B.toMat4());
-      shader.setInt("uUseTex", 1);
+      const glm::mat4 model = T.toMat4();
+      const glm::mat3 normalMat =
+          glm::transpose(glm::inverse(glm::mat3(model)));
+
+      glUniformMatrix4fv(uModelLoc, 1, GL_FALSE, glm::value_ptr(model));
+      glUniformMatrix3fv(uNormalMatLoc, 1, GL_FALSE, glm::value_ptr(normalMat));
+      glUniform1i(uUseTexLoc, 0);
+      const glm::vec3 solidB(0.2f, 0.6f, 1.0f); // blau
+      glUniform3fv(uSolidColLoc, 1, glm::value_ptr(solidB));
+
       quad.draw();
     }
 
-    // fps title
+    // FPS in Title
     frames++;
     if (now - lastTitle >= 0.5) {
       double fps = frames / (now - lastTitle);
@@ -257,7 +273,7 @@ int main() {
       std::snprintf(title, sizeof(title),
                     "GotMilked  |  FPS: %.1f  |  VSync: %s  |  Wireframe: %s  "
                     "|  FOV: %.1f",
-                    fps, boolStr(vsyncOn), boolStr(wireframe), fovNow);
+                    fps, boolStr(vsyncOn), boolStr(wireframe), fov);
       glfwSetWindowTitle(window, title);
     }
 

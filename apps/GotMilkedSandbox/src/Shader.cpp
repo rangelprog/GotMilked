@@ -121,3 +121,15 @@ void Shader::setInt(const char *name, int v) const {
   if (loc >= 0)
     glUniform1i(loc, v);
 }
+
+void Shader::setVec3(const char *name, const glm::vec3 &v) const {
+  const GLint loc = uniformLoc(name);
+  if (loc >= 0)
+    glUniform3fv(loc, 1, glm::value_ptr(v));
+}
+
+void Shader::setMat3(const char *name, const glm::mat3 &m) const {
+  const GLint loc = uniformLoc(name);
+  if (loc >= 0)
+    glUniformMatrix3fv(loc, 1, GL_FALSE, glm::value_ptr(m));
+}
