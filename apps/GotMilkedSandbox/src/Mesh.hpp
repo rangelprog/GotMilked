@@ -12,17 +12,27 @@ public:
   Mesh(Mesh &&other) noexcept;
   Mesh &operator=(Mesh &&other) noexcept;
 
-  // 3 floats pro Vertex (x,y,z)
+  // Position-only (3 floats/vertex)
   static Mesh fromPositions(const std::vector<float> &positions);
-  static Mesh fromIndexed(const std::vector<float> &positions, const std::vector<unsigned int> &indices);
+
+  // Position-only + Indizes
+  static Mesh fromIndexed(const std::vector<float> &positions,
+                          const std::vector<unsigned int> &indices);
+
+  // Position + UV (separate arrays) + Indizes
+  // positions: 3 floats/vertex, uvs: 2 floats/vertex
+  static Mesh fromIndexedPUV(const std::vector<float> &positions,
+                             const std::vector<float> &uvs,
+                             const std::vector<unsigned int> &indices);
 
   void draw() const;
 
 private:
   GLuint m_vao{0};
   GLuint m_vbo{0};
-  GLuint m_ebo{0};          // optional (nur bei indexed)
-  GLsizei m_vertexCount{0}; // für drawArrays
-  GLsizei m_indexCount{0};  // für drawElements
+  GLuint m_ebo{0};
+  GLsizei m_vertexCount{0}; // drawArrays
+  GLsizei m_indexCount{0};  // drawElements
   bool m_indexed{false};
+  bool m_hasUV{false};
 };

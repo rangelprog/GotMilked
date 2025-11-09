@@ -14,19 +14,8 @@
 #include "Camera.hpp"
 #include "Mesh.hpp"
 #include "Shader.hpp"
+#include "Texture.hpp"
 #include "Transform.hpp"
-
-// helpers
-static void setVSync(bool on) { glfwSwapInterval(on ? 1 : 0); }
-static const char *boolStr(bool v) { return v ? "ON" : "OFF"; }
-
-// FOV state for scroll callback
-struct FovState {
-  static float &ref() {
-    static float fov = 60.0f;
-    return fov;
-  }
-};
 
 const char *NAME{"GotMilked:"};
 
@@ -34,9 +23,20 @@ const char *NAME{"GotMilked:"};
 #error GM_ASSETS_DIR must be defined (see CMakeLists.txt)
 #endif
 
+// helpers
 static void error_callback(int code, const char *desc) {
   std::fprintf(stderr, "%s GLFW error %d: %s\n", NAME, code, desc);
 }
+static void setVSync(bool on) { glfwSwapInterval(on ? 1 : 0); }
+static const char *boolStr(bool v) { return v ? "ON" : "OFF"; }
+
+// FOV store for scroll callback
+struct FovState {
+  static float &ref() {
+    static float fov = 60.0f;
+    return fov;
+  }
+};
 
 int main() {
   glfwSetErrorCallback(error_callback);
@@ -71,7 +71,6 @@ int main() {
   bool vsyncOn = true;
   setVSync(vsyncOn);
 
-  // Scroll -> FOV (30..100°)
   glfwSetScrollCallback(window, [](GLFWwindow *, double, double yoff) {
     float &fov = FovState::ref();
     fov -= static_cast<float>(yoff) * 2.0f;
@@ -83,20 +82,6 @@ int main() {
 
   glEnable(GL_DEPTH_TEST);
 
-  // geometry
-  std::vector<float> triVerts = {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f,
-                                 0.0f,  0.0f,  0.5f, 0.0f};
-  Mesh tri = Mesh::fromPositions(triVerts);
-
-  std::vector<float> quadVerts = {
-      -0.5f, -0.5f, 0.0f, // 0
-      0.5f,  -0.5f, 0.0f, // 1
-      0.5f,  0.5f,  0.0f, // 2
-      -0.5f, 0.5f,  0.0f  // 3
-  };
-  std::vector<unsigned int> quadIdx = {0, 1, 2, 2, 3, 0};
-  Mesh quad = Mesh::fromIndexed(quadVerts, quadIdx);
-
   // shader
   const std::string shaderDir = std::string(GM_ASSETS_DIR) + "/shaders";
   Shader shader;
@@ -106,12 +91,41 @@ int main() {
     return 1;
   }
 
+  // meshes
+  // triangle (positions only)
+  std::vector<float> triVerts = {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f,
+                                 0.0f,  0.0f,  0.5f, 0.0f};
+  Mesh tri = Mesh::fromPositions(triVerts);
+
+  // textured quad (positions + uvs + indices)
+  std::vector<float> quadPos = {
+      -0.5f, -0.5f, 0.0f, // 0
+      0.5f,  -0.5f, 0.0f, // 1
+      0.5f,  0.5f,  0.0f, // 2
+      -0.5f, 0.5f,  0.0f  // 3
+  };
+  std::vector<float> quadUV = {
+      0.0f, 0.0f, // 0
+      1.0f, 0.0f, // 1
+      1.0f, 1.0f, // 2
+      0.0f, 1.0f  // 3
+  };
+  std::vector<unsigned int> quadIdx = {0, 1, 2, 2, 3, 0};
+  Mesh quad = Mesh::fromIndexedPUV(quadPos, quadUV, quadIdx);
+
+  // checker texture
+  Texture checker = Texture::makeChecker(256, 256, 16);
+
+  // static uniforms
+  shader.use();
+  shader.setInt("uTex", 0); // sampler unit
+
   // camera & input
-  Camera cam; // (0,0,2), yaw=-90, pitch=0
+  Camera cam;
   float mouseSensitivity = 0.12f;
   bool mouseCaptured = false, firstCapture = true;
-  double lastMouseX = 0.0, lastMouseY = 0.0;
   bool wireframe = false;
+  double lastMouseX = 0.0, lastMouseY = 0.0;
 
   // timing / fps
   double lastTime = glfwGetTime();
@@ -119,8 +133,8 @@ int main() {
   int frames = 0;
 
   while (!glfwWindowShouldClose(window)) {
-    double now = glfwGetTime();
-    float dt = static_cast<float>(now - lastTime);
+    const double now = glfwGetTime();
+    const float dt = static_cast<float>(now - lastTime);
     lastTime = now;
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
@@ -147,15 +161,15 @@ int main() {
         lastMouseY = my;
         firstCapture = false;
       }
-      double dx = mx - lastMouseX;
-      double dy = lastMouseY - my; // invert Y
+      const double dx = mx - lastMouseX;
+      const double dy = lastMouseY - my;
       lastMouseX = mx;
       lastMouseY = my;
       cam.addYawPitch(static_cast<float>(dx) * mouseSensitivity,
                       static_cast<float>(dy) * mouseSensitivity);
     }
 
-    // movement (+Shift boost)
+    // movement + speed boost
     float baseSpeed = 3.0f;
     float speedMul =
         (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) ? 4.0f : 1.0f;
@@ -173,7 +187,7 @@ int main() {
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
       cam.moveDown(step);
 
-    // toggles: F (wireframe), V (vsync)
+    // toggles: F(wireframe), V(vsync)
     {
       static bool prevF = false, prevV = false;
       bool fNow = (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS);
@@ -200,7 +214,6 @@ int main() {
     glClearColor(0.10f, 0.10f, 0.12f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // matrices
     const float aspect = static_cast<float>(fbw) / static_cast<float>(fbh);
     const float fovNow = FovState::ref();
     const glm::mat4 proj =
@@ -212,25 +225,29 @@ int main() {
 
     shader.use();
 
-    // A) rotierendes Dreieck
+    // A) untexturiertes Dreieck
     {
       Transform A;
       A.rotationDeg.z = t * 45.0f;
       shader.setMat4("uMVP", viewProj * A.toMat4());
+      shader.setInt("uUseTex", 0);
       tri.draw();
     }
 
-    // B) Quad rechts, kleiner, gegenläufig
+    // B) texturiertes Quad (Checker)
     {
       Transform B;
       B.position = {1.2f, 0.0f, 0.0f};
-      B.rotationDeg.z = -t * 60.0f;
       B.scale = {0.8f, 0.8f, 0.8f};
+      B.rotationDeg.z = -t * 60.0f;
+
+      checker.bind(0);
       shader.setMat4("uMVP", viewProj * B.toMat4());
+      shader.setInt("uUseTex", 1);
       quad.draw();
     }
 
-    // FPS im Fenstertitel
+    // fps title
     frames++;
     if (now - lastTitle >= 0.5) {
       double fps = frames / (now - lastTitle);

@@ -16,9 +16,6 @@
     <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\Texture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\stb_image_impl.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\CMakeLists.txt" />
