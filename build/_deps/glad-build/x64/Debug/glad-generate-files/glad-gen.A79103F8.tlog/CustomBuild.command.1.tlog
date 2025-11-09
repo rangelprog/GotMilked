@@ -1,0 +1,32 @@
+^C:\USERS\TMEIN\DOCUMENTS\GITHUB\GOTMILKED\BUILD\CMAKEFILES\804726BAA813A8BD9D77A2892F46ADC2\GLAD.H.RULE
+setlocal
+cd C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-src
+if %errorlevel% neq 0 goto :cmEnd
+C:
+if %errorlevel% neq 0 goto :cmEnd
+C:\Users\tmein\AppData\Local\Programs\Python\Python313\python.exe -m glad --profile=compatibility --out-path=C:/Users/tmein/Documents/GitHub/GotMilked/build/_deps/glad-build --api= --generator=c --extensions= --spec=gl
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\TMEIN\DOCUMENTS\GITHUB\GOTMILKED\BUILD\CMAKEFILES\734566F9019524EE6E1E4FB6BB941879\GLAD-GENERATE-FILES.RULE
+setlocal
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
+^C:\USERS\TMEIN\DOCUMENTS\GITHUB\GOTMILKED\BUILD\_DEPS\GLAD-SRC\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/tmein/Documents/GitHub/GotMilked -BC:/Users/tmein/Documents/GitHub/GotMilked/build --check-stamp-file C:/Users/tmein/Documents/GitHub/GotMilked/build/_deps/glad-build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

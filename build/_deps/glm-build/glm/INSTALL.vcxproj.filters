@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\tmein\Documents\GitHub\GotMilked\build\CMakeFiles\180706589c84a7123433d045cb2096f2\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{5F022802-869C-3E3C-8CD1-C2FB88498C92}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
