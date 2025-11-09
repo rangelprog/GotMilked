@@ -1,0 +1,18 @@
+# Build/IDE
+build/
+x64/
+.vs/
+*.obj
+*.pdb
+*.ilk
+*.tlog
+*.log
+*.exe
+*.lib
+*.dll
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.vcxproj*
