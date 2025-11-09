@@ -1,7 +1,5 @@
 #include <cmath>
 #include <cstdio>
-#include <fstream>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -14,15 +12,15 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "Camera.hpp"
-#include "Shader.hpp"
 #include "Mesh.hpp"
+#include "Shader.hpp"
 #include "Transform.hpp"
 
-// --- helpers (add after includes) ---
+// helpers
 static void setVSync(bool on) { glfwSwapInterval(on ? 1 : 0); }
 static const char *boolStr(bool v) { return v ? "ON" : "OFF"; }
 
-// store FOV in a static for the scroll callback
+// FOV state for scroll callback
 struct FovState {
   static float &ref() {
     static float fov = 60.0f;
@@ -73,26 +71,23 @@ int main() {
   bool vsyncOn = true;
   setVSync(vsyncOn);
 
-  // Mausrad -> FOV (30..100 Grad)
+  // Scroll -> FOV (30..100°)
   glfwSetScrollCallback(window, [](GLFWwindow *, double, double yoff) {
     float &fov = FovState::ref();
-    fov -= static_cast<float>(yoff) * 2.0f; // Wheel up = zoom in
+    fov -= static_cast<float>(yoff) * 2.0f;
     if (fov < 30.0f)
       fov = 30.0f;
     if (fov > 100.0f)
       fov = 100.0f;
   });
 
-  glfwSwapInterval(1);
   glEnable(GL_DEPTH_TEST);
 
   // geometry
   std::vector<float> triVerts = {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f,
                                  0.0f,  0.0f,  0.5f, 0.0f};
-
   Mesh tri = Mesh::fromPositions(triVerts);
 
-  // Quad mit Indizes (2 Dreiecke), 4 eindeutige Vertices
   std::vector<float> quadVerts = {
       -0.5f, -0.5f, 0.0f, // 0
       0.5f,  -0.5f, 0.0f, // 1
@@ -111,9 +106,8 @@ int main() {
     return 1;
   }
 
-  // camera
+  // camera & input
   Camera cam; // (0,0,2), yaw=-90, pitch=0
-  float camSpeed = 3.0f;
   float mouseSensitivity = 0.12f;
   bool mouseCaptured = false, firstCapture = true;
   double lastMouseX = 0.0, lastMouseY = 0.0;
@@ -125,14 +119,14 @@ int main() {
   int frames = 0;
 
   while (!glfwWindowShouldClose(window)) {
-    const double now = glfwGetTime();
-    const float dt = static_cast<float>(now - lastTime);
+    double now = glfwGetTime();
+    float dt = static_cast<float>(now - lastTime);
     lastTime = now;
 
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
       glfwSetWindowShouldClose(window, 1);
 
-    // RMB toggles cursor capture
+    // RMB capture toggle
     if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
       if (!mouseCaptured) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -153,20 +147,19 @@ int main() {
         lastMouseY = my;
         firstCapture = false;
       }
-      const double dx = mx - lastMouseX;
-      const double dy = lastMouseY - my; // invert Y
+      double dx = mx - lastMouseX;
+      double dy = lastMouseY - my; // invert Y
       lastMouseX = mx;
       lastMouseY = my;
       cam.addYawPitch(static_cast<float>(dx) * mouseSensitivity,
                       static_cast<float>(dy) * mouseSensitivity);
     }
 
-    // movement with speed-boost (Shift = schneller)
+    // movement (+Shift boost)
     float baseSpeed = 3.0f;
     float speedMul =
         (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) ? 4.0f : 1.0f;
     float step = baseSpeed * speedMul * dt;
-
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
       cam.moveForward(step);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -180,12 +173,11 @@ int main() {
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
       cam.moveDown(step);
 
-    // edge-trigger toggles
+    // toggles: F (wireframe), V (vsync)
     {
       static bool prevF = false, prevV = false;
       bool fNow = (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS);
       bool vNow = (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS);
-
       if (fNow && !prevF) {
         wireframe = !wireframe;
         glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
@@ -208,43 +200,42 @@ int main() {
     glClearColor(0.10f, 0.10f, 0.12f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    shader.use();
-
-    // View/Projection einmal
+    // matrices
     const float aspect = static_cast<float>(fbw) / static_cast<float>(fbh);
     const float fovNow = FovState::ref();
-    const glm::mat4 proj = glm::perspective(glm::radians(fovNow), aspect, 0.1f, 100.0f);
+    const glm::mat4 proj =
+        glm::perspective(glm::radians(fovNow), aspect, 0.1f, 100.0f);
     const glm::mat4 view = cam.view();
     const glm::mat4 viewProj = proj * view;
 
-    const float t = static_cast<float>(glfwGetTime());
+    const float t = static_cast<float>(now);
 
-    // Objekt A: drehendes Dreieck (fromPositions)
+    shader.use();
+
+    // A) rotierendes Dreieck
     {
       Transform A;
       A.rotationDeg.z = t * 45.0f;
-      const glm::mat4 mvpA = viewProj * A.toMat4();
-      shader.setMat4("uMVP", mvpA);
+      shader.setMat4("uMVP", viewProj * A.toMat4());
       tri.draw();
     }
 
-    // Objekt B: rechts versetztes, kleineres Quad (fromIndexed)
+    // B) Quad rechts, kleiner, gegenläufig
     {
       Transform B;
       B.position = {1.2f, 0.0f, 0.0f};
       B.rotationDeg.z = -t * 60.0f;
       B.scale = {0.8f, 0.8f, 0.8f};
-      const glm::mat4 mvpB = viewProj * B.toMat4();
-      shader.setMat4("uMVP", mvpB);
+      shader.setMat4("uMVP", viewProj * B.toMat4());
       quad.draw();
     }
 
+    // FPS im Fenstertitel
     frames++;
     if (now - lastTitle >= 0.5) {
       double fps = frames / (now - lastTitle);
       lastTitle = now;
       frames = 0;
-
       char title[160];
       std::snprintf(title, sizeof(title),
                     "GotMilked  |  FPS: %.1f  |  VSync: %s  |  Wireframe: %s  "

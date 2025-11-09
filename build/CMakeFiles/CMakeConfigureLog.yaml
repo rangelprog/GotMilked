@@ -49,6 +49,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
@@ -75,7 +76,7 @@ events:
       The output was:
       0
       MSBuild version 17.14.14+a129329f1 for .NET Framework
-      Build started 08/11/2025 20:35:09.
+      Build started 09/11/2025 19:47:45.
       
       Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\4.2.0-rc2\\CompilerIdCXX\\CompilerIdCXX.vcxproj" on node 1 (default targets).
       PrepareForBuild:
@@ -104,7 +105,7 @@ events:
           0 Warning(s)
           0 Error(s)
       
-      Time Elapsed 00:00:00.78
+      Time Elapsed 00:00:00.58
       
       
       Compilation of the CXX compiler identification source "CMakeCXXCompilerId.cpp" produced "CompilerIdCXX.exe"
@@ -151,6 +152,7 @@ events:
       - "C:/Program Files/nodejs/"
       - "C:/Program Files/Git/cmd/"
       - "C:/Program Files/CMake/bin/"
+      - "C:/Program Files/GitHub CLI/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/"
       - "C:/Users/tmein/AppData/Local/Microsoft/WindowsApps/"
@@ -179,6 +181,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
@@ -226,6 +229,7 @@ events:
       - "C:/Program Files/nodejs/"
       - "C:/Program Files/Git/cmd/"
       - "C:/Program Files/CMake/bin/"
+      - "C:/Program Files/GitHub CLI/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/"
       - "C:/Users/tmein/AppData/Local/Microsoft/WindowsApps/"
@@ -281,6 +285,9 @@ events:
       - "C:/Program Files/CMake/bin/lld-link.com"
       - "C:/Program Files/CMake/bin/lld-link.exe"
       - "C:/Program Files/CMake/bin/lld-link"
+      - "C:/Program Files/GitHub CLI/lld-link.com"
+      - "C:/Program Files/GitHub CLI/lld-link.exe"
+      - "C:/Program Files/GitHub CLI/lld-link"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/lld-link.com"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/lld-link.exe"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/lld-link"
@@ -325,6 +332,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
@@ -370,6 +378,7 @@ events:
       - "C:/Program Files/nodejs/"
       - "C:/Program Files/Git/cmd/"
       - "C:/Program Files/CMake/bin/"
+      - "C:/Program Files/GitHub CLI/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/"
       - "C:/Users/tmein/AppData/Local/Microsoft/WindowsApps/"
@@ -398,6 +407,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
@@ -443,6 +453,7 @@ events:
       - "C:/Program Files/nodejs/"
       - "C:/Program Files/Git/cmd/"
       - "C:/Program Files/CMake/bin/"
+      - "C:/Program Files/GitHub CLI/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/"
       - "C:/Users/tmein/AppData/Local/Microsoft/WindowsApps/"
@@ -498,6 +509,9 @@ events:
       - "C:/Program Files/CMake/bin/mt.com"
       - "C:/Program Files/CMake/bin/mt.exe"
       - "C:/Program Files/CMake/bin/mt"
+      - "C:/Program Files/GitHub CLI/mt.com"
+      - "C:/Program Files/GitHub CLI/mt.exe"
+      - "C:/Program Files/GitHub CLI/mt"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/mt.com"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/mt.exe"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/mt"
@@ -542,6 +556,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
@@ -587,6 +602,7 @@ events:
       - "C:/Program Files/nodejs/"
       - "C:/Program Files/Git/cmd/"
       - "C:/Program Files/CMake/bin/"
+      - "C:/Program Files/GitHub CLI/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/"
       - "C:/Users/tmein/AppData/Local/Microsoft/WindowsApps/"
@@ -615,6 +631,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
@@ -662,6 +679,7 @@ events:
       - "C:/Program Files/nodejs/"
       - "C:/Program Files/Git/cmd/"
       - "C:/Program Files/CMake/bin/"
+      - "C:/Program Files/GitHub CLI/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/"
       - "C:/Users/tmein/AppData/Local/Microsoft/WindowsApps/"
@@ -726,6 +744,9 @@ events:
       - "C:/Program Files/CMake/bin/rc.com"
       - "C:/Program Files/CMake/bin/rc.exe"
       - "C:/Program Files/CMake/bin/rc"
+      - "C:/Program Files/GitHub CLI/rc.com"
+      - "C:/Program Files/GitHub CLI/rc.exe"
+      - "C:/Program Files/GitHub CLI/rc"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/rc.com"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/rc.exe"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/rc"
@@ -806,6 +827,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
@@ -831,8 +853,8 @@ events:
     checks:
       - "Detecting CXX compiler ABI info"
     directories:
-      source: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-3dmijz"
-      binary: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-3dmijz"
+      source: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-3o68or"
+      binary: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-3o68or"
     cmakeVariables:
       CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
       CMAKE_CXX_FLAGS_DEBUG: "/Ob0 /Od"
@@ -842,33 +864,33 @@ events:
       variable: "CMAKE_CXX_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-3dmijz'
+        Change Dir: 'C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-3o68or'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_e40e8.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_f9226.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
         MSBuild version 17.14.14+a129329f1 for .NET Framework
-        Build started 08/11/2025 20:35:10.
+        Build started 09/11/2025 19:47:46.
         
-        Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-3dmijz\\cmTC_e40e8.vcxproj" on node 1 (default targets).
+        Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-3o68or\\cmTC_f9226.vcxproj" on node 1 (default targets).
         PrepareForBuild:
           Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
-          Creating directory "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-3dmijz\\Debug\\".
-          Creating directory "cmTC_e40e8.dir\\Debug\\cmTC_e40e8.tlog\\".
+          Creating directory "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-3o68or\\Debug\\".
+          Creating directory "cmTC_f9226.dir\\Debug\\cmTC_f9226.tlog\\".
         InitializeBuildStatus:
-          Creating "cmTC_e40e8.dir\\Debug\\cmTC_e40e8.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
-          Touching "cmTC_e40e8.dir\\Debug\\cmTC_e40e8.tlog\\unsuccessfulbuild".
+          Creating "cmTC_f9226.dir\\Debug\\cmTC_f9226.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_f9226.dir\\Debug\\cmTC_f9226.tlog\\unsuccessfulbuild".
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /Fo"cmTC_e40e8.dir\\Debug\\\\" /Fd"cmTC_e40e8.dir\\Debug\\vc143.pdb" /external:W1 /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCXXCompilerABI.cpp"
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /Fo"cmTC_f9226.dir\\Debug\\\\" /Fd"cmTC_f9226.dir\\Debug\\vc143.pdb" /external:W1 /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCXXCompilerABI.cpp"
           Microsoft (R) C/C++ Optimizing Compiler Version 19.44.35211 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /Fo"cmTC_e40e8.dir\\Debug\\\\" /Fd"cmTC_e40e8.dir\\Debug\\vc143.pdb" /external:W1 /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCXXCompilerABI.cpp"
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /Fo"cmTC_f9226.dir\\Debug\\\\" /Fd"cmTC_f9226.dir\\Debug\\vc143.pdb" /external:W1 /TP /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCXXCompilerABI.cpp"
           CMakeCXXCompilerABI.cpp
         Link:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-3dmijz\\Debug\\cmTC_e40e8.exe" /INCREMENTAL /ILK:"cmTC_e40e8.dir\\Debug\\cmTC_e40e8.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-3dmijz/Debug/cmTC_e40e8.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-3dmijz/Debug/cmTC_e40e8.lib" /MACHINE:X64 cmTC_e40e8.dir\\Debug\\CMakeCXXCompilerABI.obj
-          cmTC_e40e8.vcxproj -> C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-3dmijz\\Debug\\cmTC_e40e8.exe
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-3o68or\\Debug\\cmTC_f9226.exe" /INCREMENTAL /ILK:"cmTC_f9226.dir\\Debug\\cmTC_f9226.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-3o68or/Debug/cmTC_f9226.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-3o68or/Debug/cmTC_f9226.lib" /MACHINE:X64 cmTC_f9226.dir\\Debug\\CMakeCXXCompilerABI.obj
+          cmTC_f9226.vcxproj -> C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-3o68or\\Debug\\cmTC_f9226.exe
         FinalizeBuildStatus:
-          Deleting file "cmTC_e40e8.dir\\Debug\\cmTC_e40e8.tlog\\unsuccessfulbuild".
-          Touching "cmTC_e40e8.dir\\Debug\\cmTC_e40e8.tlog\\cmTC_e40e8.lastbuildstate".
-        Done Building Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-3dmijz\\cmTC_e40e8.vcxproj" (default targets).
+          Deleting file "cmTC_f9226.dir\\Debug\\cmTC_f9226.tlog\\unsuccessfulbuild".
+          Touching "cmTC_f9226.dir\\Debug\\cmTC_f9226.tlog\\cmTC_f9226.lastbuildstate".
+        Done Building Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-3o68or\\cmTC_f9226.vcxproj" (default targets).
         
         Build succeeded.
             0 Warning(s)
@@ -945,6 +967,7 @@ events:
       - "C:/Program Files/nodejs/"
       - "C:/Program Files/Git/cmd/"
       - "C:/Program Files/CMake/bin/"
+      - "C:/Program Files/GitHub CLI/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/"
       - "C:/Users/tmein/AppData/Local/Microsoft/WindowsApps/"
@@ -1010,6 +1033,9 @@ events:
       - "C:/Program Files/CMake/bin/git.cmd.com"
       - "C:/Program Files/CMake/bin/git.cmd.exe"
       - "C:/Program Files/CMake/bin/git.cmd"
+      - "C:/Program Files/GitHub CLI/git.cmd.com"
+      - "C:/Program Files/GitHub CLI/git.cmd.exe"
+      - "C:/Program Files/GitHub CLI/git.cmd"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/git.cmd.com"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/git.cmd.exe"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/git.cmd"
@@ -1130,6 +1156,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
@@ -1187,6 +1214,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
@@ -1219,7 +1247,7 @@ events:
       The output was:
       0
       MSBuild version 17.14.14+a129329f1 for .NET Framework
-      Build started 08/11/2025 20:35:14.
+      Build started 09/11/2025 19:47:50.
       
       Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\4.2.0-rc2\\CompilerIdC\\CompilerIdC.vcxproj" on node 1 (default targets).
       PrepareForBuild:
@@ -1248,7 +1276,7 @@ events:
           0 Warning(s)
           0 Error(s)
       
-      Time Elapsed 00:00:00.54
+      Time Elapsed 00:00:00.55
       
       
       Compilation of the C compiler identification source "CMakeCCompilerId.c" produced "CompilerIdC.exe"
@@ -1295,6 +1323,7 @@ events:
       - "C:/Program Files/nodejs/"
       - "C:/Program Files/Git/cmd/"
       - "C:/Program Files/CMake/bin/"
+      - "C:/Program Files/GitHub CLI/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/"
       - "C:/Users/tmein/AppData/Local/Microsoft/WindowsApps/"
@@ -1362,6 +1391,9 @@ events:
       - "C:/Program Files/CMake/bin/lld-link.com"
       - "C:/Program Files/CMake/bin/lld-link.exe"
       - "C:/Program Files/CMake/bin/lld-link"
+      - "C:/Program Files/GitHub CLI/lld-link.com"
+      - "C:/Program Files/GitHub CLI/lld-link.exe"
+      - "C:/Program Files/GitHub CLI/lld-link"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/lld-link.com"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/lld-link.exe"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/lld-link"
@@ -1442,6 +1474,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
@@ -1467,8 +1500,8 @@ events:
     checks:
       - "Detecting C compiler ABI info"
     directories:
-      source: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-mj9gry"
-      binary: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-mj9gry"
+      source: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-1w3bta"
+      binary: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-1w3bta"
     cmakeVariables:
       CMAKE_C_FLAGS: "/DWIN32 /D_WINDOWS"
       CMAKE_C_FLAGS_DEBUG: "/Ob0 /Od"
@@ -1477,39 +1510,39 @@ events:
       variable: "CMAKE_C_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-mj9gry'
+        Change Dir: 'C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-1w3bta'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_507c6.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_7e59e.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
         MSBuild version 17.14.14+a129329f1 for .NET Framework
-        Build started 08/11/2025 20:35:15.
+        Build started 09/11/2025 19:47:51.
         
-        Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-mj9gry\\cmTC_507c6.vcxproj" on node 1 (default targets).
+        Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1w3bta\\cmTC_7e59e.vcxproj" on node 1 (default targets).
         PrepareForBuild:
           Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
-          Creating directory "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-mj9gry\\Debug\\".
-          Creating directory "cmTC_507c6.dir\\Debug\\cmTC_507c6.tlog\\".
+          Creating directory "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1w3bta\\Debug\\".
+          Creating directory "cmTC_7e59e.dir\\Debug\\cmTC_7e59e.tlog\\".
         InitializeBuildStatus:
-          Creating "cmTC_507c6.dir\\Debug\\cmTC_507c6.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
-          Touching "cmTC_507c6.dir\\Debug\\cmTC_507c6.tlog\\unsuccessfulbuild".
+          Creating "cmTC_7e59e.dir\\Debug\\cmTC_7e59e.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_7e59e.dir\\Debug\\cmTC_7e59e.tlog\\unsuccessfulbuild".
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_507c6.dir\\Debug\\\\" /Fd"cmTC_507c6.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCCompilerABI.c"
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_7e59e.dir\\Debug\\\\" /Fd"cmTC_7e59e.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCCompilerABI.c"
           Microsoft (R) C/C++ Optimizing Compiler Version 19.44.35211 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_507c6.dir\\Debug\\\\" /Fd"cmTC_507c6.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCCompilerABI.c"
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_7e59e.dir\\Debug\\\\" /Fd"cmTC_7e59e.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Program Files\\CMake\\share\\cmake-4.2\\Modules\\CMakeCCompilerABI.c"
           CMakeCCompilerABI.c
         Link:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-mj9gry\\Debug\\cmTC_507c6.exe" /INCREMENTAL /ILK:"cmTC_507c6.dir\\Debug\\cmTC_507c6.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-mj9gry/Debug/cmTC_507c6.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-mj9gry/Debug/cmTC_507c6.lib" /MACHINE:X64 cmTC_507c6.dir\\Debug\\CMakeCCompilerABI.obj
-          cmTC_507c6.vcxproj -> C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-mj9gry\\Debug\\cmTC_507c6.exe
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1w3bta\\Debug\\cmTC_7e59e.exe" /INCREMENTAL /ILK:"cmTC_7e59e.dir\\Debug\\cmTC_7e59e.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-1w3bta/Debug/cmTC_7e59e.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-1w3bta/Debug/cmTC_7e59e.lib" /MACHINE:X64 cmTC_7e59e.dir\\Debug\\CMakeCCompilerABI.obj
+          cmTC_7e59e.vcxproj -> C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1w3bta\\Debug\\cmTC_7e59e.exe
         FinalizeBuildStatus:
-          Deleting file "cmTC_507c6.dir\\Debug\\cmTC_507c6.tlog\\unsuccessfulbuild".
-          Touching "cmTC_507c6.dir\\Debug\\cmTC_507c6.tlog\\cmTC_507c6.lastbuildstate".
-        Done Building Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-mj9gry\\cmTC_507c6.vcxproj" (default targets).
+          Deleting file "cmTC_7e59e.dir\\Debug\\cmTC_7e59e.tlog\\unsuccessfulbuild".
+          Touching "cmTC_7e59e.dir\\Debug\\cmTC_7e59e.tlog\\cmTC_7e59e.lastbuildstate".
+        Done Building Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1w3bta\\cmTC_7e59e.vcxproj" (default targets).
         
         Build succeeded.
             0 Warning(s)
             0 Error(s)
         
-        Time Elapsed 00:00:00.56
+        Time Elapsed 00:00:00.54
         
       exitCode: 0
   -
@@ -1551,8 +1584,8 @@ events:
     checks:
       - "Performing Test CMAKE_HAVE_LIBC_PTHREAD"
     directories:
-      source: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-vrn3fi"
-      binary: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-vrn3fi"
+      source: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-onpt3t"
+      binary: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-onpt3t"
     cmakeVariables:
       CMAKE_C_FLAGS: "/DWIN32 /D_WINDOWS"
       CMAKE_C_FLAGS_DEBUG: "/Ob0 /Od"
@@ -1562,34 +1595,34 @@ events:
       variable: "CMAKE_HAVE_LIBC_PTHREAD"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-vrn3fi'
+        Change Dir: 'C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-onpt3t'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_23eb0.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_e0c1d.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
         MSBuild version 17.14.14+a129329f1 for .NET Framework
-        Build started 08/11/2025 20:35:16.
+        Build started 09/11/2025 19:47:52.
         
-        Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-vrn3fi\\cmTC_23eb0.vcxproj" on node 1 (default targets).
+        Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-onpt3t\\cmTC_e0c1d.vcxproj" on node 1 (default targets).
         PrepareForBuild:
           Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
-          Creating directory "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-vrn3fi\\Debug\\".
-          Creating directory "cmTC_23eb0.dir\\Debug\\cmTC_23eb0.tlog\\".
+          Creating directory "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-onpt3t\\Debug\\".
+          Creating directory "cmTC_e0c1d.dir\\Debug\\cmTC_e0c1d.tlog\\".
         InitializeBuildStatus:
-          Creating "cmTC_23eb0.dir\\Debug\\cmTC_23eb0.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
-          Touching "cmTC_23eb0.dir\\Debug\\cmTC_23eb0.tlog\\unsuccessfulbuild".
+          Creating "cmTC_e0c1d.dir\\Debug\\cmTC_e0c1d.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_e0c1d.dir\\Debug\\cmTC_e0c1d.tlog\\unsuccessfulbuild".
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CMAKE_HAVE_LIBC_PTHREAD /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_23eb0.dir\\Debug\\\\" /Fd"cmTC_23eb0.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-vrn3fi\\src.c"
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CMAKE_HAVE_LIBC_PTHREAD /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_e0c1d.dir\\Debug\\\\" /Fd"cmTC_e0c1d.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-onpt3t\\src.c"
           Microsoft (R) C/C++ Optimizing Compiler Version 19.44.35211 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CMAKE_HAVE_LIBC_PTHREAD /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_23eb0.dir\\Debug\\\\" /Fd"cmTC_23eb0.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-vrn3fi\\src.c"
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CMAKE_HAVE_LIBC_PTHREAD /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_e0c1d.dir\\Debug\\\\" /Fd"cmTC_e0c1d.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-onpt3t\\src.c"
           src.c
-        C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-vrn3fi\\src.c(1,10): error C1083: Cannot open include file: 'pthread.h': No such file or directory [C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-vrn3fi\\cmTC_23eb0.vcxproj]
-        Done Building Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-vrn3fi\\cmTC_23eb0.vcxproj" (default targets) -- FAILED.
+        C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-onpt3t\\src.c(1,10): error C1083: Cannot open include file: 'pthread.h': No such file or directory [C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-onpt3t\\cmTC_e0c1d.vcxproj]
+        Done Building Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-onpt3t\\cmTC_e0c1d.vcxproj" (default targets) -- FAILED.
         
         Build FAILED.
         
-        "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-vrn3fi\\cmTC_23eb0.vcxproj" (default target) (1) ->
+        "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-onpt3t\\cmTC_e0c1d.vcxproj" (default target) (1) ->
         (ClCompile target) -> 
-          C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-vrn3fi\\src.c(1,10): error C1083: Cannot open include file: 'pthread.h': No such file or directory [C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-vrn3fi\\cmTC_23eb0.vcxproj]
+          C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-onpt3t\\src.c(1,10): error C1083: Cannot open include file: 'pthread.h': No such file or directory [C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-onpt3t\\cmTC_e0c1d.vcxproj]
         
             0 Warning(s)
             1 Error(s)
@@ -1607,8 +1640,8 @@ events:
     checks:
       - "Looking for pthread_create in pthreads"
     directories:
-      source: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-exiw32"
-      binary: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-exiw32"
+      source: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-u5rspq"
+      binary: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-u5rspq"
     cmakeVariables:
       CMAKE_C_FLAGS: "/DWIN32 /D_WINDOWS"
       CMAKE_C_FLAGS_DEBUG: "/Ob0 /Od"
@@ -1618,36 +1651,36 @@ events:
       variable: "CMAKE_HAVE_PTHREADS_CREATE"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-exiw32'
+        Change Dir: 'C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-u5rspq'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_95a23.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_e891d.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
         MSBuild version 17.14.14+a129329f1 for .NET Framework
-        Build started 08/11/2025 20:35:16.
+        Build started 09/11/2025 19:47:53.
         
-        Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-exiw32\\cmTC_95a23.vcxproj" on node 1 (default targets).
+        Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-u5rspq\\cmTC_e891d.vcxproj" on node 1 (default targets).
         PrepareForBuild:
           Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
-          Creating directory "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-exiw32\\Debug\\".
-          Creating directory "cmTC_95a23.dir\\Debug\\cmTC_95a23.tlog\\".
+          Creating directory "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-u5rspq\\Debug\\".
+          Creating directory "cmTC_e891d.dir\\Debug\\cmTC_e891d.tlog\\".
         InitializeBuildStatus:
-          Creating "cmTC_95a23.dir\\Debug\\cmTC_95a23.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
-          Touching "cmTC_95a23.dir\\Debug\\cmTC_95a23.tlog\\unsuccessfulbuild".
+          Creating "cmTC_e891d.dir\\Debug\\cmTC_e891d.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_e891d.dir\\Debug\\cmTC_e891d.tlog\\unsuccessfulbuild".
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_95a23.dir\\Debug\\\\" /Fd"cmTC_95a23.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-exiw32\\CheckFunctionExists.c"
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_e891d.dir\\Debug\\\\" /Fd"cmTC_e891d.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-u5rspq\\CheckFunctionExists.c"
           Microsoft (R) C/C++ Optimizing Compiler Version 19.44.35211 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_95a23.dir\\Debug\\\\" /Fd"cmTC_95a23.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-exiw32\\CheckFunctionExists.c"
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_e891d.dir\\Debug\\\\" /Fd"cmTC_e891d.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-u5rspq\\CheckFunctionExists.c"
           CheckFunctionExists.c
         Link:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-exiw32\\Debug\\cmTC_95a23.exe" /INCREMENTAL /ILK:"cmTC_95a23.dir\\Debug\\cmTC_95a23.ilk" /NOLOGO pthreads.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-exiw32/Debug/cmTC_95a23.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-exiw32/Debug/cmTC_95a23.lib" /MACHINE:X64 cmTC_95a23.dir\\Debug\\CheckFunctionExists.obj
-        LINK : fatal error LNK1104: cannot open file 'pthreads.lib' [C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-exiw32\\cmTC_95a23.vcxproj]
-        Done Building Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-exiw32\\cmTC_95a23.vcxproj" (default targets) -- FAILED.
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-u5rspq\\Debug\\cmTC_e891d.exe" /INCREMENTAL /ILK:"cmTC_e891d.dir\\Debug\\cmTC_e891d.ilk" /NOLOGO pthreads.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-u5rspq/Debug/cmTC_e891d.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-u5rspq/Debug/cmTC_e891d.lib" /MACHINE:X64 cmTC_e891d.dir\\Debug\\CheckFunctionExists.obj
+        LINK : fatal error LNK1104: cannot open file 'pthreads.lib' [C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-u5rspq\\cmTC_e891d.vcxproj]
+        Done Building Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-u5rspq\\cmTC_e891d.vcxproj" (default targets) -- FAILED.
         
         Build FAILED.
         
-        "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-exiw32\\cmTC_95a23.vcxproj" (default target) (1) ->
+        "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-u5rspq\\cmTC_e891d.vcxproj" (default target) (1) ->
         (Link target) -> 
-          LINK : fatal error LNK1104: cannot open file 'pthreads.lib' [C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-exiw32\\cmTC_95a23.vcxproj]
+          LINK : fatal error LNK1104: cannot open file 'pthreads.lib' [C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-u5rspq\\cmTC_e891d.vcxproj]
         
             0 Warning(s)
             1 Error(s)
@@ -1665,8 +1698,8 @@ events:
     checks:
       - "Looking for pthread_create in pthread"
     directories:
-      source: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-y4rths"
-      binary: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-y4rths"
+      source: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-2evl7a"
+      binary: "C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-2evl7a"
     cmakeVariables:
       CMAKE_C_FLAGS: "/DWIN32 /D_WINDOWS"
       CMAKE_C_FLAGS_DEBUG: "/Ob0 /Od"
@@ -1676,36 +1709,36 @@ events:
       variable: "CMAKE_HAVE_PTHREAD_CREATE"
       cached: true
       stdout: |
-        Change Dir: 'C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-y4rths'
+        Change Dir: 'C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-2evl7a'
         
-        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_47157.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        Run Build Command(s): "C:/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_75ff8.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
         MSBuild version 17.14.14+a129329f1 for .NET Framework
-        Build started 08/11/2025 20:35:17.
+        Build started 09/11/2025 19:47:53.
         
-        Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-y4rths\\cmTC_47157.vcxproj" on node 1 (default targets).
+        Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2evl7a\\cmTC_75ff8.vcxproj" on node 1 (default targets).
         PrepareForBuild:
           Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
-          Creating directory "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-y4rths\\Debug\\".
-          Creating directory "cmTC_47157.dir\\Debug\\cmTC_47157.tlog\\".
+          Creating directory "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2evl7a\\Debug\\".
+          Creating directory "cmTC_75ff8.dir\\Debug\\cmTC_75ff8.tlog\\".
         InitializeBuildStatus:
-          Creating "cmTC_47157.dir\\Debug\\cmTC_47157.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
-          Touching "cmTC_47157.dir\\Debug\\cmTC_47157.tlog\\unsuccessfulbuild".
+          Creating "cmTC_75ff8.dir\\Debug\\cmTC_75ff8.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_75ff8.dir\\Debug\\cmTC_75ff8.tlog\\unsuccessfulbuild".
         ClCompile:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_47157.dir\\Debug\\\\" /Fd"cmTC_47157.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-y4rths\\CheckFunctionExists.c"
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_75ff8.dir\\Debug\\\\" /Fd"cmTC_75ff8.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2evl7a\\CheckFunctionExists.c"
           Microsoft (R) C/C++ Optimizing Compiler Version 19.44.35211 for x64
           Copyright (C) Microsoft Corporation.  All rights reserved.
-          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_47157.dir\\Debug\\\\" /Fd"cmTC_47157.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-y4rths\\CheckFunctionExists.c"
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D CHECK_FUNCTION_EXISTS=pthread_create /D _MBCS /D "CMAKE_INTDIR=\\"Debug\\"" /RTC1 /MDd /Fo"cmTC_75ff8.dir\\Debug\\\\" /Fd"cmTC_75ff8.dir\\Debug\\vc143.pdb" /external:W1 /TC /errorReport:queue "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2evl7a\\CheckFunctionExists.c"
           CheckFunctionExists.c
         Link:
-          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-y4rths\\Debug\\cmTC_47157.exe" /INCREMENTAL /ILK:"cmTC_47157.dir\\Debug\\cmTC_47157.ilk" /NOLOGO pthread.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-y4rths/Debug/cmTC_47157.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-y4rths/Debug/cmTC_47157.lib" /MACHINE:X64 cmTC_47157.dir\\Debug\\CheckFunctionExists.obj
-        LINK : fatal error LNK1104: cannot open file 'pthread.lib' [C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-y4rths\\cmTC_47157.vcxproj]
-        Done Building Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-y4rths\\cmTC_47157.vcxproj" (default targets) -- FAILED.
+          C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\HostX64\\x64\\link.exe /OUT:"C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2evl7a\\Debug\\cmTC_75ff8.exe" /INCREMENTAL /ILK:"cmTC_75ff8.dir\\Debug\\cmTC_75ff8.ilk" /NOLOGO pthread.lib kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-2evl7a/Debug/cmTC_75ff8.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /IMPLIB:"C:/Users/tmein/Documents/GitHub/GotMilked/build/CMakeFiles/CMakeScratch/TryCompile-2evl7a/Debug/cmTC_75ff8.lib" /MACHINE:X64 cmTC_75ff8.dir\\Debug\\CheckFunctionExists.obj
+        LINK : fatal error LNK1104: cannot open file 'pthread.lib' [C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2evl7a\\cmTC_75ff8.vcxproj]
+        Done Building Project "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2evl7a\\cmTC_75ff8.vcxproj" (default targets) -- FAILED.
         
         Build FAILED.
         
-        "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-y4rths\\cmTC_47157.vcxproj" (default target) (1) ->
+        "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2evl7a\\cmTC_75ff8.vcxproj" (default target) (1) ->
         (Link target) -> 
-          LINK : fatal error LNK1104: cannot open file 'pthread.lib' [C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-y4rths\\cmTC_47157.vcxproj]
+          LINK : fatal error LNK1104: cannot open file 'pthread.lib' [C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build\\CMakeFiles\\CMakeScratch\\TryCompile-2evl7a\\cmTC_75ff8.vcxproj]
         
             0 Warning(s)
             1 Error(s)
@@ -1747,6 +1780,7 @@ events:
       - "C:/Program Files/nodejs/"
       - "C:/Program Files/Git/cmd/"
       - "C:/Program Files/CMake/bin/"
+      - "C:/Program Files/GitHub CLI/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/"
       - "C:/Users/tmein/AppData/Local/Microsoft/WindowsApps/"
@@ -1816,6 +1850,9 @@ events:
       - "C:/Program Files/CMake/bin/doxygen.com"
       - "C:/Program Files/CMake/bin/doxygen.exe"
       - "C:/Program Files/CMake/bin/doxygen"
+      - "C:/Program Files/GitHub CLI/doxygen.com"
+      - "C:/Program Files/GitHub CLI/doxygen.exe"
+      - "C:/Program Files/GitHub CLI/doxygen"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/doxygen.com"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/doxygen.exe"
       - "C:/Users/tmein/AppData/Local/Programs/Python/Python313/Scripts/doxygen"
@@ -1911,6 +1948,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
@@ -2135,6 +2173,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
@@ -2502,6 +2541,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
@@ -2568,6 +2608,7 @@ events:
         - "C:\\Program Files\\nodejs\\"
         - "C:\\Program Files\\Git\\cmd"
         - "C:\\Program Files\\CMake\\bin"
+        - "C:\\Program Files\\GitHub CLI\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\Scripts\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Programs\\Python\\Python313\\"
         - "C:\\Users\\tmein\\AppData\\Local\\Microsoft\\WindowsApps"
