@@ -1,7 +1,7 @@
 #pragma once
-#include <gm/Mesh.hpp>
-#include <gm/Texture.hpp>
-#include <gm/Transform.hpp>
+#include <gm/rendering/Mesh.hpp>
+#include <gm/rendering/Texture.hpp>
+#include <gm/scene/Transform.hpp>
 #include <glm/glm.hpp>
 
 namespace gm {

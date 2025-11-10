@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "GotMilkedEngine.dir\\Debug\\Mesh.obj",
+            "outputs": [
+                "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\src\\Debug\\GotMilkedEngine.pdb",
+                "GotMilkedEngine.dir\\Debug\\"
+            ],
+            "requires": []
+        }
+    ]
+}

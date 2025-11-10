@@ -10,12 +10,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "gm/Camera.hpp"
-#include "gm/Mesh.hpp"
-#include "gm/ObjLoader.hpp"
-#include "gm/Shader.hpp"
-#include "gm/Texture.hpp"
-#include "gm/Transform.hpp"
+#include "gm/rendering/Camera.hpp"
+#include "gm/rendering/Mesh.hpp"
+#include "gm/utils/ObjLoader.hpp"
+#include "gm/rendering/Shader.hpp"
+#include "gm/rendering/Texture.hpp"
+#include "gm/scene/Transform.hpp"
 
 // -----------------------------------------------------
 static void setVSync(bool on) { glfwSwapInterval(on ? 1 : 0); }
@@ -32,9 +32,6 @@ static void error_callback(int code, const char *desc) {
   std::fprintf(stderr, "GLFW error %d: %s\n", code, desc);
 }
 
-#ifndef GM_ASSETS_DIR
-#error GM_ASSETS_DIR must be defined (via CMake)
-#endif
 // -----------------------------------------------------
 
 int main() {

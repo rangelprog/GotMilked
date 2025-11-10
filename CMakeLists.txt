@@ -65,21 +65,38 @@ if (GM_BUILD_SANDBOX)
 endif()
 
 add_library(GotMilkedEngine
-    src/Camera.cpp
-    src/GameObject.cpp
-    src/Shader.cpp
-    src/Texture.cpp
-    src/Mesh.cpp
-    src/stb_image_impl.cpp
-    src/Scene.cpp
-    src/ObjLoader.cpp
-    src/ResourceManager.cpp
+    # Core systems
+    src/core/Time.cpp
+    src/core/Event.cpp
+
+    # Rendering systems
+    src/rendering/Camera.cpp
+    src/rendering/Shader.cpp
+    src/rendering/Texture.cpp
+    src/rendering/Mesh.cpp
+    src/rendering/stb_image_impl.cpp
+
+    # Scene management
+    src/scene/Scene.cpp
+    src/scene/GameObject.cpp
+
+    # Utils
+    src/utils/ObjLoader.cpp
+    src/utils/ResourceManager.cpp
 )
 
 target_include_directories(GotMilkedEngine 
     PUBLIC 
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/core
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/rendering
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/scene
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/utils
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/scene
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
 )
 target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm::glm)
