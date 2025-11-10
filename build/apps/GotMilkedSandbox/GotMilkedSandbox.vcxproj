@@ -373,6 +373,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\main.cpp" />
+    <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\Game.cpp" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>

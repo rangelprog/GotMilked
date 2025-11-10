@@ -1,5 +1,6 @@
 add_executable(GotMilkedSandbox
-    src/main.cpp
+  src/main.cpp
+  src/Game.cpp
 )
 
 set_target_properties(GotMilkedSandbox PROPERTIES OUTPUT_NAME "GotMilkedSandbox")

@@ -68,6 +68,7 @@ add_library(GotMilkedEngine
     # Core systems
     src/core/Time.cpp
     src/core/Event.cpp
+    src/core/input/InputSystem.cpp
 
     # Rendering systems
     src/rendering/Camera.cpp
