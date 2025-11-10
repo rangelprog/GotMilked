@@ -70,6 +70,7 @@ add_library(GotMilkedEngine
     src/Texture.cpp
     src/Mesh.cpp
     src/stb_image_impl.cpp
+    src/Scene.cpp
 )
 
 target_include_directories(GotMilkedEngine PUBLIC src)

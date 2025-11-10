@@ -33,6 +33,8 @@ public:
                              const std::vector<float> &uvs,
                              const std::vector<unsigned int> &indices);
 
+  static Mesh fromPNUV_Quad();
+
   void draw() const;
 
 private:

@@ -204,6 +204,51 @@ Mesh Mesh::fromIndexedPNU(const std::vector<float> &positions,
   return m;
 }
 
+Mesh Mesh::fromPNUV_Quad() {
+  const float n[3] = {0.0f, 0.0f, 1.0f};
+
+  std::vector<float> data = {// Px, Py, Pz,   Nx, Ny, Nz,   U, V
+                             -0.5f, -0.5f, 0.0f, n[0], n[1], n[2], 0.0f, 0.0f,
+                             0.5f,  -0.5f, 0.0f, n[0], n[1], n[2], 1.0f, 0.0f,
+                             0.5f,  0.5f,  0.0f, n[0], n[1], n[2], 1.0f, 1.0f,
+                             -0.5f, 0.5f,  0.0f, n[0], n[1], n[2], 0.0f, 1.0f};
+
+  std::vector<unsigned int> idx = {0, 1, 2, 2, 3, 0};
+
+  Mesh m;
+
+  glGenVertexArrays(1, &m.m_vao);
+  glBindVertexArray(m.m_vao);
+
+  glGenBuffers(1, &m.m_vbo);
+  glBindBuffer(GL_ARRAY_BUFFER, m.m_vbo);
+  glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), data.data(),
+               GL_STATIC_DRAW);
+
+  glGenBuffers(1, &m.m_ebo);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.m_ebo);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx.size() * sizeof(unsigned int),
+               idx.data(), GL_STATIC_DRAW);
+
+  const GLsizei stride = 8 * sizeof(float);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void *)0);
+
+  glEnableVertexAttribArray(1);
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride,
+                        (void *)(3 * sizeof(float)));
+
+  glEnableVertexAttribArray(2);
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride,
+                        (void *)(6 * sizeof(float)));
+
+  m.m_indexed = true;
+  m.m_indexCount = 6;
+
+  glBindVertexArray(0);
+  return m;
+}
+
 void Mesh::draw() const {
   glBindVertexArray(m_vao);
   if (m_indexed) {
