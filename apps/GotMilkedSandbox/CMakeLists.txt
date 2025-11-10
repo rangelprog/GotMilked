@@ -1,16 +1,10 @@
 add_executable(GotMilkedSandbox
     src/main.cpp
-    src/Camera.cpp
-    src/Shader.cpp
-    src/Texture.cpp
-    src/stb_image_impl.cpp
-    src/Mesh.cpp
-
 )
 
 set_target_properties(GotMilkedSandbox PROPERTIES OUTPUT_NAME "GotMilkedSandbox")
 gm_apply_warnings(GotMilkedSandbox)
-target_link_libraries(GotMilkedSandbox PRIVATE glfw glad glm::glm)
+target_link_libraries(GotMilkedSandbox PRIVATE GotMilkedEngine)
 
 if (APPLE)
   find_library(COCOA_LIBRARY Cocoa REQUIRED)

@@ -63,3 +63,14 @@ FetchContent_MakeAvailable(glm)
 if (GM_BUILD_SANDBOX)
     add_subdirectory(apps/GotMilkedSandbox)
 endif()
+
+add_library(GotMilkedEngine
+    src/Camera.cpp
+    src/Shader.cpp
+    src/Texture.cpp
+    src/Mesh.cpp
+    src/stb_image_impl.cpp
+)
+
+target_include_directories(GotMilkedEngine PUBLIC src)
+target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm)
