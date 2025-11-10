@@ -12,37 +12,24 @@ public:
   Mesh(Mesh &&other) noexcept;
   Mesh &operator=(Mesh &&other) noexcept;
 
-  // Position-only (3 floats/vertex)
+  // schon vorhanden:
   static Mesh fromPositions(const std::vector<float> &positions);
-
-  // Position-only + Indizes
   static Mesh fromIndexed(const std::vector<float> &positions,
                           const std::vector<unsigned int> &indices);
 
-  // Position + UV (separate arrays) + Indizes
-  // positions: 3 floats/vertex, uvs: 2 floats/vertex
-  static Mesh fromIndexedPUV(const std::vector<float> &positions,
-                             const std::vector<float> &uvs,
-                             const std::vector<unsigned int> &indices);
-
-  // ... dein Header oben bleibt gleich ...
-  // Position + Normal + UV (separate Arrays) + Indizes
-  // positions: 3 floats/vertex, normals: 3 floats/vertex, uvs: 2 floats/vertex
-  static Mesh fromIndexedPNU(const std::vector<float> &positions,
-                             const std::vector<float> &normals,
-                             const std::vector<float> &uvs,
-                             const std::vector<unsigned int> &indices);
-
-  static Mesh fromPNUV_Quad();
+  // >>> NEU: P/N/UV (8 floats pro Vertex: Px Py Pz Nx Ny Nz U V)
+  static Mesh
+  fromPNUV(const std::vector<float> &interleavedPNUV); // non-indexed
+  static Mesh fromIndexedPNUV(const std::vector<float> &interleavedPNUV,
+                              const std::vector<unsigned int> &indices);
 
   void draw() const;
 
 private:
   GLuint m_vao{0};
   GLuint m_vbo{0};
-  GLuint m_ebo{0};
-  GLsizei m_vertexCount{0}; // drawArrays
-  GLsizei m_indexCount{0};  // drawElements
+  GLuint m_ebo{0};          // optional
+  GLsizei m_vertexCount{0}; // für drawArrays
+  GLsizei m_indexCount{0};  // für drawElements
   bool m_indexed{false};
-  bool m_hasUV{false};
 };

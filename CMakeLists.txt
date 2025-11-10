@@ -71,7 +71,8 @@ add_library(GotMilkedEngine
     src/Mesh.cpp
     src/stb_image_impl.cpp
     src/Scene.cpp
+    src/ObjLoader.cpp
 )
 
 target_include_directories(GotMilkedEngine PUBLIC src)
-target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm)
+target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm::glm)
