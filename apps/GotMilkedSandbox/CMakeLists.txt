@@ -2,8 +2,10 @@ add_executable(GotMilkedSandbox
     src/main.cpp
     src/Camera.cpp
     src/Shader.cpp
-    src/Mesh.cpp
     src/Texture.cpp
+    src/stb_image_impl.cpp
+    src/Mesh.cpp
+
 )
 
 set_target_properties(GotMilkedSandbox PROPERTIES OUTPUT_NAME "GotMilkedSandbox")

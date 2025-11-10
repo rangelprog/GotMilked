@@ -4,7 +4,7 @@ cd C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-src
 if %errorlevel% neq 0 goto :cmEnd
 C:
 if %errorlevel% neq 0 goto :cmEnd
-C:\Users\tmein\AppData\Local\Programs\Python\Python313\python.exe -m glad --profile=core --out-path=C:/Users/tmein/Documents/GitHub/GotMilked/build/_deps/glad-build --api=gl=4.6 --generator=c --extensions= --spec=gl
+C:\Users\tmein\AppData\Local\Programs\Python\Python313\python.exe -m glad --profile=compatibility --out-path=C:/Users/tmein/Documents/GitHub/GotMilked/build/_deps/glad-build --api= --generator=c --extensions= --spec=gl
 if %errorlevel% neq 0 goto :cmEnd
 :cmEnd
 endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone

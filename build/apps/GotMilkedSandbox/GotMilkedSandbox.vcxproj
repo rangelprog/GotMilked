@@ -375,8 +375,9 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\main.cpp" />
     <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\Camera.cpp" />
     <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\Shader.cpp" />
-    <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\Mesh.cpp" />
     <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\Texture.cpp" />
+    <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\stb_image_impl.cpp" />
+    <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\Mesh.cpp" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>

@@ -303,8 +303,8 @@
             "c:\\users\\tmein\\documents\\github\\gotmilked\\build\\_deps\\glm-src\\glm\\ext\\vector_uint1_sized.hpp",
             "c:\\users\\tmein\\documents\\github\\gotmilked\\build\\_deps\\glm-src\\glm\\gtc\\type_ptr.inl",
             "c:\\users\\tmein\\documents\\github\\gotmilked\\apps\\gotmilkedsandbox\\src\\camera.hpp",
-            "c:\\users\\tmein\\documents\\github\\gotmilked\\apps\\gotmilkedsandbox\\src\\mesh.hpp",
             "c:\\users\\tmein\\documents\\github\\gotmilked\\apps\\gotmilkedsandbox\\src\\shader.hpp",
+            "c:\\users\\tmein\\documents\\github\\gotmilked\\apps\\gotmilkedsandbox\\src\\texture.hpp",
             "c:\\users\\tmein\\documents\\github\\gotmilked\\apps\\gotmilkedsandbox\\src\\transform.hpp"
         ],
         "ImportedModules": [],

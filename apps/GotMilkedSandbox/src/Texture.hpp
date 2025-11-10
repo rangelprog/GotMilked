@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <glad/glad.h>
+#include <string>
 #include <vector>
 
 class Texture {
@@ -25,6 +26,9 @@ public:
 
   // Procedural checkerboard helper
   static Texture makeChecker(int w = 256, int h = 256, int cell = 16);
+
+  // ==== Choice B: abort on failure ====
+  static Texture loadOrDie(const std::string &path, bool flipY = true);
 
 private:
   GLuint m_id{0};

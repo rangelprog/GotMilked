@@ -1,5 +1,12 @@
 #include "Texture.hpp"
 #include <cstdio>
+#include <cstdlib>
+#include <cstring> // für std::memcpy
+#include <string>
+#include <vector>
+
+// KEINE STB-DEFINES HIER (kein STB_IMAGE_IMPLEMENTATION, kein STBI_NO_STDIO)
+#include "stb_image.h"
 
 Texture::~Texture() {
   if (m_id)
@@ -24,7 +31,8 @@ bool Texture::createRGBA8(int width, int height,
                           const std::vector<std::uint8_t> &pixels,
                           bool generateMipmaps) {
   if (width <= 0 || height <= 0 || (int)pixels.size() < width * height * 4) {
-    std::fprintf(stderr, "Texture: invalid data\n");
+    std::fprintf(stderr, "Texture: invalid RGBA8 buffer (%dx%d, size=%zu)\n",
+                 width, height, pixels.size());
     return false;
   }
   if (!m_id)
@@ -47,7 +55,10 @@ bool Texture::createRGBA8(int width, int height,
   return true;
 }
 
+// --- nach createRGBA8(...) und vor makeChecker(...) einfügen ---
 void Texture::bind(int unit) const {
+  if (!m_id)
+    return; // nothing to bind (optional guard)
   glActiveTexture(GL_TEXTURE0 + unit);
   glBindTexture(GL_TEXTURE_2D, m_id);
 }
@@ -58,7 +69,7 @@ Texture Texture::makeChecker(int w, int h, int cell) {
     for (int x = 0; x < w; ++x) {
       bool on = ((x / cell) + (y / cell)) % 2 == 0;
       std::uint8_t c = on ? 240 : 30;
-      int idx = (y * w + x) * 4;
+      size_t idx = static_cast<size_t>(y * w + x) * 4;
       px[idx + 0] = c;
       px[idx + 1] = c;
       px[idx + 2] = c;
@@ -67,5 +78,30 @@ Texture Texture::makeChecker(int w, int h, int cell) {
   }
   Texture t;
   t.createRGBA8(w, h, px, true);
+  return t;
+}
+
+Texture Texture::loadOrDie(const std::string &path, bool flipY) {
+  stbi_set_flip_vertically_on_load(flipY ? 1 : 0);
+
+  int w = 0, h = 0, comp = 0;
+  unsigned char *data = stbi_load(path.c_str(), &w, &h, &comp, 4);
+  if (!data) {
+    std::fprintf(stderr, "Texture load FAILED: %s (%s)\n", path.c_str(),
+                 stbi_failure_reason());
+    std::fflush(stderr);
+    std::abort(); // Choice B: hard fail
+  }
+
+  std::vector<std::uint8_t> pixels(static_cast<size_t>(w * h * 4));
+  std::memcpy(pixels.data(), data, pixels.size());
+  stbi_image_free(data);
+
+  Texture t;
+  if (!t.createRGBA8(w, h, pixels, true)) {
+    std::fprintf(stderr, "Texture upload FAILED: %s\n", path.c_str());
+    std::fflush(stderr);
+    std::abort();
+  }
   return t;
 }
