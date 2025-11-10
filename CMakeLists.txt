@@ -66,13 +66,20 @@ endif()
 
 add_library(GotMilkedEngine
     src/Camera.cpp
+    src/GameObject.cpp
     src/Shader.cpp
     src/Texture.cpp
     src/Mesh.cpp
     src/stb_image_impl.cpp
     src/Scene.cpp
     src/ObjLoader.cpp
+    src/ResourceManager.cpp
 )
 
-target_include_directories(GotMilkedEngine PUBLIC src)
+target_include_directories(GotMilkedEngine 
+    PUBLIC 
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
 target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm::glm)

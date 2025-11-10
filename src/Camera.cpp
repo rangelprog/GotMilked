@@ -1,44 +1,62 @@
-#include "Camera.hpp"
+#include "gm/Camera.hpp"
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
 #include <cmath>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-static constexpr glm::vec3 WORLD_UP(0.0f, 1.0f, 0.0f);
+namespace gm {
 
-Camera::Camera(glm::vec3 position, float yawDeg, float pitchDeg)
-    : m_Pos(position), m_Yaw(yawDeg), m_Pitch(pitchDeg) {
-  updateBasis();
+Camera::Camera(glm::vec3 pos)
+    : position(pos),
+      front(glm::vec3(0.0f, 0.0f, -1.0f)),
+      worldUp(glm::vec3(0.0f, 1.0f, 0.0f)),
+      yaw(-90.0f),
+      pitch(0.0f),
+      movementSpeed(2.5f),
+      mouseSensitivity(0.1f),
+      zoom(45.0f)
+{
+    updateCameraVectors();
 }
 
-void Camera::moveForward(float d) { m_Pos += m_Front * d; }
-void Camera::moveBackward(float d) { m_Pos -= m_Front * d; }
-void Camera::moveRight(float d) { m_Pos += m_Right * d; }
-void Camera::moveLeft(float d) { m_Pos -= m_Right * d; }
-void Camera::moveUp(float d) { m_Pos += m_Up * d; }
-void Camera::moveDown(float d) { m_Pos -= m_Up * d; }
+void Camera::ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch) {
+    xoffset *= mouseSensitivity;
+    yoffset *= mouseSensitivity;
 
-void Camera::addYawPitch(float dYawDeg, float dPitchDeg) {
-  m_Yaw += dYawDeg;
-  m_Pitch += dPitchDeg;
-  if (m_Pitch > 89.0f)
-    m_Pitch = 89.0f;
-  if (m_Pitch < -89.0f)
-    m_Pitch = -89.0f;
-  updateBasis();
+    yaw   += xoffset;
+    pitch += yoffset;
+
+    if (constrainPitch) {
+        if (pitch > 89.0f)
+            pitch = 89.0f;
+        if (pitch < -89.0f)
+            pitch = -89.0f;
+    }
+
+    updateCameraVectors();
 }
 
-glm::mat4 Camera::view() const {
-  return glm::lookAt(m_Pos, m_Pos + m_Front, m_Up);
+void Camera::ProcessMouseScroll(float yoffset) {
+    zoom -= yoffset;
+    if (zoom < 1.0f)
+        zoom = 1.0f;
+    if (zoom > 45.0f)
+        zoom = 45.0f;
 }
 
-void Camera::updateBasis() {
-  const float yawR = glm::radians(m_Yaw);
-  const float pitchR = glm::radians(m_Pitch);
-  glm::vec3 f;
-  f.x = std::cos(yawR) * std::cos(pitchR);
-  f.y = std::sin(pitchR);
-  f.z = std::sin(yawR) * std::cos(pitchR);
-  m_Front = glm::normalize(f);
-  m_Right = glm::normalize(glm::cross(m_Front, WORLD_UP));
-  m_Up = glm::normalize(glm::cross(m_Right, m_Front));
+glm::mat4 Camera::View() const {
+    return glm::lookAt(position, position + front, up);
 }
+
+void Camera::updateCameraVectors() {
+    glm::vec3 newFront;
+    newFront.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+    newFront.y = sin(glm::radians(pitch));
+    newFront.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    front = glm::normalize(newFront);
+    right = glm::normalize(glm::cross(front, worldUp));
+    up    = glm::normalize(glm::cross(right, front));
+}
+
+} // namespace gm

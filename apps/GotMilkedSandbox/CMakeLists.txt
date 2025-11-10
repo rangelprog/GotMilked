@@ -4,6 +4,11 @@ add_executable(GotMilkedSandbox
 
 set_target_properties(GotMilkedSandbox PROPERTIES OUTPUT_NAME "GotMilkedSandbox")
 gm_apply_warnings(GotMilkedSandbox)
+
+target_include_directories(GotMilkedSandbox PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)
+
 target_link_libraries(GotMilkedSandbox PRIVATE GotMilkedEngine)
 
 if (APPLE)
@@ -14,6 +19,6 @@ if (APPLE)
 endif()
 
 # assets define
-set(GM_SANDBOX_ASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets")
-string(REPLACE "\\" "/" GM_SANDBOX_ASSETS_DIR "${GM_SANDBOX_ASSETS_DIR}")
-target_compile_definitions(GotMilkedSandbox PRIVATE "GM_ASSETS_DIR=\"${GM_SANDBOX_ASSETS_DIR}\"")
+set(GM_ASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+string(REPLACE "\\" "/" GM_ASSETS_DIR "${GM_ASSETS_DIR}")
+target_compile_definitions(GotMilkedSandbox PRIVATE "GM_ASSETS_DIR=\"${GM_ASSETS_DIR}\"")

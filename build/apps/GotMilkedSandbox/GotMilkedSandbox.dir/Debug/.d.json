@@ -302,12 +302,12 @@
             "c:\\users\\tmein\\documents\\github\\gotmilked\\build\\_deps\\glm-src\\glm\\ext\\vector_uint1.hpp",
             "c:\\users\\tmein\\documents\\github\\gotmilked\\build\\_deps\\glm-src\\glm\\ext\\vector_uint1_sized.hpp",
             "c:\\users\\tmein\\documents\\github\\gotmilked\\build\\_deps\\glm-src\\glm\\gtc\\type_ptr.inl",
-            "c:\\users\\tmein\\documents\\github\\gotmilked\\src\\camera.hpp",
-            "c:\\users\\tmein\\documents\\github\\gotmilked\\src\\mesh.hpp",
-            "c:\\users\\tmein\\documents\\github\\gotmilked\\src\\objloader.hpp",
-            "c:\\users\\tmein\\documents\\github\\gotmilked\\src\\shader.hpp",
-            "c:\\users\\tmein\\documents\\github\\gotmilked\\src\\texture.hpp",
-            "c:\\users\\tmein\\documents\\github\\gotmilked\\src\\transform.hpp"
+            "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\camera.hpp",
+            "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\mesh.hpp",
+            "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\objloader.hpp",
+            "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\shader.hpp",
+            "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\texture.hpp",
+            "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\transform.hpp"
         ],
         "ImportedModules": [],
         "ImportedHeaderUnits": []

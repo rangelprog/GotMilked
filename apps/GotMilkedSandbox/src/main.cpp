@@ -10,12 +10,12 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "Camera.hpp"
-#include "Mesh.hpp"
-#include "ObjLoader.hpp"
-#include "Shader.hpp"
-#include "Texture.hpp"
-#include "Transform.hpp"
+#include "gm/Camera.hpp"
+#include "gm/Mesh.hpp"
+#include "gm/ObjLoader.hpp"
+#include "gm/Shader.hpp"
+#include "gm/Texture.hpp"
+#include "gm/Transform.hpp"
 
 // -----------------------------------------------------
 static void setVSync(bool on) { glfwSwapInterval(on ? 1 : 0); }
@@ -38,6 +38,7 @@ static void error_callback(int code, const char *desc) {
 // -----------------------------------------------------
 
 int main() {
+  // --- GLFW / OpenGL ---
   glfwSetErrorCallback(error_callback);
   if (!glfwInit())
     return 1;
@@ -46,8 +47,7 @@ int main() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  GLFWwindow *window =
-      glfwCreateWindow(1280, 720, "GotMilked", nullptr, nullptr);
+  GLFWwindow *window = glfwCreateWindow(1280, 720, "GotMilked", nullptr, nullptr);
   if (!window)
     return 1;
   glfwMakeContextCurrent(window);
@@ -56,43 +56,50 @@ int main() {
     return 1;
   glEnable(GL_DEPTH_TEST);
 
+  // VSync
   bool vsyncOn = true;
   setVSync(vsyncOn);
 
-  glfwSetScrollCallback(window, [](GLFWwindow *, double, double yoff) {
-    float &f = FovState::ref();
-    f -= (float)yoff * 2.0f;
-    if (f < 30.0f)
-      f = 30.0f;
-    if (f > 100.0f)
-      f = 100.0f;
+  // Camera
+  gm::Camera cam;
+  float mouseSensitivity = 1.f;
+  bool mouseCaptured = false, firstCapture = true;
+  double lastMouseX = 0.0, lastMouseY = 0.0;
+  bool wireframe = false;
+
+  // FOV Control
+  glfwSetScrollCallback(window, [](GLFWwindow*, double, double yoff) {
+    FovState::ref() -= (float)yoff * 2.0f;
+    if (FovState::ref() < 30.0f)
+      FovState::ref() = 30.0f;
+    if (FovState::ref() > 100.0f)
+      FovState::ref() = 100.0f;
   });
 
-  // --- Shader ---
-  const std::string shaderDir = std::string(GM_ASSETS_DIR) + "/shaders";
-  Shader shader;
-  if (!shader.loadFromFiles(shaderDir + "/simple.vert.glsl",
-                            shaderDir + "/simple.frag.glsl")) {
+  const std::string assetsDir = std::string(GM_ASSETS_DIR);
+  const std::string shaderDir = assetsDir + "/shaders";
+  const std::string vertPath = shaderDir + "/simple.vert.glsl";
+  const std::string fragPath = shaderDir + "/simple.frag.glsl";
+  printf("GM_ASSETS_DIR: %s\n", GM_ASSETS_DIR);
+  printf("Loading vertex shader from: %s\n", vertPath.c_str());
+  printf("Loading fragment shader from: %s\n", fragPath.c_str());
+  gm::Shader shader;
+  if (!shader.loadFromFiles(vertPath, fragPath)) {
+    printf("Failed to load shaders!\n");
     return 1;
   }
 
   // --- Texture ---
-  const std::string cowTexPath =
-      std::string(GM_ASSETS_DIR) + "/textures/cow.png";
-  Texture cowTex = Texture::loadOrDie(cowTexPath, true);
-  shader.use();
-  shader.setInt("uTex", 0); // sampler -> unit 0
+  const std::string cowTexPath = assetsDir + "/textures/cow.png";
+  gm::Texture cowTex = gm::Texture::loadOrDie(cowTexPath, true);
+  shader.Use();
+  shader.SetInt("uTex", 0); // sampler -> unit 0
 
   // --- Load Model ---
-  const std::string cowObjPath = std::string(GM_ASSETS_DIR) + "/models/cow.obj";
-  Mesh cowMesh = ObjLoader::loadObjPNUV(cowObjPath);
+  const std::string cowObjPath = assetsDir + "/models/cow.obj";
+  gm::Mesh cowMesh = gm::ObjLoader::LoadObjPNUV(cowObjPath);
 
-  // --- Camera / Controls ---
-  Camera cam;
-  float mouseSensitivity = 0.12f;
-  bool mouseCaptured = false, firstCapture = true;
-  double lastMouseX = 0.0, lastMouseY = 0.0;
-  bool wireframe = false;
+
 
   // --- Timing ---
   double lastTime = glfwGetTime();
@@ -136,29 +143,26 @@ int main() {
       double dy = lastMouseY - my;
       lastMouseX = mx;
       lastMouseY = my;
-      cam.addYawPitch((float)dx * mouseSensitivity,
-                      (float)dy * mouseSensitivity);
+      cam.ProcessMouseMovement((float)dx * mouseSensitivity,
+                              (float)dy * mouseSensitivity);
     }
 
     // Movement
     const float baseSpeed = 3.0f;
-    const float speed =
-        baseSpeed *
-        ((glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) ? 4.0f
-                                                                 : 1.0f) *
-        dt;
+    const float speed = baseSpeed * ((glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) ? 4.0f : 1.0f) * dt;
+    
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-      cam.moveForward(speed);
+      cam.MoveForward(speed);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-      cam.moveBackward(speed);
+      cam.MoveBackward(speed);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-      cam.moveLeft(speed);
+      cam.MoveLeft(speed);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-      cam.moveRight(speed);
+      cam.MoveRight(speed);
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-      cam.moveUp(speed);
+      cam.MoveUp(speed);
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
-      cam.moveDown(speed);
+      cam.MoveDown(speed);
 
     // Toggles
     {
@@ -187,24 +191,24 @@ int main() {
     float aspect = (float)fbw / (float)fbh;
     float fov = FovState::ref();
     glm::mat4 proj = glm::perspective(glm::radians(fov), aspect, 0.1f, 200.0f);
-    glm::mat4 view = cam.view();
+    glm::mat4 view = cam.View();
 
-    Transform T;
+    gm::Transform T;
     T.scale = glm::vec3(1.0f);
-    T.rotationDeg.y = (float)now * 20.0f;
-    glm::mat4 model = T.toMat4();
+    T.rotation.y = (float)now * 20.0f;
+    glm::mat4 model = T.getMatrix();
     glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(model)));
 
-    shader.use();
-    shader.setMat4("uModel", model);
-    shader.setMat4("uView", view);
-    shader.setMat4("uProj", proj);
+    shader.Use();
+    shader.SetMat4("uModel", model);
+    shader.SetMat4("uView", view);
+    shader.SetMat4("uProj", proj);
 
     if (GLint loc = shader.uniformLoc("uNormalMat"); loc >= 0)
       glUniformMatrix3fv(loc, 1, GL_FALSE, glm::value_ptr(normalMat));
 
     if (GLint loc = shader.uniformLoc("uViewPos"); loc >= 0)
-      glUniform3fv(loc, 1, glm::value_ptr(cam.position()));
+      glUniform3fv(loc, 1, glm::value_ptr(cam.Position()));
     if (GLint loc = shader.uniformLoc("uLightDir"); loc >= 0)
       glUniform3fv(loc, 1, glm::value_ptr(lightDir));
     if (GLint loc = shader.uniformLoc("uLightColor"); loc >= 0)
@@ -214,7 +218,7 @@ int main() {
       glUniform1i(loc, 1);
     cowTex.bind(0);
 
-    cowMesh.draw();
+    cowMesh.Draw();
 
     // FPS title
     frames++;
@@ -223,10 +227,7 @@ int main() {
       lastTitle = now;
       frames = 0;
       char buf[160];
-      std::snprintf(
-          buf, sizeof(buf),
-          "GotMilked | FPS: %.1f | VSync: %s | Wireframe: %s | FOV: %.1f", fps,
-          boolStr(vsyncOn), boolStr(wireframe), fov);
+      std::snprintf(buf, sizeof(buf), "GotMilked | FPS: %.1f | VSync: %s | Wireframe: %s | FOV: %.1f", fps, boolStr(vsyncOn), boolStr(wireframe), fov);
       glfwSetWindowTitle(window, buf);
     }
 

@@ -1,11 +1,15 @@
 #pragma once
-#include "Mesh.hpp"
-#include "Texture.hpp"
-#include "Transform.hpp"
+#include <gm/Mesh.hpp>
+#include <gm/Texture.hpp>
+#include <gm/Transform.hpp>
 #include <glm/glm.hpp>
 
+namespace gm {
+
 struct SceneEntity {
-  Mesh *mesh = nullptr;
-  Texture *texture = nullptr;
-  Transform transform;
+    Mesh* mesh = nullptr;
+    Texture* texture = nullptr;
+    Transform transform;
 };
+
+} // namespace gm

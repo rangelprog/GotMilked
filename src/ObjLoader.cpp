@@ -1,5 +1,5 @@
-#include "ObjLoader.hpp"
-#include "Mesh.hpp"
+#include "gm/ObjLoader.hpp"
+#include "gm/Mesh.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/vec2.hpp>
@@ -12,12 +12,11 @@
 #include <unordered_map>
 #include <vector>
 
-// ------------------------------------------------------------
-// Hilfsfunktion: lädt eine OBJ und erzeugt Mesh (P/N/UV interleaved)
-// ------------------------------------------------------------
-Mesh ObjLoader::loadObjPNUV(const std::string &path) {
-  std::ifstream in(path);
-  if (!in) {
+namespace gm {
+
+Mesh ObjLoader::LoadObjPNUV(const std::string& path) {
+    std::ifstream in(path);
+    if (!in) {
     std::fprintf(stderr, "ObjLoader ERROR: cannot open '%s'\n", path.c_str());
     return {}; // leerer Mesh
   }
@@ -55,7 +54,7 @@ Mesh ObjLoader::loadObjPNUV(const std::string &path) {
 
       while (ss >> vtx) {
         int p = -1, t = -1, n = -1;
-        // mögliche Formen:
+        // mï¿½gliche Formen:
         // p/t/n  p//n  p/t
         if (sscanf(vtx.c_str(), "%d/%d/%d", &p, &t, &n) == 3) {
           // ok
@@ -137,5 +136,7 @@ Mesh ObjLoader::loadObjPNUV(const std::string &path) {
     indices.push_back(c);
   }
 
-  return Mesh::fromIndexedPNUV(pnuv, indices);
+    return Mesh::fromIndexed(pnuv, indices);
 }
+
+} // namespace gm
