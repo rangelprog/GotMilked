@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 
 #include "Game.hpp"
+#include "CowRendererComponent.hpp"
 #include <cstdio>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -12,8 +13,13 @@
 #include "gm/rendering/Shader.hpp"
 #include "gm/rendering/Texture.hpp"
 #include "gm/scene/Transform.hpp"
+#include "gm/scene/TransformComponent.hpp"
+#include "gm/scene/Scene.hpp"
+#include "gm/scene/SceneManager.hpp"
 #include "gm/core/input/InputManager.hpp"
 #include "gm/core/input/InputAction.hpp"
+#include "gm/utils/CoordinateDisplay.hpp"
+#include "gm/utils/ImGuiManager.hpp"
 
 namespace {
 static float &FovRef() { static float fov = 60.0f; return fov; }
@@ -50,6 +56,15 @@ bool Game::Init(GLFWwindow* window) {
     // Camera
     m_camera = std::make_unique<gm::Camera>();
 
+    // Initialize ImGui
+    m_imguiManager = std::make_unique<gm::utils::ImGuiManager>();
+    if (!m_imguiManager->Init(window)) {
+        printf("[Game] Warning: Failed to initialize ImGui\n");
+    }
+
+    // Initialize Coordinate Display
+    m_coordDisplay = std::make_unique<gm::utils::CoordinateDisplay>();
+
     // Initialize InputManager (singleton)
     using namespace gm::core;
     auto& inputManager = InputManager::Instance();
@@ -72,11 +87,80 @@ bool Game::Init(GLFWwindow* window) {
     auto wireframeAction = inputManager.CreateAction("Wireframe");
     wireframeAction->AddBinding({InputType::Keyboard, GLFW_KEY_F, InputTriggerType::OnPress});
 
+    // Initialize scene system
+    SetupScene();
+
     return true;
 }
 
+void Game::SetupScene() {
+    auto& sceneManager = gm::SceneManager::Instance();
+    
+    // Create and load the game scene
+    m_gameScene = sceneManager.LoadScene("GameScene");
+    
+    if (!m_gameScene) {
+        printf("[Game] Error: Failed to create game scene\n");
+        return;
+    }
+    
+    // Initialize the scene
+    sceneManager.InitActiveScene();
+    printf("[Game] Game scene initialized successfully\n");
+
+    // Create multiple cows to demonstrate the component system
+    const int numCows = 3;
+    const float spacing = 3.0f;
+    
+    for (int i = 0; i < numCows; ++i) {
+        std::string cowName = "Cow_" + std::to_string(i + 1);
+        
+        // Create the cow GameObject
+        auto cowObject = m_gameScene->CreateGameObject(cowName);
+        cowObject->AddTag("animal");
+        cowObject->AddTag("cow");
+        
+        // Ensure TransformComponent exists and position the cow
+        auto transform = cowObject->EnsureTransform();
+        float xPos = (i - (numCows - 1) / 2.0f) * spacing;
+        transform->SetPosition(xPos, 0.0f, -5.0f);
+        transform->SetScale(1.0f); // Uniform scale
+        
+        // Add the CowRendererComponent
+        auto cowRenderer = cowObject->AddComponent<CowRendererComponent>();
+        cowRenderer->SetMesh(m_cowMesh.get());
+        cowRenderer->SetTexture(m_cowTex.get());
+        cowRenderer->SetShader(m_shader.get());
+        cowRenderer->SetCamera(m_camera.get());
+        
+        // Vary rotation speed for each cow
+        cowRenderer->SetRotationSpeed(15.0f + i * 5.0f);
+        
+        cowRenderer->Init();
+        
+        // Verify component was added correctly
+        if (cowObject->HasComponent<CowRendererComponent>()) {
+            printf("[Game] %s created at position (%.1f, 0.0, -5.0)\n", 
+                   cowName.c_str(), xPos);
+        }
+        
+        m_cowObjects.push_back(cowObject);
+    }
+
+    // Demonstrate finding objects by tag
+    auto animals = m_gameScene->FindGameObjectsByTag("animal");
+    printf("[Game] Found %zu animals in scene\n", animals.size());
+    
+    printf("[Game] Scene setup complete with %zu cows\n", m_cowObjects.size());
+}
+
+
 void Game::Update(float dt) {
     if (!m_window) return;
+
+    // Update the scene (updates all GameObjects)
+    auto& sceneManager = gm::SceneManager::Instance();
+    sceneManager.UpdateActiveScene(dt);
 
     // Get input system (Update() already called in main loop before glfwPollEvents)
     auto& inputManager = gm::core::InputManager::Instance();
@@ -148,39 +232,50 @@ void Game::Render() {
     glm::mat4 proj = glm::perspective(glm::radians(fov), aspect, 0.1f, 200.0f);
     glm::mat4 view = m_camera->View();
 
-    gm::Transform T;
-    T.scale = glm::vec3(1.0f);
-    T.rotation.y = (float)glfwGetTime() * 20.0f;
-    glm::mat4 model = T.getMatrix();
-    glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(model)));
+    // Update projection matrix on all CowRendererComponents
+    for (auto& cowObject : m_cowObjects) {
+        if (cowObject && cowObject->HasComponent<CowRendererComponent>()) {
+            if (auto cowRenderer = cowObject->GetComponent<CowRendererComponent>()) {
+                cowRenderer->SetProjectionMatrix(proj);
+            }
+        }
+    }
 
-    m_shader->Use();
-    m_shader->SetMat4("uModel", model);
-    m_shader->SetMat4("uView", view);
-    m_shader->SetMat4("uProj", proj);
-
-    if (GLint loc = m_shader->uniformLoc("uNormalMat"); loc >= 0)
-        glUniformMatrix3fv(loc, 1, GL_FALSE, glm::value_ptr(normalMat));
-
-    if (GLint loc = m_shader->uniformLoc("uViewPos"); loc >= 0)
-        glUniform3fv(loc, 1, glm::value_ptr(m_camera->Position()));
-
-    if (GLint loc = m_shader->uniformLoc("uLightDir"); loc >= 0)
-        glUniform3fv(loc, 1, glm::value_ptr(glm::normalize(glm::vec3(-0.4f, -1.0f, -0.3f))));
-    if (GLint loc = m_shader->uniformLoc("uLightColor"); loc >= 0)
-        glUniform3fv(loc, 1, glm::value_ptr(glm::vec3(1.0f)));
-
-    if (GLint loc = m_shader->uniformLoc("uUseTex"); loc >= 0)
-        glUniform1i(loc, 1);
-    m_cowTex->bind(0);
-
-    m_cowMesh->Draw();
+    // Render the game scene with all its GameObjects
+    if (m_gameScene && m_shader && m_camera) {
+        m_gameScene->Draw(*m_shader, *m_camera, fbw, fbh, fov);
+    }
+    
+    // Start ImGui frame
+    if (m_imguiManager && m_imguiManager->IsInitialized()) {
+        m_imguiManager->NewFrame();
+        
+        // Render coordinate display
+        if (m_coordDisplay && m_camera) {
+            m_coordDisplay->Render(*m_camera, fov);
+        }
+        
+        // Render ImGui
+        m_imguiManager->Render();
+    }
 }
 
 void Game::Shutdown() {
+    // Clear cow object references (they'll be destroyed with the scene)
+    m_cowObjects.clear();
+    
+    // Clean up scene and scene manager
+    m_gameScene.reset();
+    gm::SceneManager::Instance().Shutdown();
+
+    // Clean up resources
+    m_imguiManager.reset();
+    m_coordDisplay.reset();
     m_cowMesh.reset();
     m_cowTex.reset();
     m_shader.reset();
     m_camera.reset();
+    
     // InputManager is a singleton, no need to manually reset
+    printf("[Game] Shutdown complete\n");
 }

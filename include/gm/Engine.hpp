@@ -16,7 +16,10 @@
 #include "gm/scene/GameObject.hpp"
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/Transform.hpp"
+#include "gm/scene/TransformComponent.hpp"
 
 // Utilities
 #include "gm/utils/ObjLoader.hpp"
 #include "gm/utils/ResourceManager.hpp"
+#include "gm/utils/CoordinateDisplay.hpp"
+#include "gm/utils/ImGuiManager.hpp"

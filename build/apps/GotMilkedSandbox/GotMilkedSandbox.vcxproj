@@ -90,7 +90,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <BufferSecurityCheck></BufferSecurityCheck>
@@ -117,10 +117,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;GM_ASSETS_DIR=\"C:/Users/tmein/Documents/GitHub/GotMilked/apps/GotMilkedSandbox/assets\";_MBCS;CMAKE_INTDIR=\"Debug\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -128,7 +128,7 @@
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <Link>
-      <AdditionalDependencies>..\..\Debug\GotMilkedEngine.lib;..\..\_deps\glfw-build\src\Debug\glfw3.lib;..\..\_deps\glad-build\Debug\glad.lib;..\..\_deps\glm-build\glm\Debug\glm.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>..\..\Debug\GotMilkedEngine.lib;..\..\_deps\glad-build\Debug\glad.lib;..\..\_deps\glm-build\glm\Debug\glm.lib;..\..\Debug\imgui.lib;..\..\_deps\glfw-build\src\Debug\glfw3.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <DataExecutionPrevention></DataExecutionPrevention>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -146,7 +146,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <BufferSecurityCheck></BufferSecurityCheck>
@@ -174,10 +174,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;GM_ASSETS_DIR=\"C:/Users/tmein/Documents/GitHub/GotMilked/apps/GotMilkedSandbox/assets\";_MBCS;CMAKE_INTDIR=\"Release\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -185,7 +185,7 @@
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <Link>
-      <AdditionalDependencies>..\..\Release\GotMilkedEngine.lib;..\..\_deps\glfw-build\src\Release\glfw3.lib;..\..\_deps\glad-build\Release\glad.lib;..\..\_deps\glm-build\glm\Release\glm.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>..\..\Release\GotMilkedEngine.lib;..\..\_deps\glad-build\Release\glad.lib;..\..\_deps\glm-build\glm\Release\glm.lib;..\..\Release\imgui.lib;..\..\_deps\glfw-build\src\Release\glfw3.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <DataExecutionPrevention></DataExecutionPrevention>
       <GenerateDebugInformation>false</GenerateDebugInformation>
@@ -203,7 +203,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <BufferSecurityCheck></BufferSecurityCheck>
@@ -231,10 +231,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;GM_ASSETS_DIR=\"C:/Users/tmein/Documents/GitHub/GotMilked/apps/GotMilkedSandbox/assets\";_MBCS;CMAKE_INTDIR=\"MinSizeRel\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -242,7 +242,7 @@
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <Link>
-      <AdditionalDependencies>..\..\MinSizeRel\GotMilkedEngine.lib;..\..\_deps\glfw-build\src\MinSizeRel\glfw3.lib;..\..\_deps\glad-build\MinSizeRel\glad.lib;..\..\_deps\glm-build\glm\MinSizeRel\glm.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>..\..\MinSizeRel\GotMilkedEngine.lib;..\..\_deps\glad-build\MinSizeRel\glad.lib;..\..\_deps\glm-build\glm\MinSizeRel\glm.lib;..\..\MinSizeRel\imgui.lib;..\..\_deps\glfw-build\src\MinSizeRel\glfw3.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <DataExecutionPrevention></DataExecutionPrevention>
       <GenerateDebugInformation>false</GenerateDebugInformation>
@@ -260,7 +260,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
     <ClCompile>
-      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <BufferSecurityCheck></BufferSecurityCheck>
@@ -287,10 +287,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;GM_ASSETS_DIR=\"C:/Users/tmein/Documents/GitHub/GotMilked/apps/GotMilkedSandbox/assets\";_MBCS;CMAKE_INTDIR=\"RelWithDebInfo\"</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\tmein\Documents\GitHub\GotMilked\include;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\core;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\rendering;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\scene;C:\Users\tmein\Documents\GitHub\GotMilked\include\gm\utils;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glfw-src\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glad-build\include;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src;C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\imgui-src\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -298,7 +298,7 @@
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <Link>
-      <AdditionalDependencies>..\..\RelWithDebInfo\GotMilkedEngine.lib;..\..\_deps\glfw-build\src\RelWithDebInfo\glfw3.lib;..\..\_deps\glad-build\RelWithDebInfo\glad.lib;..\..\_deps\glm-build\glm\RelWithDebInfo\glm.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalDependencies>..\..\RelWithDebInfo\GotMilkedEngine.lib;..\..\_deps\glad-build\RelWithDebInfo\glad.lib;..\..\_deps\glm-build\glm\RelWithDebInfo\glm.lib;..\..\RelWithDebInfo\imgui.lib;..\..\_deps\glfw-build\src\RelWithDebInfo\glfw3.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <DataExecutionPrevention></DataExecutionPrevention>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -374,6 +374,7 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   <ItemGroup>
     <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\main.cpp" />
     <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\Game.cpp" />
+    <ClCompile Include="C:\Users\tmein\Documents\GitHub\GotMilked\apps\GotMilkedSandbox\src\CowRendererComponent.cpp" />
   </ItemGroup>
   <ItemGroup />
   <ItemGroup>
@@ -398,6 +399,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ProjectReference Include="C:\Users\tmein\Documents\GitHub\GotMilked\build\_deps\glm-build\glm\glm.vcxproj">
       <Project>{5C406B8A-14A6-3643-8801-0C41F1191235}</Project>
       <Name>glm</Name>
+    </ProjectReference>
+    <ProjectReference Include="C:\Users\tmein\Documents\GitHub\GotMilked\build\imgui.vcxproj">
+      <Project>{09B88A26-2F3A-3C09-8B34-99AE84893026}</Project>
+      <Name>imgui</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

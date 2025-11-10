@@ -198,6 +198,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Project>{5C406B8A-14A6-3643-8801-0C41F1191235}</Project>
       <Name>glm</Name>
     </ProjectReference>
+    <ProjectReference Include="C:\Users\tmein\Documents\GitHub\GotMilked\build\imgui.vcxproj">
+      <Project>{09B88A26-2F3A-3C09-8B34-99AE84893026}</Project>
+      <Name>imgui</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

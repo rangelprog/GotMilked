@@ -1,6 +1,7 @@
 add_executable(GotMilkedSandbox
   src/main.cpp
   src/Game.cpp
+  src/CowRendererComponent.cpp
 )
 
 set_target_properties(GotMilkedSandbox PROPERTIES OUTPUT_NAME "GotMilkedSandbox")

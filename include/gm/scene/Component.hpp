@@ -18,6 +18,7 @@ public:
     virtual void Init() {}
     virtual void Update(float deltaTime) {}
     virtual void Render() {}
+    virtual void OnDestroy() {} // Called when component is about to be destroyed
 
     void SetOwner(GameObject* obj) { owner = obj; }
     GameObject* GetOwner() const { return owner; }
