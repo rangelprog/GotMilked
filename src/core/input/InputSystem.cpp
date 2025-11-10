@@ -17,8 +17,14 @@ void InputSystem::Init(GLFWwindow* window) {
 }
 
 void InputSystem::Update() {
-    // Store last mouse state
+    // Store last mouse state BEFORE transitions
+    // This is used for delta calculation
     m_lastMouseState = m_mouseState;
+
+    // Transition states that were marked as JustPressed/JustReleased in PREVIOUS frame
+    // These persist for exactly one frame after the input event
+    // The callbacks set them to JustPressed/JustReleased, but we don't transition them
+    // until the next frame, so the code that checks them sees the transient state
 
     // Update key states
     for (auto& [key, state] : m_keyStates) {

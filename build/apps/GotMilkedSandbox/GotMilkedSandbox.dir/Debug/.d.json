@@ -318,7 +318,17 @@
             "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\utils\\objloader.hpp",
             "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\rendering\\shader.hpp",
             "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\rendering\\texture.hpp",
-            "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\scene\\transform.hpp"
+            "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\scene\\transform.hpp",
+            "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\core\\input\\inputmanager.hpp",
+            "c:\\program files\\microsoft visual studio\\2022\\community\\vc\\tools\\msvc\\14.44.35207\\include\\unordered_map",
+            "c:\\program files\\microsoft visual studio\\2022\\community\\vc\\tools\\msvc\\14.44.35207\\include\\xhash",
+            "c:\\program files\\microsoft visual studio\\2022\\community\\vc\\tools\\msvc\\14.44.35207\\include\\list",
+            "c:\\program files\\microsoft visual studio\\2022\\community\\vc\\tools\\msvc\\14.44.35207\\include\\xbit_ops.h",
+            "c:\\program files\\microsoft visual studio\\2022\\community\\vc\\tools\\msvc\\14.44.35207\\include\\xnode_handle.h",
+            "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\core\\input\\inputsystem.hpp",
+            "c:\\program files\\microsoft visual studio\\2022\\community\\vc\\tools\\msvc\\14.44.35207\\include\\array",
+            "c:\\program files\\microsoft visual studio\\2022\\community\\vc\\tools\\msvc\\14.44.35207\\include\\functional",
+            "c:\\users\\tmein\\documents\\github\\gotmilked\\include\\gm\\core\\input\\inputaction.hpp"
         ],
         "ImportedModules": [],
         "ImportedHeaderUnits": []

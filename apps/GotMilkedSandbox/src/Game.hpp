@@ -9,6 +9,7 @@ class Shader;
 class Texture;
 class Mesh;
 class Camera;
+namespace core { class InputManager; class InputAction; }
 namespace scene { struct Transform; }
 }
 
@@ -35,6 +36,5 @@ private:
     std::unique_ptr<gm::Camera> m_camera;
     bool m_mouseCaptured = false;
     bool m_firstCapture = true;
-    double m_lastMouseX = 0.0, m_lastMouseY = 0.0;
     bool m_wireframe = false;
 };

@@ -6,6 +6,7 @@
 #include <glad/glad.h>
 
 #include "Game.hpp"
+#include "gm/core/input/InputManager.hpp"
 
 static void error_callback(int code, const char *desc) {
   std::fprintf(stderr, "GLFW error %d: %s\n", code, desc);
@@ -48,6 +49,12 @@ int main() {
     float dt = (float)(now - lastTime);
     lastTime = now;
 
+    // Update input state transitions BEFORE polling new events
+    gm::core::InputManager::Instance().Update();
+
+    // Poll events which trigger input callbacks
+    glfwPollEvents();
+
     game.Update(dt);
     game.Render();
 
@@ -63,7 +70,6 @@ int main() {
     }
 
     glfwSwapBuffers(window);
-    glfwPollEvents();
   }
 
   game.Shutdown();

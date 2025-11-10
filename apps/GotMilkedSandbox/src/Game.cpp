@@ -12,6 +12,8 @@
 #include "gm/rendering/Shader.hpp"
 #include "gm/rendering/Texture.hpp"
 #include "gm/scene/Transform.hpp"
+#include "gm/core/input/InputManager.hpp"
+#include "gm/core/input/InputAction.hpp"
 
 namespace {
 static float &FovRef() { static float fov = 60.0f; return fov; }
@@ -48,12 +50,27 @@ bool Game::Init(GLFWwindow* window) {
     // Camera
     m_camera = std::make_unique<gm::Camera>();
 
-    // Scroll callback (FOV)
-    glfwSetScrollCallback(window, [](GLFWwindow*, double, double yoff) {
-        FovRef() -= (float)yoff * 2.0f;
-        if (FovRef() < 30.0f) FovRef() = 30.0f;
-        if (FovRef() > 100.0f) FovRef() = 100.0f;
-    });
+    // Initialize InputManager (singleton)
+    using namespace gm::core;
+    auto& inputManager = InputManager::Instance();
+    inputManager.Init(window);
+
+    // Create movement action (WASD + Space/Ctrl)
+    auto moveAction = inputManager.CreateAction("Move");
+    moveAction->AddBinding({InputType::Keyboard, GLFW_KEY_W, InputTriggerType::WhilePressed});
+    moveAction->AddBinding({InputType::Keyboard, GLFW_KEY_S, InputTriggerType::WhilePressed});
+    moveAction->AddBinding({InputType::Keyboard, GLFW_KEY_A, InputTriggerType::WhilePressed});
+    moveAction->AddBinding({InputType::Keyboard, GLFW_KEY_D, InputTriggerType::WhilePressed});
+    moveAction->AddBinding({InputType::Keyboard, GLFW_KEY_SPACE, InputTriggerType::WhilePressed});
+    moveAction->AddBinding({InputType::Keyboard, GLFW_KEY_LEFT_CONTROL, InputTriggerType::WhilePressed});
+
+    // Create capture action (RMB for mouse capture)
+    auto captureAction = inputManager.CreateAction("Capture");
+    captureAction->AddBinding({InputType::MouseButton, static_cast<int>(gm::core::MouseButton::Right), InputTriggerType::WhilePressed});
+
+    // Create wireframe toggle (F key)
+    auto wireframeAction = inputManager.CreateAction("Wireframe");
+    wireframeAction->AddBinding({InputType::Keyboard, GLFW_KEY_F, InputTriggerType::OnPress});
 
     return true;
 }
@@ -61,50 +78,60 @@ bool Game::Init(GLFWwindow* window) {
 void Game::Update(float dt) {
     if (!m_window) return;
 
-    // Close
-    if (glfwGetKey(m_window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    // Get input system (Update() already called in main loop before glfwPollEvents)
+    auto& inputManager = gm::core::InputManager::Instance();
+    auto inputSys = inputManager.GetInputSystem();
+
+    // Close window on ESC
+    if (inputSys->IsKeyJustPressed(GLFW_KEY_ESCAPE))
         glfwSetWindowShouldClose(m_window, 1);
 
-    // RMB capture toggle
-    if (glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
-        if (!m_mouseCaptured) {
-            glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-            m_mouseCaptured = true;
-            m_firstCapture = true;
-        }
-    } else if (m_mouseCaptured) {
+    // RMB capture toggle - check if button is held while captured, or just pressed
+    if (!m_mouseCaptured && inputSys->IsMouseButtonJustPressed(gm::core::MouseButton::Right)) {
+        // Start capture on RMB press
+        glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        m_mouseCaptured = true;
+        m_firstCapture = true;
+    } else if (m_mouseCaptured && inputSys->IsMouseButtonJustReleased(gm::core::MouseButton::Right)) {
+        // End capture on RMB release
         glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
         m_mouseCaptured = false;
     }
 
-    // Mouse look
+    // Mouse look with delta
     if (m_mouseCaptured) {
-        double mx, my;
-        glfwGetCursorPos(m_window, &mx, &my);
         if (m_firstCapture) {
-            m_lastMouseX = mx; m_lastMouseY = my; m_firstCapture = false;
+            m_firstCapture = false;
         }
-        double dx = mx - m_lastMouseX;
-        double dy = m_lastMouseY - my;
-        m_lastMouseX = mx; m_lastMouseY = my;
+        double dx = inputSys->GetMouseDeltaX();
+        double dy = inputSys->GetMouseDeltaY();
         m_camera->ProcessMouseMovement((float)dx, (float)dy);
     }
 
-    // Movement
+    // Movement with speed boost for Shift
     const float baseSpeed = 3.0f;
-    const float speed = baseSpeed * ((glfwGetKey(m_window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) ? 4.0f : 1.0f) * dt;
-    if (glfwGetKey(m_window, GLFW_KEY_W) == GLFW_PRESS) m_camera->MoveForward(speed);
-    if (glfwGetKey(m_window, GLFW_KEY_S) == GLFW_PRESS) m_camera->MoveBackward(speed);
-    if (glfwGetKey(m_window, GLFW_KEY_A) == GLFW_PRESS) m_camera->MoveLeft(speed);
-    if (glfwGetKey(m_window, GLFW_KEY_D) == GLFW_PRESS) m_camera->MoveRight(speed);
-    if (glfwGetKey(m_window, GLFW_KEY_SPACE) == GLFW_PRESS) m_camera->MoveUp(speed);
-    if (glfwGetKey(m_window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) m_camera->MoveDown(speed);
+    const float speed = baseSpeed * (inputSys->IsKeyPressed(GLFW_KEY_LEFT_SHIFT) ? 4.0f : 1.0f) * dt;
+    
+    if (inputSys->IsKeyPressed(GLFW_KEY_W)) m_camera->MoveForward(speed);
+    if (inputSys->IsKeyPressed(GLFW_KEY_S)) m_camera->MoveBackward(speed);
+    if (inputSys->IsKeyPressed(GLFW_KEY_A)) m_camera->MoveLeft(speed);
+    if (inputSys->IsKeyPressed(GLFW_KEY_D)) m_camera->MoveRight(speed);
+    if (inputSys->IsKeyPressed(GLFW_KEY_SPACE)) m_camera->MoveUp(speed);
+    if (inputSys->IsKeyPressed(GLFW_KEY_LEFT_CONTROL)) m_camera->MoveDown(speed);
 
-    // Toggles
-    static bool pf = false;
-    bool fNow = glfwGetKey(m_window, GLFW_KEY_F) == GLFW_PRESS;
-    if (fNow && !pf) { m_wireframe = !m_wireframe; glPolygonMode(GL_FRONT_AND_BACK, m_wireframe ? GL_LINE : GL_FILL); }
-    pf = fNow;
+    // Wireframe toggle on F key
+    if (inputSys->IsKeyJustPressed(GLFW_KEY_F)) {
+        m_wireframe = !m_wireframe;
+        glPolygonMode(GL_FRONT_AND_BACK, m_wireframe ? GL_LINE : GL_FILL);
+    }
+
+    // Handle scroll for FOV
+    double scrollY = inputSys->GetMouseScrollY();
+    if (scrollY != 0.0) {
+        FovRef() -= (float)scrollY * 2.0f;
+        if (FovRef() < 30.0f) FovRef() = 30.0f;
+        if (FovRef() > 100.0f) FovRef() = 100.0f;
+    }
 }
 
 void Game::Render() {
@@ -155,4 +182,5 @@ void Game::Shutdown() {
     m_cowTex.reset();
     m_shader.reset();
     m_camera.reset();
+    // InputManager is a singleton, no need to manually reset
 }

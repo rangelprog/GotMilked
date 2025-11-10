@@ -45,7 +45,8 @@ public:
     // Initialization
     void Init(GLFWwindow* window);
 
-    // Update
+    // Update - processes pending input state changes
+    // Call this at the START of your frame, before glfwPollEvents()
     void Update();
 
     // Keyboard methods
