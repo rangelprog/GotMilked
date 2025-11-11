@@ -12,13 +12,12 @@ namespace gm {
     class Camera;
     class Scene;
     class GameObject;
-    namespace core { class InputManager; class InputAction; }
+    namespace core { class InputManager; }
     namespace scene { struct Transform; }
-    namespace utils { class CoordinateDisplay; class ImGuiManager; }
 }
 
-// Include for GameObject definition (needed for shared_ptr instantiation)
 #include "gm/scene/GameObject.hpp"
+#include "SandboxResources.hpp"
 
 class Game {
 public:
@@ -36,12 +35,9 @@ private:
 
     // Scene management
     std::shared_ptr<gm::Scene> m_gameScene;
-    std::vector<std::shared_ptr<gm::GameObject>> m_cowObjects; // Multiple cows for demonstration
+    std::vector<std::shared_ptr<gm::GameObject>> m_spinnerObjects; // Mesh spinner objects for demonstration
 
-    // resources
-    std::unique_ptr<gm::Shader> m_shader;
-    std::unique_ptr<gm::Texture> m_cowTex;
-    std::unique_ptr<gm::Mesh> m_cowMesh;
+    SandboxResources m_resources;
 
     // camera / state
     std::unique_ptr<gm::Camera> m_camera;
@@ -49,10 +45,6 @@ private:
     bool m_firstCapture = true;
     bool m_wireframe = false;
     
-    // UI / Debug
-    std::unique_ptr<gm::utils::ImGuiManager> m_imguiManager;
-    std::unique_ptr<gm::utils::CoordinateDisplay> m_coordDisplay;
-
     // Helper methods
     void SetupScene();
 };

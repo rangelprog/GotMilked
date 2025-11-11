@@ -13,6 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Option to build the sandbox app
 option(GM_BUILD_SANDBOX "Build GotMilked Sandbox app" ON)
+option(GM_BUILD_TESTS "Build GotMilked tests" ON)
 
 # Warning helper function
 function(gm_apply_warnings target)
@@ -96,6 +97,11 @@ endif()
 # ---------------------------
 if (GM_BUILD_SANDBOX)
     add_subdirectory(apps/GotMilkedSandbox)
+endif()
+
+if (GM_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
 
 add_library(GotMilkedEngine

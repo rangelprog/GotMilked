@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <functional>
 #include <nlohmann/json_fwd.hpp>
 
 namespace gm {
@@ -13,6 +14,9 @@ class Component;
  */
 class SceneSerializer {
 public:
+    using SerializeCallback = std::function<nlohmann::json(Component*)>;
+    using DeserializeCallback = std::function<Component*(GameObject*, const nlohmann::json&)>;
+
     // Save scene to JSON file
     static bool SaveToFile(Scene& scene, const std::string& filepath);
     
@@ -24,6 +28,13 @@ public:
     
     // Deserialize scene from JSON string
     static bool Deserialize(Scene& scene, const std::string& jsonString);
+    
+    // Custom component serialization registration
+    static void RegisterComponentSerializer(const std::string& typeName,
+                                            SerializeCallback serializer,
+                                            DeserializeCallback deserializer);
+    static void UnregisterComponentSerializer(const std::string& typeName);
+    static void ClearComponentSerializers();
 
 private:
     // Helper functions for JSON conversion
@@ -38,9 +49,9 @@ private:
     static nlohmann::json SerializeMaterialComponent(Component* component);
     static nlohmann::json SerializeLightComponent(Component* component);
     
-    static void DeserializeTransformComponent(GameObject* obj, const nlohmann::json& transformJson);
-    static void DeserializeMaterialComponent(GameObject* obj, const nlohmann::json& materialJson);
-    static void DeserializeLightComponent(GameObject* obj, const nlohmann::json& lightJson);
+    static Component* DeserializeTransformComponent(GameObject* obj, const nlohmann::json& transformJson);
+    static Component* DeserializeMaterialComponent(GameObject* obj, const nlohmann::json& materialJson);
+    static Component* DeserializeLightComponent(GameObject* obj, const nlohmann::json& lightJson);
 };
 
 } // namespace gm

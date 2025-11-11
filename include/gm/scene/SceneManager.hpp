@@ -2,9 +2,10 @@
 #include <memory>
 #include <unordered_map>
 #include <string>
-#include "Scene.hpp"
 
 namespace gm {
+
+class Scene;
 
 /**
  * SceneManager - Singleton for managing scene loading, unloading, and switching

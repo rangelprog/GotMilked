@@ -4,6 +4,7 @@
 #include "gm/rendering/Shader.hpp"
 #include "gm/rendering/Camera.hpp"
 #include "gm/rendering/LightManager.hpp"
+#include "gm/core/Logger.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
 
@@ -69,12 +70,13 @@ void Scene::Cleanup() {
 
 std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string& name) {
     if (name.empty()) {
-        printf("[Scene] Warning: Creating GameObject with empty name\n");
+        core::Logger::Warning("[Scene] Creating GameObject with empty name");
     }
     
     // Check if name already exists
     if (objectsByName.find(name) != objectsByName.end()) {
-        printf("[Scene] Warning: GameObject with name '%s' already exists, returning existing object\n", name.c_str());
+        core::Logger::Warning("[Scene] GameObject with name '%s' already exists, returning existing object",
+                              name.c_str());
         return objectsByName[name];
     }
     
@@ -94,12 +96,13 @@ std::shared_ptr<GameObject> Scene::SpawnGameObject(const std::string& name) {
 
 void Scene::DestroyGameObject(std::shared_ptr<GameObject> gameObject) {
     if (!gameObject) {
-        printf("[Scene] Warning: Attempted to destroy null GameObject\n");
+        core::Logger::Warning("[Scene] Attempted to destroy null GameObject");
         return;
     }
     
     if (gameObject->IsDestroyed()) {
-        printf("[Scene] Warning: GameObject '%s' is already marked for destruction\n", gameObject->GetName().c_str());
+        core::Logger::Warning("[Scene] GameObject '%s' is already marked for destruction",
+                              gameObject->GetName().c_str());
         return;
     }
     
@@ -154,12 +157,12 @@ void Scene::UntagGameObject(std::shared_ptr<GameObject> gameObject, const std::s
 
 void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovDeg) {
     if (fbw <= 0 || fbh <= 0) {
-        printf("[Scene] Warning: Invalid framebuffer size (%d x %d)\n", fbw, fbh);
+        core::Logger::Warning("[Scene] Invalid framebuffer size (%d x %d)", fbw, fbh);
         return;
     }
     
     if (fovDeg <= 0.0f || fovDeg >= 180.0f) {
-        printf("[Scene] Warning: Invalid FOV: %.2f degrees (expected 0-180)\n", fovDeg);
+        core::Logger::Warning("[Scene] Invalid FOV: %.2f degrees (expected 0-180)", fovDeg);
         return;
     }
 

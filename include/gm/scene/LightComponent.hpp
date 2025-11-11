@@ -23,10 +23,6 @@ public:
     LightComponent();
     ~LightComponent() override = default;
 
-    void Init() override {}
-    void Update(float deltaTime) override {}
-    void Render() override {}
-
     // Light type
     void SetType(LightType type) { m_type = type; }
     LightType GetType() const { return m_type; }

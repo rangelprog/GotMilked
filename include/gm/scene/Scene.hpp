@@ -3,9 +3,13 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
-#include "gm/scene/GameObject.hpp"
 
 namespace gm {
+
+class GameObject;
+
+class Shader;
+class Camera;
 
 class Scene {
 private:
@@ -24,7 +28,7 @@ public:
     virtual void Init();
     virtual void Update(float deltaTime);
     virtual void Cleanup();
-    void Draw(class Shader& shader, const class Camera& cam, int fbw, int fbh, float fovDeg);
+    void Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovDeg);
 
     // Scene state
     const std::string& GetName() const { return sceneName; }

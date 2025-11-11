@@ -1,5 +1,5 @@
 #include "gm/rendering/Shader.hpp"
-#include <cstdio>
+#include "gm/core/Logger.hpp"
 #include <fstream>
 #include <glm/gtc/type_ptr.hpp>
 #include <sstream>
@@ -30,7 +30,7 @@ Shader& Shader::operator=(Shader&& other) noexcept {
 /*static*/ bool Shader::readFile(const std::string& path, std::string& out) {
     std::ifstream in(path, std::ios::binary);
     if (!in) {
-        std::fprintf(stderr, "Shader: failed to open file: %s\n", path.c_str());
+        core::Logger::Error("Shader: failed to open file: %s", path.c_str());
         return false;
     }
     std::ostringstream ss;
@@ -50,7 +50,7 @@ GLuint Shader::compile(GLenum type, const char* src) {
         glGetShaderiv(id, GL_INFO_LOG_LENGTH, &len);
         std::vector<char> log(static_cast<size_t>(len) + 1);
         glGetShaderInfoLog(id, len, nullptr, log.data());
-        std::fprintf(stderr, "Shader: compile failed: %s\n", log.data());
+        core::Logger::Error("Shader: compile failed: %s", log.data());
         glDeleteShader(id);
         return 0;
     }
@@ -69,7 +69,7 @@ GLuint Shader::link(GLuint vs, GLuint fs) {
         glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &len);
         std::vector<char> log(static_cast<size_t>(len) + 1);
         glGetProgramInfoLog(prog, len, nullptr, log.data());
-        std::fprintf(stderr, "Shader: link failed: %s\n", log.data());
+        core::Logger::Error("Shader: link failed: %s", log.data());
         glDeleteProgram(prog);
         return 0;
     }

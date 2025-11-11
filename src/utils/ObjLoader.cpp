@@ -1,11 +1,11 @@
 #include "gm/utils/ObjLoader.hpp"
 #include "gm/rendering/Mesh.hpp"
+#include "gm/core/Logger.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
-#include <cstdio>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -17,7 +17,7 @@ namespace gm {
 Mesh ObjLoader::LoadObjPNUV(const std::string& path) {
     std::ifstream in(path);
     if (!in) {
-    std::fprintf(stderr, "ObjLoader ERROR: cannot open '%s'\n", path.c_str());
+    core::Logger::Error("ObjLoader ERROR: cannot open '%s'", path.c_str());
     return {}; // leerer Mesh
   }
 

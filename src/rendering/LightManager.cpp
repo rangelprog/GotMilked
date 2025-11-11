@@ -2,7 +2,7 @@
 #include "gm/rendering/Shader.hpp"
 #include "gm/scene/LightComponent.hpp"
 #include "gm/scene/GameObject.hpp"
-#include <cstdio>
+#include "gm/core/Logger.hpp"
 
 namespace gm {
 
@@ -20,7 +20,9 @@ void LightManager::CollectLights(const std::vector<std::shared_ptr<GameObject>>&
                 if (m_lights.size() < MAX_LIGHTS) {
                     m_lights.push_back(lightComp.get());
                 } else {
-                    printf("[LightManager] Warning: Maximum number of lights (%zu) reached, skipping light\n", MAX_LIGHTS);
+                    core::Logger::Warning(
+                        "[LightManager] Maximum number of lights (%zu) reached, skipping light",
+                        MAX_LIGHTS);
                 }
             }
         }

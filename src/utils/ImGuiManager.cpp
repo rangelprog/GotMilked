@@ -5,7 +5,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include <cstdio>
+#include "gm/core/Logger.hpp"
 
 namespace gm {
 namespace utils {
@@ -25,7 +25,7 @@ bool ImGuiManager::Init(GLFWwindow* window) {
     if (m_initialized) return true;
     
     if (!window) {
-        printf("[ImGuiManager] Error: Window is null\n");
+        core::Logger::Error("[ImGuiManager] Window is null");
         return false;
     }
     
@@ -46,7 +46,7 @@ bool ImGuiManager::Init(GLFWwindow* window) {
     ImGui_ImplOpenGL3_Init("#version 460 core");
     
     m_initialized = true;
-    printf("[ImGuiManager] Initialized successfully\n");
+    core::Logger::Info("[ImGuiManager] Initialized successfully");
     return true;
 }
 

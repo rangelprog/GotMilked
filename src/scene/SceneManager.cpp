@@ -1,24 +1,26 @@
 #include "gm/scene/SceneManager.hpp"
+#include "gm/scene/Scene.hpp"
+#include "gm/core/Logger.hpp"
 #include <algorithm>
-#include <cstdio>
 
 namespace gm {
 
 std::shared_ptr<Scene> SceneManager::CreateScene(const std::string& name) {
     if (name.empty()) {
-        printf("[SceneManager] Error: Cannot create scene with empty name\n");
+        core::Logger::Error("[SceneManager] Cannot create scene with empty name");
         return nullptr;
     }
     
     if (scenes.find(name) != scenes.end()) {
-        printf("[SceneManager] Warning: Scene '%s' already exists, returning existing scene\n", name.c_str());
+        core::Logger::Warning("[SceneManager] Scene '%s' already exists, returning existing scene",
+                              name.c_str());
         return scenes[name];
     }
 
     auto scene = std::make_shared<Scene>(name);
     scenes[name] = scene;
     
-    printf("[SceneManager] Created scene '%s'\n", name.c_str());
+    core::Logger::Info("[SceneManager] Created scene '%s'", name.c_str());
     return scene;
 }
 
@@ -39,7 +41,7 @@ void SceneManager::UnloadScene(const std::string& name) {
             activeScene = nullptr;
         }
         
-        printf("[SceneManager] Unloaded scene '%s'\n", name.c_str());
+        core::Logger::Info("[SceneManager] Unloaded scene '%s'", name.c_str());
     }
 }
 
@@ -49,7 +51,7 @@ void SceneManager::UnloadAllScenes() {
     }
     scenes.clear();
     activeScene = nullptr;
-    printf("[SceneManager] Unloaded all scenes\n");
+    core::Logger::Info("[SceneManager] Unloaded all scenes");
 }
 
 std::shared_ptr<Scene> SceneManager::GetScene(const std::string& name) {
@@ -66,27 +68,28 @@ bool SceneManager::HasScene(const std::string& name) const {
 
 void SceneManager::SetActiveScene(const std::string& name) {
     if (name.empty()) {
-        printf("[SceneManager] Error: Cannot set active scene with empty name\n");
+        core::Logger::Error("[SceneManager] Cannot set active scene with empty name");
         return;
     }
     
     auto scene = GetScene(name);
     if (scene) {
         activeScene = scene;
-        printf("[SceneManager] Set active scene to '%s'\n", name.c_str());
+        core::Logger::Info("[SceneManager] Set active scene to '%s'", name.c_str());
     } else {
-        printf("[SceneManager] Error: Scene '%s' not found\n", name.c_str());
+        core::Logger::Error("[SceneManager] Scene '%s' not found", name.c_str());
     }
 }
 
 void SceneManager::InitActiveScene() {
     if (!activeScene) {
-        printf("[SceneManager] Warning: No active scene to initialize\n");
+        core::Logger::Warning("[SceneManager] No active scene to initialize");
         return;
     }
     
     if (activeScene->IsInitialized()) {
-        printf("[SceneManager] Warning: Active scene '%s' is already initialized\n", activeScene->GetName().c_str());
+        core::Logger::Warning("[SceneManager] Active scene '%s' is already initialized",
+                              activeScene->GetName().c_str());
         return;
     }
     
@@ -99,7 +102,8 @@ void SceneManager::UpdateActiveScene(float deltaTime) {
     }
     
     if (deltaTime < 0.0f) {
-        printf("[SceneManager] Warning: Negative deltaTime (%.6f), clamping to 0\n", deltaTime);
+        core::Logger::Warning("[SceneManager] Negative deltaTime (%.6f), clamping to 0",
+                              deltaTime);
         deltaTime = 0.0f;
     }
     

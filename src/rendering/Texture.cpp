@@ -1,6 +1,6 @@
 #include "gm/rendering/Texture.hpp"
 #include <glad/glad.h>
-#include <cstdio>
+#include "gm/core/Logger.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -34,8 +34,8 @@ bool Texture::createRGBA8(int width, int height,
                           const std::vector<std::uint8_t> &pixels,
                           bool generateMipmaps) {
   if (width <= 0 || height <= 0 || (int)pixels.size() < width * height * 4) {
-    std::fprintf(stderr, "Texture: invalid RGBA8 buffer (%dx%d, size=%zu)\n",
-                 width, height, pixels.size());
+    core::Logger::Error("Texture: invalid RGBA8 buffer (%dx%d, size=%zu)",
+                        width, height, pixels.size());
     return false;
   }
   if (!m_id)
@@ -89,9 +89,8 @@ Texture Texture::loadOrDie(const std::string& path, bool flipY) {
     int w = 0, h = 0, comp = 0;
     unsigned char* data = stbi_load(path.c_str(), &w, &h, &comp, 4);
     if (!data) {
-        std::fprintf(stderr, "Texture load FAILED: %s (%s)\n", path.c_str(),
-            stbi_failure_reason());
-        std::fflush(stderr);
+        core::Logger::Error("Texture load FAILED: %s (%s)", path.c_str(),
+                            stbi_failure_reason());
         std::abort();
     }
 
@@ -101,8 +100,7 @@ Texture Texture::loadOrDie(const std::string& path, bool flipY) {
 
     Texture t;
     if (!t.createRGBA8(w, h, pixels, true)) {
-        std::fprintf(stderr, "Texture upload FAILED: %s\n", path.c_str());
-        std::fflush(stderr);
+        core::Logger::Error("Texture upload FAILED: %s", path.c_str());
         std::abort();
     }
     return t;

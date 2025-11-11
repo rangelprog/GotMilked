@@ -1,4 +1,4 @@
-#include "CowRendererComponent.hpp"
+#include "MeshSpinnerComponent.hpp"
 #include "gm/rendering/Shader.hpp"
 #include "gm/rendering/Texture.hpp"
 #include "gm/rendering/Mesh.hpp"
@@ -10,31 +10,29 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-CowRendererComponent::CowRendererComponent()
+MeshSpinnerComponent::MeshSpinnerComponent()
     : gm::Component() {
-    name = "CowRenderer";
+    name = "MeshSpinnerComponent";
 }
 
-void CowRendererComponent::Init() {
+void MeshSpinnerComponent::Init() {
     // Component initialization - mesh, texture, shader should already be set
     if (!mesh || !texture || !shader || !camera) {
         // Log warning but don't fail - these can be set later
     }
 }
 
-void CowRendererComponent::Update(float deltaTime) {
-    // Update elapsed time for rotation animation
-    elapsedTime += deltaTime;
-    
-    // Apply rotation to TransformComponent if present
-    if (owner) {
-        if (auto transform = owner->GetTransform()) {
-            transform->SetRotation(0.0f, elapsedTime * rotationSpeed, 0.0f);
-        }
+void MeshSpinnerComponent::Update(float deltaTime) {
+    if (!owner) {
+        return;
+    }
+
+    if (auto transform = owner->GetTransform()) {
+        transform->Rotate(0.0f, rotationSpeed * deltaTime, 0.0f);
     }
 }
 
-void CowRendererComponent::Render() {
+void MeshSpinnerComponent::Render() {
     if (!mesh || !shader || !camera || !owner) {
         return;
     }

@@ -19,10 +19,6 @@ public:
     MaterialComponent();
     ~MaterialComponent() override = default;
 
-    void Init() override {}
-    void Update(float deltaTime) override {}
-    void Render() override {}
-
     // Material management
     void SetMaterial(std::shared_ptr<Material> material) { m_material = material; }
     std::shared_ptr<Material> GetMaterial() const { return m_material; }
