@@ -24,6 +24,8 @@
 #include "gm/scene/MaterialComponent.hpp"
 #include "gm/scene/LightComponent.hpp"
 #include "gm/scene/SceneSerializer.hpp"
+#include "gm/scene/ComponentFactory.hpp"
+#include "gm/scene/StaticMeshComponent.hpp"
 
 // Utilities
 #include "gm/utils/ObjLoader.hpp"
@@ -31,12 +33,14 @@
 #include "gm/utils/CoordinateDisplay.hpp"
 #include "gm/utils/ImGuiManager.hpp"
 #include "gm/utils/HotReloader.hpp"
+#include "gm/utils/FileDialog.hpp"
 
 // Prototypes
 #include "gm/prototypes/Primitives.hpp"
 
 // Physics
 #include "gm/physics/PhysicsWorld.hpp"
+#include "gm/physics/RigidBodyComponent.hpp"
 
 // Gameplay
 #include "gm/gameplay/FlyCameraController.hpp"

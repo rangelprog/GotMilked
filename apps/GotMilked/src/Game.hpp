@@ -14,7 +14,6 @@ namespace gm {
     class Scene;
     class GameObject;
     namespace core { class InputManager; }
-    namespace scene { struct Transform; }
 }
 
 #include "gm/scene/GameObject.hpp"
@@ -67,8 +66,20 @@ private:
     void PerformQuickLoad();
     void ForceResourceReload();
 
+    // Initialization helpers
+    bool SetupPhysics();
+    bool SetupRendering();
+    void SetupInput();
+    void SetupGameplay();
+    void SetupSaveSystem();
+    bool SetupDebugTools();
+#ifdef _DEBUG
+    void SetupDebugMenu();
+#endif
+    
     // Helper methods
     void SetupScene();
     void SetupResourceHotReload();
     void ApplyResourcesToScene();
+    void ApplyResourcesToTerrain();
 };

@@ -7,7 +7,7 @@ class Scene;
 class Camera;
 }
 
-struct GameResources;
+class GameResources;
 struct GLFWwindow;
 
 namespace gotmilked {

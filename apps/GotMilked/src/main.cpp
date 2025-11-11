@@ -1,10 +1,10 @@
 #include <filesystem>
 #include <string>
 #include <exception>
-#include <cstdio>
 
 #include "Game.hpp"
 #include "gm/core/GameApp.hpp"
+#include "gm/core/Logger.hpp"
 #include "gm/utils/Config.hpp"
 
 int main() {
@@ -31,10 +31,10 @@ int main() {
       try {
         return game.Init(ctx.window);
       } catch (const std::exception& ex) {
-        std::fprintf(stderr, "[main] Exception in onInit: %s\n", ex.what());
+        gm::core::Logger::Error("[main] Exception in onInit: %s", ex.what());
         return false;
       } catch (...) {
-        std::fprintf(stderr, "[main] Unknown exception in onInit\n");
+        gm::core::Logger::Error("[main] Unknown exception in onInit");
         return false;
       }
     };
@@ -42,36 +42,36 @@ int main() {
       try {
         game.Update(dt);
       } catch (const std::exception& ex) {
-        std::fprintf(stderr, "[main] Exception in onUpdate: %s\n", ex.what());
+        gm::core::Logger::Error("[main] Exception in onUpdate: %s", ex.what());
       } catch (...) {
-        std::fprintf(stderr, "[main] Unknown exception in onUpdate\n");
+        gm::core::Logger::Error("[main] Unknown exception in onUpdate");
       }
     };
     callbacks.onRender = [&](gm::core::GameAppContext&) {
       try {
         game.Render();
       } catch (const std::exception& ex) {
-        std::fprintf(stderr, "[main] Exception in onRender: %s\n", ex.what());
+        gm::core::Logger::Error("[main] Exception in onRender: %s", ex.what());
       } catch (...) {
-        std::fprintf(stderr, "[main] Unknown exception in onRender\n");
+        gm::core::Logger::Error("[main] Unknown exception in onRender");
       }
     };
     callbacks.onShutdown = [&](gm::core::GameAppContext&) {
       try {
         game.Shutdown();
       } catch (const std::exception& ex) {
-        std::fprintf(stderr, "[main] Exception in onShutdown: %s\n", ex.what());
+        gm::core::Logger::Error("[main] Exception in onShutdown: %s", ex.what());
       } catch (...) {
-        std::fprintf(stderr, "[main] Unknown exception in onShutdown\n");
+        gm::core::Logger::Error("[main] Unknown exception in onShutdown");
       }
     };
 
     return app.Run(callbacks);
   } catch (const std::exception& ex) {
-    std::fprintf(stderr, "[main] Fatal exception: %s\n", ex.what());
+    gm::core::Logger::Error("[main] Fatal exception: %s", ex.what());
     return 1;
   } catch (...) {
-    std::fprintf(stderr, "[main] Fatal unknown exception\n");
+    gm::core::Logger::Error("[main] Fatal unknown exception");
     return 1;
   }
 }

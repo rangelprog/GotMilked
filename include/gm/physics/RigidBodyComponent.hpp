@@ -5,6 +5,11 @@
 
 #include <glm/vec3.hpp>
 
+namespace gm::physics {
+
+/**
+ * @brief Component for adding physics simulation to GameObjects
+ */
 class RigidBodyComponent : public gm::Component {
 public:
     enum class BodyType {
@@ -32,7 +37,9 @@ public:
 
     // For plane collider
     void SetPlaneNormal(const glm::vec3& normal) { m_planeNormal = normal; }
+    glm::vec3 GetPlaneNormal() const { return m_planeNormal; }
     void SetPlaneConstant(float constant) { m_planeConstant = constant; }
+    float GetPlaneConstant() const { return m_planeConstant; }
 
     // For box collider
     void SetBoxHalfExtent(const glm::vec3& halfExtent) { m_boxHalfExtent = halfExtent; }
@@ -44,7 +51,7 @@ public:
 
     // Body handle access
     bool IsValid() const { return m_bodyHandle.IsValid(); }
-    gm::physics::PhysicsWorld::BodyHandle GetBodyHandle() const { return m_bodyHandle; }
+    PhysicsWorld::BodyHandle GetBodyHandle() const { return m_bodyHandle; }
 
 private:
     void CreatePhysicsBody();
@@ -63,7 +70,9 @@ private:
     // Dynamic body parameters
     float m_mass = 1.0f;
 
-    gm::physics::PhysicsWorld::BodyHandle m_bodyHandle;
+    PhysicsWorld::BodyHandle m_bodyHandle;
     bool m_bodyCreated = false;
 };
+
+} // namespace gm::physics
 

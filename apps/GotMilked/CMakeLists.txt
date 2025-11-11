@@ -4,9 +4,6 @@ add_executable(GotMilked
   src/SceneSerializerExtensions.cpp
   src/GameResources.cpp
   src/GameSceneHelpers.cpp
-  src/StaticMeshComponent.cpp
-  src/RigidBodyComponent.cpp
-  src/CowComponent.cpp
   src/EditableTerrainComponent.cpp
   src/DebugMenu.cpp
 )

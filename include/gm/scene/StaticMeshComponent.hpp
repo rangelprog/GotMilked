@@ -9,10 +9,17 @@ class Mesh;
 class Shader;
 class Material;
 class Camera;
+namespace scene {
 class TransformComponent;
 }
+}
 
-class StaticMeshComponent : public gm::Component {
+namespace gm::scene {
+
+/**
+ * @brief Component for rendering a static mesh with shader and material
+ */
+class StaticMeshComponent : public Component {
 public:
     StaticMeshComponent();
 
@@ -20,6 +27,12 @@ public:
     void SetShader(gm::Shader* shader) { m_shader = shader; }
     void SetMaterial(std::shared_ptr<gm::Material> material) { m_material = std::move(material); }
     void SetCamera(const gm::Camera* camera) { m_camera = camera; }
+
+    // Getters
+    gm::Mesh* GetMesh() const { return m_mesh; }
+    gm::Shader* GetShader() const { return m_shader; }
+    std::shared_ptr<gm::Material> GetMaterial() const { return m_material; }
+    const gm::Camera* GetCamera() const { return m_camera; }
 
     void Render() override;
 
@@ -30,4 +43,5 @@ private:
     const gm::Camera* m_camera = nullptr;
 };
 
+} // namespace gm::scene
 

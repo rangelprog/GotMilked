@@ -9,20 +9,17 @@
 #include "Game.hpp"
 #include "GameSceneHelpers.hpp"
 #include "SceneSerializerExtensions.hpp"
-#include "gm/physics/PhysicsWorld.hpp"
 #include "EditableTerrainComponent.hpp"
 
-#include <cstdio>
 #include <filesystem>
 #include <optional>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
 
 #include "gm/rendering/Camera.hpp"
-#include "gm/scene/Transform.hpp"
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/SceneManager.hpp"
+#include "gm/physics/PhysicsWorld.hpp"
 #include "gm/rendering/Material.hpp"
 #include "gm/core/Input.hpp"
 #include "gm/core/InputBindings.hpp"
@@ -37,7 +34,6 @@
 #ifdef _DEBUG
 #include "DebugMenu.hpp"
 #endif
-#include "EditableTerrainComponent.hpp"
 #include <imgui.h>
 
 
@@ -54,39 +50,85 @@ bool Game::Init(GLFWwindow* window) {
         return false;
     }
 
-    auto& physics = gm::physics::PhysicsWorld::Instance();
-    if (!physics.IsInitialized()) {
-        physics.Init();
+    if (!SetupPhysics()) {
+        return false;
     }
 
-    const std::string assetsPath = m_assetsDir.string();
-    if (!m_resources.Load(assetsPath)) {
-        gm::core::Logger::Error("[Game] Failed to load resources from %s", assetsPath.c_str());
+    if (!SetupRendering()) {
+        return false;
+    }
+
+    SetupInput();
+    SetupScene();
+    ApplyResourcesToScene();
+    SetupGameplay();
+    SetupSaveSystem();
+
+    if (!SetupDebugTools()) {
+        gm::core::Logger::Warning("[Game] Some debug tools failed to initialize, continuing anyway");
+    }
+
+    SetupResourceHotReload();
+    return true;
+}
+
+bool Game::SetupPhysics() {
+    auto& physics = gm::physics::PhysicsWorld::Instance();
+    if (!physics.IsInitialized()) {
+        try {
+            physics.Init();
+        } catch (const std::exception& ex) {
+            gm::core::Logger::Error("[Game] Failed to initialize physics: %s", ex.what());
+            return false;
+        } catch (...) {
+            gm::core::Logger::Error("[Game] Failed to initialize physics: unknown error");
+            return false;
+        }
+    }
+    
+    if (!physics.IsInitialized()) {
+        gm::core::Logger::Error("[Game] Physics initialization completed but IsInitialized() returned false");
+        return false;
+    }
+    
+    return true;
+}
+
+bool Game::SetupRendering() {
+    if (!m_resources.Load(m_assetsDir, m_config.resources)) {
+        gm::core::Logger::Error("[Game] Failed to load resources from %s", m_assetsDir.string().c_str());
         return false;
     }
 
     gm::SceneSerializerExtensions::RegisterSerializers();
-
     m_camera = std::make_unique<gm::Camera>();
+    return true;
+}
 
-    // Set up input action bindings
+void Game::SetupInput() {
     auto& inputManager = gm::core::InputManager::Instance();
     gm::core::InputBindings::SetupDefaultBindings(inputManager);
+}
 
-    SetupScene();
-    ApplyResourcesToScene();
-
+void Game::SetupGameplay() {
     m_gameplay = std::make_unique<gm::gameplay::FlyCameraController>(*m_camera, m_window);
     m_gameplay->SetScene(m_gameScene);
+}
 
+void Game::SetupSaveSystem() {
     m_saveManager = std::make_unique<gm::save::SaveManager>(m_config.paths.saves);
+}
 
+bool Game::SetupDebugTools() {
+    // Setup ImGui
     m_imgui = std::make_unique<gm::utils::ImGuiManager>();
     if (m_imgui && !m_imgui->Init(m_window)) {
         gm::core::Logger::Warning("[Game] Failed to initialize ImGui; tooling overlay disabled");
         m_imgui.reset();
+        return false;
     }
 
+    // Setup tooling overlay
     m_tooling = std::make_unique<gm::tooling::Overlay>();
     if (m_tooling) {
         gm::tooling::Overlay::Callbacks callbacks{
@@ -113,133 +155,137 @@ bool Game::Init(GLFWwindow* window) {
     }
 
 #ifdef _DEBUG
+    // Setup debug menu
     m_debugMenu = std::make_unique<DebugMenu>();
     if (m_debugMenu) {
-        DebugMenu::Callbacks callbacks{
-            [this]() { PerformQuickSave(); },
-            [this]() { PerformQuickLoad(); },
-            [this]() { ForceResourceReload(); },
-            [this]() {
-                gm::core::Logger::Info("[Game] onSceneLoaded callback called");
-                
-                // Log all GameObjects in scene before applying resources
-                if (m_gameScene) {
-                    auto allObjects = m_gameScene->GetAllGameObjects();
-                    gm::core::Logger::Info("[Game] Scene has %zu GameObjects after load", allObjects.size());
-                    for (const auto& obj : allObjects) {
-                        if (obj) {
-                            gm::core::Logger::Info("[Game]   - GameObject: '%s' (active=%s)", 
-                                obj->GetName().c_str(), obj->IsActive() ? "yes" : "no");
-                            auto components = obj->GetComponents();
-                            gm::core::Logger::Info("[Game]     Components: %zu", components.size());
-                            for (const auto& comp : components) {
-                                if (comp) {
-                                    gm::core::Logger::Info("[Game]       - %s (active=%s)", 
-                                        comp->GetName().c_str(), comp->IsActive() ? "yes" : "no");
-                                }
+        SetupDebugMenu();
+    }
+#endif
+
+    return true;
+}
+
+#ifdef _DEBUG
+void Game::SetupDebugMenu() {
+    DebugMenu::Callbacks callbacks{
+        [this]() { PerformQuickSave(); },
+        [this]() { PerformQuickLoad(); },
+        [this]() { ForceResourceReload(); },
+        [this]() {
+            gm::core::Logger::Info("[Game] onSceneLoaded callback called");
+            
+            // Log all GameObjects in scene before applying resources
+            if (m_gameScene) {
+                auto allObjects = m_gameScene->GetAllGameObjects();
+                gm::core::Logger::Info("[Game] Scene has %zu GameObjects after load", allObjects.size());
+                for (const auto& obj : allObjects) {
+                    if (obj) {
+                        gm::core::Logger::Info("[Game]   - GameObject: '%s' (active=%s)", 
+                            obj->GetName().c_str(), obj->IsActive() ? "yes" : "no");
+                        auto components = obj->GetComponents();
+                        gm::core::Logger::Info("[Game]     Components: %zu", components.size());
+                        for (const auto& comp : components) {
+                            if (comp) {
+                                gm::core::Logger::Info("[Game]       - %s (active=%s)", 
+                                    comp->GetName().c_str(), comp->IsActive() ? "yes" : "no");
                             }
                         }
                     }
                 }
-                
-                ApplyResourcesToScene();
-                // Reconnect terrain component after scene load
-                if (m_debugMenu && m_gameScene) {
-                    auto terrainObject = m_gameScene->FindGameObjectByName("Terrain");
-                    if (terrainObject) {
-                        if (auto terrain = terrainObject->GetComponent<EditableTerrainComponent>()) {
-                            m_debugMenu->SetTerrainComponent(terrain.get());
-                            // Ensure terrain editor window can be opened
-                            // Don't force it open, but make sure it's connected
-                        }
+            }
+            
+            ApplyResourcesToScene();
+            // Reconnect terrain component after scene load
+            if (m_debugMenu && m_gameScene) {
+                auto terrainObject = m_gameScene->FindGameObjectByName("Terrain");
+                if (terrainObject) {
+                    if (auto terrain = terrainObject->GetComponent<EditableTerrainComponent>()) {
+                        m_debugMenu->SetTerrainComponent(terrain.get());
                     }
                 }
-            },
-            // Camera getters
-            [this]() -> glm::vec3 {
-                return m_camera ? m_camera->Position() : glm::vec3(0.0f);
-            },
-            [this]() -> glm::vec3 {
-                return m_camera ? m_camera->Front() : glm::vec3(0.0f, 0.0f, -1.0f);
-            },
-            [this]() -> float {
-                return m_gameplay ? m_gameplay->GetFovDegrees() : 60.0f;
-            },
-            // Camera setter
-            [this](const glm::vec3& position, const glm::vec3& forward, float fov) {
-                if (m_camera) {
-                    m_camera->SetPosition(position);
-                    m_camera->SetForward(forward);
-                }
-                if (m_gameplay && fov > 0.0f) {
-                    m_gameplay->SetFovDegrees(fov);
-                }
-            },
-            // Rendering callbacks for GameObject labels
-            [this]() -> glm::mat4 {
-                return m_camera ? m_camera->View() : glm::mat4(1.0f);
-            },
-            [this]() -> glm::mat4 {
-                if (!m_window || !m_gameplay) {
-                    return glm::mat4(1.0f);
-                }
-                int fbw, fbh;
-                glfwGetFramebufferSize(m_window, &fbw, &fbh);
-                if (fbw <= 0 || fbh <= 0) {
-                    return glm::mat4(1.0f);
-                }
-                float aspect = static_cast<float>(fbw) / static_cast<float>(fbh);
-                float fov = m_gameplay->GetFovDegrees();
-                return glm::perspective(glm::radians(fov), aspect, 0.1f, 200.0f);
-            },
-            [this](int& width, int& height) {
-                if (m_window) {
-                    glfwGetFramebufferSize(m_window, &width, &height);
-                } else {
-                    width = 0;
-                    height = 0;
-                }
             }
-        };
-        m_debugMenu->SetCallbacks(std::move(callbacks));
-        m_debugMenu->SetSaveManager(m_saveManager.get());
-        m_debugMenu->SetScene(m_gameScene);
-        
-        // Set window handle for file dialogs
+        },
+        // Camera getters
+        [this]() -> glm::vec3 {
+            return m_camera ? m_camera->Position() : glm::vec3(0.0f);
+        },
+        [this]() -> glm::vec3 {
+            return m_camera ? m_camera->Front() : glm::vec3(0.0f, 0.0f, -1.0f);
+        },
+        [this]() -> float {
+            return m_gameplay ? m_gameplay->GetFovDegrees() : 60.0f;
+        },
+        // Camera setter
+        [this](const glm::vec3& position, const glm::vec3& forward, float fov) {
+            if (m_camera) {
+                m_camera->SetPosition(position);
+                m_camera->SetForward(forward);
+            }
+            if (m_gameplay && fov > 0.0f) {
+                m_gameplay->SetFovDegrees(fov);
+            }
+        },
+        // Rendering callbacks for GameObject labels
+        [this]() -> glm::mat4 {
+            return m_camera ? m_camera->View() : glm::mat4(1.0f);
+        },
+        [this]() -> glm::mat4 {
+            if (!m_window || !m_gameplay) {
+                return glm::mat4(1.0f);
+            }
+            int fbw, fbh;
+            glfwGetFramebufferSize(m_window, &fbw, &fbh);
+            if (fbw <= 0 || fbh <= 0) {
+                return glm::mat4(1.0f);
+            }
+            float aspect = static_cast<float>(fbw) / static_cast<float>(fbh);
+            float fov = m_gameplay->GetFovDegrees();
+            return glm::perspective(glm::radians(fov), aspect, 0.1f, 200.0f);
+        },
+        [this](int& width, int& height) {
+            if (m_window) {
+                glfwGetFramebufferSize(m_window, &width, &height);
+            } else {
+                width = 0;
+                height = 0;
+            }
+        }
+    };
+    m_debugMenu->SetCallbacks(std::move(callbacks));
+    m_debugMenu->SetSaveManager(m_saveManager.get());
+    m_debugMenu->SetScene(m_gameScene);
+    
+    // Set window handle for file dialogs
 #ifdef _WIN32
-        if (m_window) {
-            HWND hwnd = glfwGetWin32Window(m_window);
-            m_debugMenu->SetWindowHandle(hwnd);
-        }
-#endif
-
-        // Find terrain component and connect it to debug menu
-        if (m_gameScene) {
-            auto terrainObject = m_gameScene->FindGameObjectByName("Terrain");
-            if (terrainObject) {
-                if (auto terrain = terrainObject->GetComponent<EditableTerrainComponent>()) {
-                    m_debugMenu->SetTerrainComponent(terrain.get());
-                }
-            }
-        }
+    if (m_window) {
+        HWND hwnd = glfwGetWin32Window(m_window);
+        m_debugMenu->SetWindowHandle(hwnd);
     }
 #endif
 
-    SetupResourceHotReload();
-    return true;
+    // Find terrain component and connect it to debug menu
+    if (m_gameScene) {
+        auto terrainObject = m_gameScene->FindGameObjectByName("Terrain");
+        if (terrainObject) {
+            if (auto terrain = terrainObject->GetComponent<EditableTerrainComponent>()) {
+                m_debugMenu->SetTerrainComponent(terrain.get());
+            }
+        }
+    }
 }
+#endif
 
 void Game::SetupScene() {
     auto& sceneManager = gm::SceneManager::Instance();
 
     m_gameScene = sceneManager.LoadScene("GameScene");
     if (!m_gameScene) {
-        std::printf("[Game] Error: Failed to create game scene\n");
+        gm::core::Logger::Error("[Game] Failed to create game scene");
         return;
     }
 
     m_gameScene->SetParallelGameObjectUpdates(true);
-    std::printf("[Game] Game scene initialized successfully\n");
+    gm::core::Logger::Info("[Game] Game scene initialized successfully");
 
     // Populate initial scene if empty
     if (m_gameScene->GetAllGameObjects().empty()) {
@@ -308,8 +354,8 @@ void Game::Update(float dt) {
 
 void Game::Render() {
     if (!m_window) return;
-    if (!m_resources.shader) {
-        std::printf("[Game] Warning: Cannot render - shader not loaded\n");
+    if (!m_resources.GetShader()) {
+        gm::core::Logger::Warning("[Game] Cannot render - shader not loaded");
         return;
     }
 
@@ -330,7 +376,7 @@ void Game::Render() {
 
     // Render the game scene with all its GameObjects
     if (m_gameScene && m_camera) {
-        m_gameScene->Draw(*m_resources.shader, *m_camera, fbw, fbh, fov);
+        m_gameScene->Draw(*m_resources.GetShader(), *m_camera, fbw, fbh, fov);
     }
     
     if (m_imgui && m_imgui->IsInitialized()) {
@@ -368,7 +414,7 @@ void Game::Shutdown() {
     m_camera.reset();
     
     // InputManager is a singleton, no need to manually reset
-    printf("[Game] Shutdown complete\n");
+    gm::core::Logger::Info("[Game] Shutdown complete");
 
     gm::physics::PhysicsWorld::Instance().Shutdown();
 }
@@ -381,10 +427,10 @@ void Game::SetupResourceHotReload() {
         return;
     }
 
-    if (!m_resources.shaderVertPath.empty() && !m_resources.shaderFragPath.empty()) {
+    if (!m_resources.GetShaderVertPath().empty() && !m_resources.GetShaderFragPath().empty()) {
         m_hotReloader.AddWatch(
             "game_shader",
-            {std::filesystem::path(m_resources.shaderVertPath), std::filesystem::path(m_resources.shaderFragPath)},
+            {std::filesystem::path(m_resources.GetShaderVertPath()), std::filesystem::path(m_resources.GetShaderFragPath())},
             [this]() {
                 bool ok = m_resources.ReloadShader();
                 if (ok) {
@@ -394,10 +440,10 @@ void Game::SetupResourceHotReload() {
             });
     }
 
-    if (!m_resources.texturePath.empty()) {
+    if (!m_resources.GetTexturePath().empty()) {
         m_hotReloader.AddWatch(
             "game_texture",
-            {std::filesystem::path(m_resources.texturePath)},
+            {std::filesystem::path(m_resources.GetTexturePath())},
             [this]() {
                 bool ok = m_resources.ReloadTexture();
                 if (ok) {
@@ -407,10 +453,10 @@ void Game::SetupResourceHotReload() {
             });
     }
 
-    if (!m_resources.meshPath.empty()) {
+    if (!m_resources.GetMeshPath().empty()) {
         m_hotReloader.AddWatch(
             "game_mesh",
-            {std::filesystem::path(m_resources.meshPath)},
+            {std::filesystem::path(m_resources.GetMeshPath())},
             [this]() {
                 bool ok = m_resources.ReloadMesh();
                 if (ok) {
@@ -429,54 +475,45 @@ void Game::ApplyResourcesToScene() {
         return;
     }
 
-    auto terrainObject = m_gameScene->FindGameObjectByName("Terrain");
-    if (!terrainObject) {
-        gm::core::Logger::Warning("[Game] ApplyResourcesToScene: Terrain object not found");
-        return;
-    }
-
-    if (auto terrain = terrainObject->GetComponent<EditableTerrainComponent>()) {
-        gm::core::Logger::Info("[Game] ApplyResourcesToScene: Found terrain component");
-        
-        terrain->SetShader(m_resources.shader.get());
-        terrain->SetMaterial(m_resources.planeMaterial);
-        terrain->SetWindow(m_window);
-        terrain->SetCamera(m_camera.get());
-        
-        // Set FOV provider for terrain ray picking
-        if (m_gameplay) {
-            auto fovProvider = [this]() -> float {
-                return m_gameplay->GetFovDegrees();
-            };
-            terrain->SetFovProvider(std::move(fovProvider));
-        }
-        
-        // Ensure terrain GameObject is initialized
-        terrainObject->Init();
-        
-        // Reinitialize terrain component to rebuild mesh if needed
-        // This will mark mesh as dirty if heights are already loaded
-        terrain->Init();
-        
-        // After loading scenes, explicitly mark mesh as dirty to ensure it rebuilds
-        // This is critical because the terrain component might have been deserialized
-        // with height data, but the mesh hasn't been created yet
-        terrain->MarkMeshDirty();
-        
-        // Log terrain state for debugging
-        gm::core::Logger::Info("[Game] Terrain: resolution=%d, size=%.2f, heights=%zu, shader=%s, material=%s",
-            terrain->GetResolution(),
-            terrain->GetTerrainSize(),
-            terrain->GetHeights().size(),
-            m_resources.shader ? "set" : "null",
-            m_resources.planeMaterial ? "set" : "null");
-    } else {
-        gm::core::Logger::Warning("[Game] ApplyResourcesToScene: Terrain component not found on Terrain object");
-    }
+    ApplyResourcesToTerrain();
 
     if (m_tooling) {
         m_tooling->SetScene(m_gameScene);
     }
+}
+
+void Game::ApplyResourcesToTerrain() {
+    if (!m_gameScene) {
+        return;
+    }
+
+    auto terrainObject = m_gameScene->FindGameObjectByName("Terrain");
+    if (!terrainObject) {
+        return;
+    }
+
+    auto terrain = terrainObject->GetComponent<EditableTerrainComponent>();
+    if (!terrain) {
+        return;
+    }
+
+    // Apply resources to terrain component
+    terrain->SetShader(m_resources.GetShader());
+    terrain->SetMaterial(m_resources.GetPlaneMaterial());
+    terrain->SetWindow(m_window);
+    terrain->SetCamera(m_camera.get());
+
+    // Set FOV provider for terrain ray picking
+    if (m_gameplay) {
+        terrain->SetFovProvider([this]() -> float {
+            return m_gameplay->GetFovDegrees();
+        });
+    }
+
+    // Initialize terrain and mark mesh dirty to ensure it rebuilds
+    terrainObject->Init();
+    terrain->Init();
+    terrain->MarkMeshDirty();
 }
 
 void Game::PerformQuickSave() {

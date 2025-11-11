@@ -7,9 +7,6 @@ add_executable(GotMilkedTests
     TestAssetHelpers.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameResources.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameSceneHelpers.cpp
-    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/StaticMeshComponent.cpp
-    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/RigidBodyComponent.cpp
-    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/CowComponent.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/EditableTerrainComponent.cpp
     TestMain.cpp
 )

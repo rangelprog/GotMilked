@@ -70,8 +70,8 @@ void SceneDrawSmoke() {
 
     GameResources resources;
     PopulateGameResourcesFromTestAssets(bundle, resources);
-    assert(resources.shader);
-    assert(resources.mesh);
+    assert(resources.GetShader());
+    assert(resources.GetMesh());
 
     gm::Scene scene("DrawScene");
 
@@ -80,10 +80,10 @@ void SceneDrawSmoke() {
     gotmilked::PopulateInitialScene(scene, camera, resources);
     scene.Init();
 
-    if (resources.shader) {
-        resources.shader->Use();
+    if (resources.GetShader()) {
+        resources.GetShader()->Use();
     }
-    scene.Draw(*resources.shader, camera, 128, 128, 60.0f);
+    scene.Draw(*resources.GetShader(), camera, 128, 128, 60.0f);
 
     resources.Release();
 }

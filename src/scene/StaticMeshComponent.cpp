@@ -1,4 +1,4 @@
-#include "StaticMeshComponent.hpp"
+#include "gm/scene/StaticMeshComponent.hpp"
 
 #include "gm/rendering/Mesh.hpp"
 #include "gm/rendering/Shader.hpp"
@@ -9,6 +9,8 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
+
+namespace gm::scene {
 
 StaticMeshComponent::StaticMeshComponent() {
     SetName("StaticMeshComponent");
@@ -42,4 +44,5 @@ void StaticMeshComponent::Render() {
     m_mesh->Draw();
 }
 
+} // namespace gm::scene
 

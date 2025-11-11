@@ -222,10 +222,13 @@ bool EditableTerrainComponent::SetHeightData(int resolution,
                                               float maxHeight,
                                               const std::vector<float>& heights) {
     if (resolution < 2) {
+        gm::core::Logger::Error("[EditableTerrainComponent] SetHeightData failed: resolution (%d) must be at least 2", resolution);
         return false;
     }
     const std::size_t expected = static_cast<std::size_t>(resolution) * static_cast<std::size_t>(resolution);
     if (heights.size() != expected) {
+        gm::core::Logger::Error("[EditableTerrainComponent] SetHeightData failed: expected %zu height values, got %zu", 
+                    expected, heights.size());
         return false;
     }
 

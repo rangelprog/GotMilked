@@ -1,4 +1,4 @@
-#include "RigidBodyComponent.hpp"
+#include "gm/physics/RigidBodyComponent.hpp"
 
 #include "gm/scene/GameObject.hpp"
 #include "gm/scene/TransformComponent.hpp"
@@ -7,23 +7,25 @@
 
 namespace {
 
-const char* ToString(RigidBodyComponent::BodyType type) {
+const char* ToString(gm::physics::RigidBodyComponent::BodyType type) {
     switch (type) {
-        case RigidBodyComponent::BodyType::Static: return "Static";
-        case RigidBodyComponent::BodyType::Dynamic: return "Dynamic";
+        case gm::physics::RigidBodyComponent::BodyType::Static: return "Static";
+        case gm::physics::RigidBodyComponent::BodyType::Dynamic: return "Dynamic";
     }
     return "Unknown";
 }
 
-const char* ToString(RigidBodyComponent::ColliderShape shape) {
+const char* ToString(gm::physics::RigidBodyComponent::ColliderShape shape) {
     switch (shape) {
-        case RigidBodyComponent::ColliderShape::Plane: return "Plane";
-        case RigidBodyComponent::ColliderShape::Box: return "Box";
+        case gm::physics::RigidBodyComponent::ColliderShape::Plane: return "Plane";
+        case gm::physics::RigidBodyComponent::ColliderShape::Box: return "Box";
     }
     return "Unknown";
 }
 
 } // namespace
+
+namespace gm::physics {
 
 RigidBodyComponent::RigidBodyComponent() = default;
 
@@ -42,22 +44,23 @@ void RigidBodyComponent::OnDestroy() {
 }
 
 void RigidBodyComponent::CreatePhysicsBody() {
-    if (m_bodyCreated || !owner) {
+    if (m_bodyCreated || !GetOwner()) {
         return;
     }
 
-    auto& physics = gm::physics::PhysicsWorld::Instance();
+    auto& physics = PhysicsWorld::Instance();
     if (!physics.IsInitialized()) {
         return;
     }
 
+    auto* owner = GetOwner();
     if (m_bodyType == BodyType::Static && m_colliderShape == ColliderShape::Plane) {
         m_bodyHandle = physics.CreateStaticPlane(*owner, m_planeNormal, m_planeConstant);
     } else if (m_bodyType == BodyType::Dynamic && m_colliderShape == ColliderShape::Box) {
         m_bodyHandle = physics.CreateDynamicBox(*owner, m_boxHalfExtent, m_mass);
     } else {
         const char* ownerName = owner ? owner->GetName().c_str() : "<null>";
-        gm::core::Logger::Warning(
+        core::Logger::Warning(
             "[RigidBodyComponent] Unsupported body/collider combination (body=%s, collider=%s) on '%s'",
             ToString(m_bodyType),
             ToString(m_colliderShape),
@@ -73,12 +76,14 @@ void RigidBodyComponent::DestroyPhysicsBody() {
         return;
     }
 
-    auto& physics = gm::physics::PhysicsWorld::Instance();
+    auto& physics = PhysicsWorld::Instance();
     if (physics.IsInitialized()) {
         physics.RemoveBody(m_bodyHandle);
     }
 
-    m_bodyHandle = gm::physics::PhysicsWorld::BodyHandle{};
+    m_bodyHandle = PhysicsWorld::BodyHandle{};
     m_bodyCreated = false;
 }
+
+} // namespace gm::physics
 

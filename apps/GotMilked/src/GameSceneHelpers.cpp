@@ -7,8 +7,8 @@
 #include "gm/scene/GameObject.hpp"
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/scene/LightComponent.hpp"
+#include "gm/core/Logger.hpp"
 
-#include <cstdio>
 #include <glm/vec3.hpp>
 #include <utility>
 
@@ -41,11 +41,11 @@ void PopulateInitialScene(
 
     auto terrainComponent = terrainObject->AddComponent<EditableTerrainComponent>();
     terrainComponent->SetCamera(&camera);
-    if (resources.shader) {
-        terrainComponent->SetShader(resources.shader.get());
+    if (resources.GetShader()) {
+        terrainComponent->SetShader(resources.GetShader());
     }
-    if (resources.planeMaterial) {
-        terrainComponent->SetMaterial(resources.planeMaterial);
+    if (resources.GetPlaneMaterial()) {
+        terrainComponent->SetMaterial(resources.GetPlaneMaterial());
     }
     terrainComponent->SetWindow(window);
     if (fovProvider) {
@@ -53,7 +53,7 @@ void PopulateInitialScene(
     }
     terrainComponent->SetTerrainSize(40.0f);
 
-    std::printf("[Game] Scene populated with editable terrain\n");
+    gm::core::Logger::Info("[Game] Scene populated with editable terrain");
 }
 
 } // namespace gotmilked

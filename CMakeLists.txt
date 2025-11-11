@@ -144,6 +144,8 @@ add_library(GotMilkedEngine
     src/scene/MaterialComponent.cpp
     src/scene/LightComponent.cpp
     src/scene/SceneSerializer.cpp
+    src/scene/ComponentFactory.cpp
+    src/scene/StaticMeshComponent.cpp
 
     # Utils
     src/utils/ObjLoader.cpp
@@ -153,10 +155,12 @@ add_library(GotMilkedEngine
     src/utils/ResourceRegistry.cpp
     src/utils/Config.cpp
     src/utils/HotReloader.cpp
+    src/utils/FileDialog.cpp
 
     # Physics
     src/physics/PhysicsWorld.cpp
     src/physics/JoltImpl.cpp
+    src/physics/RigidBodyComponent.cpp
 
     # Prototypes
     src/prototypes/Primitives.cpp

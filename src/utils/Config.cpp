@@ -50,6 +50,19 @@ static T GetOrDefault(const nlohmann::json& obj, const char* key, const T& fallb
 
 } // namespace
 
+std::filesystem::path gm::utils::ResourcePathConfig::ResolvePath(
+    const std::filesystem::path& assetsDir,
+    const std::string& relativePath) const {
+    if (relativePath.empty()) {
+        return NormalizePath(assetsDir);
+    }
+    std::filesystem::path raw(relativePath);
+    if (raw.is_absolute()) {
+        return NormalizePath(raw);
+    }
+    return NormalizePath(assetsDir / raw);
+}
+
 AppConfig ConfigLoader::CreateDefault(const std::filesystem::path& baseDir) {
     AppConfig config{};
     config.configDirectory = baseDir;
@@ -107,6 +120,14 @@ ConfigLoadResult ConfigLoader::Load(const std::filesystem::path& path) {
     if (pathsObj.contains("saves") && pathsObj["saves"].is_string()) {
         result.config.paths.saves = ResolvePath(baseDir, pathsObj["saves"].get<std::string>());
     }
+
+    // Load resource path configuration
+    const auto resourcesObj = json.contains("resources") ? json["resources"] : nlohmann::json::object();
+    result.config.resources.shaderVert = GetOrDefault<std::string>(resourcesObj, "shaderVert", result.config.resources.shaderVert);
+    result.config.resources.shaderFrag = GetOrDefault<std::string>(resourcesObj, "shaderFrag", result.config.resources.shaderFrag);
+    result.config.resources.textureGround = GetOrDefault<std::string>(resourcesObj, "textureGround", result.config.resources.textureGround);
+    result.config.resources.textureCow = GetOrDefault<std::string>(resourcesObj, "textureCow", result.config.resources.textureCow);
+    result.config.resources.meshPlaceholder = GetOrDefault<std::string>(resourcesObj, "meshPlaceholder", result.config.resources.meshPlaceholder);
 
     const auto hotReloadObj = json.contains("hotReload") ? json["hotReload"] : nlohmann::json::object();
     result.config.hotReload.enable = GetOrDefault<bool>(hotReloadObj, "enable", result.config.hotReload.enable);

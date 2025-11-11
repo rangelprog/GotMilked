@@ -78,12 +78,13 @@ TestAssetBundle CreateMeshSpinnerTestAssets() {
 }
 
 void PopulateGameResourcesFromTestAssets(const TestAssetBundle& bundle, GameResources& resources) {
-    resources.shader = std::make_unique<gm::Shader>();
-    if (!resources.shader->loadFromFiles(bundle.vertPath, bundle.fragPath)) {
+    // Friend function - can access private members
+    resources.m_shader = std::make_unique<gm::Shader>();
+    if (!resources.m_shader->loadFromFiles(bundle.vertPath, bundle.fragPath)) {
         throw std::runtime_error("Failed to load shader from test assets");
     }
-    resources.shader->Use();
-    resources.shader->SetInt("uTex", 0);
+    resources.m_shader->Use();
+    resources.m_shader->SetInt("uTex", 0);
 
     auto texture = std::make_unique<gm::Texture>();
     std::vector<std::uint8_t> pixels = {
@@ -95,29 +96,29 @@ void PopulateGameResourcesFromTestAssets(const TestAssetBundle& bundle, GameReso
     if (!texture->createRGBA8(2, 2, pixels, false)) {
         throw std::runtime_error("Failed to create procedural texture");
     }
-    resources.texture = std::move(texture);
+    resources.m_texture = std::move(texture);
 
-    resources.mesh = std::make_unique<gm::Mesh>(gm::ObjLoader::LoadObjPNUV(bundle.meshPath));
-    resources.planeMesh = std::make_unique<gm::Mesh>(gm::prototypes::CreatePlane(5.0f, 5.0f, 2.0f));
-    resources.cubeMesh = std::make_unique<gm::Mesh>(gm::prototypes::CreateCube(1.0f));
+    resources.m_mesh = std::make_unique<gm::Mesh>(gm::ObjLoader::LoadObjPNUV(bundle.meshPath));
+    resources.m_planeMesh = std::make_unique<gm::Mesh>(gm::prototypes::CreatePlane(5.0f, 5.0f, 2.0f));
+    resources.m_cubeMesh = std::make_unique<gm::Mesh>(gm::prototypes::CreateCube(1.0f));
 
-    resources.planeMaterial = std::make_shared<gm::Material>(gm::Material::CreatePhong(glm::vec3(0.4f, 0.7f, 0.4f),
+    resources.m_planeMaterial = std::make_shared<gm::Material>(gm::Material::CreatePhong(glm::vec3(0.4f, 0.7f, 0.4f),
                                                                                        glm::vec3(0.2f), 16.0f));
-    resources.planeMaterial->SetDiffuseTexture(resources.texture.get());
-    resources.cubeMaterial = std::make_shared<gm::Material>(gm::Material::CreatePhong(glm::vec3(0.75f, 0.25f, 0.25f),
+    resources.m_planeMaterial->SetDiffuseTexture(resources.m_texture.get());
+    resources.m_cubeMaterial = std::make_shared<gm::Material>(gm::Material::CreatePhong(glm::vec3(0.75f, 0.25f, 0.25f),
                                                                                       glm::vec3(0.4f), 32.0f));
 
-    resources.shaderGuid = "test_shader_" + bundle.root.filename().string();
-    resources.textureGuid = "test_texture_" + bundle.root.filename().string();
-    resources.meshGuid = "test_mesh_" + bundle.root.filename().string();
-    resources.shaderVertPath = bundle.vertPath;
-    resources.shaderFragPath = bundle.fragPath;
-    resources.texturePath = bundle.textureTag;
-    resources.meshPath = bundle.meshPath;
+    resources.m_shaderGuid = "test_shader_" + bundle.root.filename().string();
+    resources.m_textureGuid = "test_texture_" + bundle.root.filename().string();
+    resources.m_meshGuid = "test_mesh_" + bundle.root.filename().string();
+    resources.m_shaderVertPath = bundle.vertPath;
+    resources.m_shaderFragPath = bundle.fragPath;
+    resources.m_texturePath = bundle.textureTag;
+    resources.m_meshPath = bundle.meshPath;
 
     auto& registry = gm::ResourceRegistry::Instance();
-    registry.RegisterShader(resources.shaderGuid, resources.shaderVertPath, resources.shaderFragPath);
-    registry.RegisterTexture(resources.textureGuid, resources.texturePath);
-    registry.RegisterMesh(resources.meshGuid, resources.meshPath);
+    registry.RegisterShader(resources.m_shaderGuid, resources.m_shaderVertPath, resources.m_shaderFragPath);
+    registry.RegisterTexture(resources.m_textureGuid, resources.m_texturePath);
+    registry.RegisterMesh(resources.m_meshGuid, resources.m_meshPath);
 }
 

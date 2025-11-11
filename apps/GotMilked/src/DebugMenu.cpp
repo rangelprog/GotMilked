@@ -7,6 +7,7 @@
 #include "gm/save/SaveManager.hpp"
 #include "gm/core/Logger.hpp"
 #include "EditableTerrainComponent.hpp"
+#include "gm/utils/FileDialog.hpp"
 #include <imgui.h>
 #include <filesystem>
 #include <cstring>
@@ -17,11 +18,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <cmath>
-
-#ifdef _WIN32
-#include <windows.h>
-#include <commdlg.h>
-#endif
 
 void DebugMenu::Render(bool& menuVisible) {
     if (!menuVisible) {
@@ -66,28 +62,14 @@ void DebugMenu::RenderMenuBar() {
         ImGui::Separator();
 
         if (ImGui::MenuItem("Save Scene As...")) {
-#ifdef _WIN32
-            OPENFILENAMEA ofn;
-            char szFile[260] = {0};
+            auto result = gm::utils::FileDialog::SaveFile(
+                "JSON Files\0*.json\0All Files\0*.*\0",
+                "json",
+                m_defaultScenePath,
+                m_windowHandle);
             
-            ZeroMemory(&ofn, sizeof(ofn));
-            ofn.lStructSize = sizeof(ofn);
-            ofn.hwndOwner = static_cast<HWND>(m_windowHandle);
-            ofn.lpstrFile = szFile;
-            ofn.nMaxFile = sizeof(szFile);
-            ofn.lpstrFilter = "JSON Files\0*.json\0All Files\0*.*\0";
-            ofn.nFilterIndex = 1;
-            ofn.lpstrFileTitle = nullptr;
-            ofn.nMaxFileTitle = 0;
-            std::string initialDir = m_defaultScenePath;
-            if (!initialDir.empty() && std::filesystem::exists(initialDir)) {
-                ofn.lpstrInitialDir = initialDir.c_str();
-            }
-            ofn.Flags = OFN_PATHMUSTEXIST;
-            ofn.lpstrDefExt = "json";
-            
-            if (GetSaveFileNameA(&ofn)) {
-                std::string filePath(szFile);
+            if (result.has_value()) {
+                std::string filePath = result.value();
                 auto scene = m_scene.lock();
                 if (scene) {
                     // Check if file exists and generate unique name if needed
@@ -134,7 +116,13 @@ void DebugMenu::RenderMenuBar() {
                     
                     // Get scene JSON and add camera data
                     std::string sceneJsonStr = gm::SceneSerializer::Serialize(*scene);
-                    nlohmann::json sceneJson = nlohmann::json::parse(sceneJsonStr);
+                    nlohmann::json sceneJson;
+                    try {
+                        sceneJson = nlohmann::json::parse(sceneJsonStr);
+                    } catch (const std::exception& ex) {
+                        gm::core::Logger::Error("[DebugMenu] Failed to parse scene JSON: %s", ex.what());
+                        return;
+                    }
                     
                     // Add camera data if callbacks are available
                     if (m_callbacks.getCameraPosition && m_callbacks.getCameraForward && m_callbacks.getCameraFov) {
@@ -155,45 +143,37 @@ void DebugMenu::RenderMenuBar() {
                     std::ofstream file(filePath);
                     if (file.is_open()) {
                         file << sceneJson.dump(4);
-                        file.close();
-                        gm::core::Logger::Info("[DebugMenu] Scene saved to: %s", filePath.c_str());
+                        if (file.fail()) {
+                            gm::core::Logger::Error("[DebugMenu] Failed to write to file: %s", filePath.c_str());
+                        } else {
+                            file.close();
+                            gm::core::Logger::Info("[DebugMenu] Scene saved to: %s", filePath.c_str());
+                        }
                     } else {
                         gm::core::Logger::Error("[DebugMenu] Failed to open file for writing: %s", filePath.c_str());
                     }
                 }
-            }
-#else
-            m_showSaveAsDialog = true;
-            std::memset(m_filePathBuffer, 0, sizeof(m_filePathBuffer));
-            std::string defaultPath = m_defaultScenePath + "scene.json";
-            std::size_t copyLen = std::min(defaultPath.length(), sizeof(m_filePathBuffer) - 1);
-            std::memcpy(m_filePathBuffer, defaultPath.c_str(), copyLen);
-            m_filePathBuffer[copyLen] = '\0';
+            } else {
+                // File dialog was cancelled or failed - show fallback dialog on non-Windows
+#ifndef _WIN32
+                m_showSaveAsDialog = true;
+                std::memset(m_filePathBuffer, 0, sizeof(m_filePathBuffer));
+                std::string defaultPath = m_defaultScenePath + "scene.json";
+                std::size_t copyLen = std::min(defaultPath.length(), sizeof(m_filePathBuffer) - 1);
+                std::memcpy(m_filePathBuffer, defaultPath.c_str(), copyLen);
+                m_filePathBuffer[copyLen] = '\0';
 #endif
+            }
         }
 
         if (ImGui::MenuItem("Load Scene From...")) {
-#ifdef _WIN32
-            OPENFILENAMEA ofn;
-            char szFile[260] = {0};
+            auto result = gm::utils::FileDialog::OpenFile(
+                "JSON Files\0*.json\0All Files\0*.*\0",
+                m_defaultScenePath,
+                m_windowHandle);
             
-            ZeroMemory(&ofn, sizeof(ofn));
-            ofn.lStructSize = sizeof(ofn);
-            ofn.hwndOwner = static_cast<HWND>(m_windowHandle);
-            ofn.lpstrFile = szFile;
-            ofn.nMaxFile = sizeof(szFile);
-            ofn.lpstrFilter = "JSON Files\0*.json\0All Files\0*.*\0";
-            ofn.nFilterIndex = 1;
-            ofn.lpstrFileTitle = nullptr;
-            ofn.nMaxFileTitle = 0;
-            std::string initialDir = m_defaultScenePath;
-            if (!initialDir.empty() && std::filesystem::exists(initialDir)) {
-                ofn.lpstrInitialDir = initialDir.c_str();
-            }
-            ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-            
-            if (GetOpenFileNameA(&ofn)) {
-                std::string filePath(szFile);
+            if (result.has_value()) {
+                std::string filePath = result.value();
                 auto scene = m_scene.lock();
                 if (scene) {
                     // Read the JSON file
@@ -207,7 +187,13 @@ void DebugMenu::RenderMenuBar() {
                     buffer << file.rdbuf();
                     file.close();
                     
-                    nlohmann::json sceneJson = nlohmann::json::parse(buffer.str());
+                    nlohmann::json sceneJson;
+                    try {
+                        sceneJson = nlohmann::json::parse(buffer.str());
+                    } catch (const std::exception& ex) {
+                        gm::core::Logger::Error("[DebugMenu] Failed to parse JSON file %s: %s", filePath.c_str(), ex.what());
+                        return;
+                    }
                     
                     // Extract camera data before deserializing scene
                     if (sceneJson.contains("camera") && m_callbacks.setCamera) {
@@ -241,11 +227,13 @@ void DebugMenu::RenderMenuBar() {
                         gm::core::Logger::Error("[DebugMenu] Failed to load scene from: %s", filePath.c_str());
                     }
                 }
-            }
-#else
-            m_showLoadDialog = true;
-            std::memset(m_filePathBuffer, 0, sizeof(m_filePathBuffer));
+            } else {
+                // File dialog was cancelled or failed - show fallback dialog on non-Windows
+#ifndef _WIN32
+                m_showLoadDialog = true;
+                std::memset(m_filePathBuffer, 0, sizeof(m_filePathBuffer));
 #endif
+            }
         }
 
         ImGui::Separator();
@@ -431,6 +419,10 @@ void DebugMenu::RenderSaveAsDialog() {
             if (!dir.empty()) {
                 std::error_code ec;
                 std::filesystem::create_directories(dir, ec);
+                if (ec) {
+                    gm::core::Logger::Error("[DebugMenu] Failed to create directory %s: %s", 
+                                dir.string().c_str(), ec.message().c_str());
+                }
             }
 
             if (gm::SceneSerializer::SaveToFile(*scene, filePath)) {
