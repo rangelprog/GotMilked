@@ -3,6 +3,7 @@
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/SceneSerializer.hpp"
 #include "gm/scene/GameObject.hpp"
+#include "gm/scene/TransformComponent.hpp"
 #include "gm/save/SaveManager.hpp"
 #include "gm/core/Logger.hpp"
 #include "EditableTerrainComponent.hpp"
@@ -13,6 +14,9 @@
 #include <fstream>
 #include <sstream>
 #include <nlohmann/json.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <cmath>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -35,6 +39,11 @@ void DebugMenu::Render(bool& menuVisible) {
 
     if (m_showLoadDialog) {
         RenderLoadDialog();
+    }
+
+    // Render GameObject labels if enabled
+    if (m_showGameObjects) {
+        RenderGameObjectLabels();
     }
 }
 
@@ -284,6 +293,16 @@ void DebugMenu::RenderMenuBar() {
     } else {
         m_editMenuOpen = false;
     }
+
+    if (ImGui::BeginMenu("Options")) {
+        m_optionsMenuOpen = true;
+
+        ImGui::Checkbox("Show GameObjects", &m_showGameObjects);
+
+        ImGui::EndMenu();
+    } else {
+        m_optionsMenuOpen = false;
+    }
 }
 
 void DebugMenu::RenderFileMenu() {
@@ -292,6 +311,97 @@ void DebugMenu::RenderFileMenu() {
 
 void DebugMenu::RenderEditMenu() {
     // This is called from RenderMenuBar via BeginMenu
+}
+
+void DebugMenu::RenderOptionsMenu() {
+    // This is called from RenderMenuBar via BeginMenu
+}
+
+void DebugMenu::RenderGameObjectLabels() {
+    auto scene = m_scene.lock();
+    if (!scene) {
+        return;
+    }
+
+    // Check if callbacks are valid (std::function can be checked by converting to bool)
+    if (!static_cast<bool>(m_callbacks.getViewMatrix) || 
+        !static_cast<bool>(m_callbacks.getProjectionMatrix) || 
+        !static_cast<bool>(m_callbacks.getViewportSize)) {
+        return;
+    }
+
+    glm::mat4 view = m_callbacks.getViewMatrix();
+    glm::mat4 proj = m_callbacks.getProjectionMatrix();
+    int viewportWidth = 0, viewportHeight = 0;
+    m_callbacks.getViewportSize(viewportWidth, viewportHeight);
+
+    if (viewportWidth <= 0 || viewportHeight <= 0) {
+        return;
+    }
+
+    ImDrawList* drawList = ImGui::GetBackgroundDrawList();
+    if (!drawList) {
+        return;
+    }
+
+    const glm::mat4 viewProj = proj * view;
+    const float dotSize = 8.0f;
+    const ImU32 dotColor = IM_COL32(255, 255, 255, 255);
+    const ImU32 textColor = IM_COL32(255, 255, 255, 255);
+
+    for (const auto& gameObject : scene->GetAllGameObjects()) {
+        if (!gameObject || !gameObject->IsActive() || gameObject->IsDestroyed()) {
+            continue;
+        }
+
+        auto transform = gameObject->GetTransform();
+        if (!transform) {
+            continue;
+        }
+
+        glm::vec3 worldPos = transform->GetPosition();
+        glm::vec4 clipPos = viewProj * glm::vec4(worldPos, 1.0f);
+
+        // Perspective divide
+        if (std::abs(clipPos.w) < 1e-6f) {
+            continue;
+        }
+
+        glm::vec3 ndc = glm::vec3(clipPos) / clipPos.w;
+
+        // Check if object is behind camera or outside view frustum
+        if (ndc.z < -1.0f || ndc.z > 1.0f || 
+            ndc.x < -1.0f || ndc.x > 1.0f || 
+            ndc.y < -1.0f || ndc.y > 1.0f) {
+            continue;
+        }
+
+        // Convert NDC to screen coordinates
+        float screenX = (ndc.x + 1.0f) * 0.5f * static_cast<float>(viewportWidth);
+        float screenY = (1.0f - ndc.y) * 0.5f * static_cast<float>(viewportHeight);
+
+        ImVec2 screenPos(screenX, screenY);
+
+        // Draw white dot
+        drawList->AddCircleFilled(screenPos, dotSize, dotColor, 16);
+
+        // Draw name above the dot
+        const std::string& name = gameObject->GetName();
+        if (!name.empty()) {
+            ImVec2 textSize = ImGui::CalcTextSize(name.c_str());
+            ImVec2 textPos(screenPos.x - textSize.x * 0.5f, screenPos.y - dotSize - textSize.y - 4.0f);
+            
+            // Draw text with background for better visibility
+            ImVec2 textMin = textPos;
+            ImVec2 textMax(textPos.x + textSize.x, textPos.y + textSize.y);
+            drawList->AddRectFilled(
+                ImVec2(textMin.x - 2.0f, textMin.y - 2.0f),
+                ImVec2(textMax.x + 2.0f, textMax.y + 2.0f),
+                IM_COL32(0, 0, 0, 128), 2.0f);
+            
+            drawList->AddText(textPos, textColor, name.c_str());
+        }
+    }
 }
 
 void DebugMenu::RenderSaveAsDialog() {

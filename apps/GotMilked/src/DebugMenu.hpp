@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <glm/vec3.hpp>
+#include <glm/mat4x4.hpp>
 
 namespace gm {
 class Scene;
@@ -28,6 +29,11 @@ public:
         std::function<glm::vec3()> getCameraForward;
         std::function<float()> getCameraFov;
         std::function<void(const glm::vec3&, const glm::vec3&, float)> setCamera;
+        
+        // Rendering callbacks for GameObject labels
+        std::function<glm::mat4()> getViewMatrix;
+        std::function<glm::mat4()> getProjectionMatrix;
+        std::function<void(int&, int&)> getViewportSize;
     };
 
     void SetCallbacks(Callbacks callbacks) { m_callbacks = std::move(callbacks); }
@@ -42,8 +48,10 @@ private:
     void RenderMenuBar();
     void RenderFileMenu();
     void RenderEditMenu();
+    void RenderOptionsMenu();
     void RenderSaveAsDialog();
     void RenderLoadDialog();
+    void RenderGameObjectLabels();
 
     Callbacks m_callbacks;
     gm::save::SaveManager* m_saveManager = nullptr;
@@ -53,6 +61,8 @@ private:
 
     bool m_fileMenuOpen = false;
     bool m_editMenuOpen = false;
+    bool m_optionsMenuOpen = false;
+    bool m_showGameObjects = false;
 
     // File dialogs
     bool m_showSaveAsDialog = false;

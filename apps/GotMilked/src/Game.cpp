@@ -174,6 +174,31 @@ bool Game::Init(GLFWwindow* window) {
                 if (m_gameplay && fov > 0.0f) {
                     m_gameplay->SetFovDegrees(fov);
                 }
+            },
+            // Rendering callbacks for GameObject labels
+            [this]() -> glm::mat4 {
+                return m_camera ? m_camera->View() : glm::mat4(1.0f);
+            },
+            [this]() -> glm::mat4 {
+                if (!m_window || !m_gameplay) {
+                    return glm::mat4(1.0f);
+                }
+                int fbw, fbh;
+                glfwGetFramebufferSize(m_window, &fbw, &fbh);
+                if (fbw <= 0 || fbh <= 0) {
+                    return glm::mat4(1.0f);
+                }
+                float aspect = static_cast<float>(fbw) / static_cast<float>(fbh);
+                float fov = m_gameplay->GetFovDegrees();
+                return glm::perspective(glm::radians(fov), aspect, 0.1f, 200.0f);
+            },
+            [this](int& width, int& height) {
+                if (m_window) {
+                    glfwGetFramebufferSize(m_window, &width, &height);
+                } else {
+                    width = 0;
+                    height = 0;
+                }
             }
         };
         m_debugMenu->SetCallbacks(std::move(callbacks));
