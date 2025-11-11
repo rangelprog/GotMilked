@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <fstream>
 #include <system_error>
+#include <sstream>
+#include <iomanip>
+#include <ctime>
 
 #include <nlohmann/json.hpp>
 
@@ -113,7 +116,23 @@ SaveManager::SaveManager(std::filesystem::path saveDirectory)
 }
 
 SaveLoadResult SaveManager::QuickSave(const SaveGameData& data) {
-    return SaveToSlot("quick", data);
+    // Generate unique quick save filename with timestamp
+    auto now = std::chrono::system_clock::now();
+    auto timeT = std::chrono::system_clock::to_time_t(now);
+    std::tm tmLocal{};
+#ifdef _WIN32
+    localtime_s(&tmLocal, &timeT);
+#else
+    localtime_r(&timeT, &tmLocal);
+#endif
+    
+    std::ostringstream oss;
+    oss << "quick_save_"
+        << std::put_time(&tmLocal, "%Y%m%d_%H%M%S")
+        << ".json";
+    
+    std::string slotName = oss.str();
+    return SaveToSlot(slotName, data);
 }
 
 SaveLoadResult SaveManager::QuickLoad(SaveGameData& outData) const {
@@ -121,7 +140,13 @@ SaveLoadResult SaveManager::QuickLoad(SaveGameData& outData) const {
 }
 
 SaveLoadResult SaveManager::SaveToSlot(const std::string& slotName, const SaveGameData& data) {
-    const auto path = slotName == "quick" ? QuickSavePath() : SlotPath(slotName);
+    // Check if slotName starts with "quick_save" to use quick save directory
+    std::filesystem::path path;
+    if (slotName.find("quick_save") == 0) {
+        path = m_saveDirectory / slotName;
+    } else {
+        path = SlotPath(slotName);
+    }
     SaveLoadResult result;
 
     std::error_code ec;
@@ -152,7 +177,21 @@ SaveLoadResult SaveManager::SaveToSlot(const std::string& slotName, const SaveGa
 }
 
 SaveLoadResult SaveManager::LoadFromSlot(const std::string& slotName, SaveGameData& outData) const {
-    const auto path = slotName == "quick" ? QuickSavePath() : SlotPath(slotName);
+    // Check if slotName starts with "quick_save" to use quick save directory
+    std::filesystem::path path;
+    if (slotName == "quick") {
+        // For "quick", load the most recent quick save
+        path = GetMostRecentQuickSave();
+        if (path.empty()) {
+            SaveLoadResult result;
+            result.message = "No quick save found";
+            return result;
+        }
+    } else if (slotName.find("quick_save") == 0) {
+        path = m_saveDirectory / slotName;
+    } else {
+        path = SlotPath(slotName);
+    }
     SaveLoadResult result;
 
     std::ifstream in(path, std::ios::binary);
@@ -212,6 +251,33 @@ std::filesystem::path SaveManager::SlotPath(const std::string& slotName) const {
 
 std::filesystem::path SaveManager::QuickSavePath() const {
     return m_saveDirectory / kQuickSaveFilename;
+}
+
+std::filesystem::path SaveManager::GetMostRecentQuickSave() const {
+    std::filesystem::path mostRecent;
+    std::chrono::system_clock::time_point mostRecentTime{};
+    
+    std::error_code ec;
+    if (!std::filesystem::exists(m_saveDirectory, ec)) {
+        return mostRecent;
+    }
+    
+    for (const auto& entry : std::filesystem::directory_iterator(m_saveDirectory, ec)) {
+        if (!entry.is_regular_file()) continue;
+        
+        std::string filename = entry.path().filename().string();
+        if (filename.find("quick_save_") == 0 && entry.path().extension() == kSaveExtension) {
+            auto fileTime = entry.last_write_time();
+            auto sysTime = FromFileTime(fileTime);
+            
+            if (mostRecent.empty() || sysTime > mostRecentTime) {
+                mostRecent = entry.path();
+                mostRecentTime = sysTime;
+            }
+        }
+    }
+    
+    return mostRecent;
 }
 
 } // namespace gm::save

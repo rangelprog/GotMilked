@@ -26,6 +26,9 @@ namespace gm {
 #include "gm/tooling/Overlay.hpp"
 #include "gm/save/SaveManager.hpp"
 #include "gm/save/SaveSnapshotHelpers.hpp"
+#ifdef _DEBUG
+#include "DebugMenu.hpp"
+#endif
 
 class Game {
 public:
@@ -54,6 +57,10 @@ private:
     std::unique_ptr<gm::save::SaveManager> m_saveManager;
     std::unique_ptr<gm::utils::ImGuiManager> m_imgui;
     std::unique_ptr<gm::tooling::Overlay> m_tooling;
+#ifdef _DEBUG
+    std::unique_ptr<DebugMenu> m_debugMenu;
+    bool m_debugMenuVisible = false;
+#endif
     bool m_overlayVisible = false;
     
     void PerformQuickSave();

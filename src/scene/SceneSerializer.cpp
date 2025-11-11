@@ -110,6 +110,9 @@ std::string SceneSerializer::Serialize(Scene& scene) {
     }
     sceneJson["gameObjects"] = gameObjectsJson;
     
+    // Note: Camera data is not stored in Scene, it's managed by Game
+    // Camera position/rotation should be saved separately or via callbacks
+    
     // Pretty print with indentation
     return sceneJson.dump(4);
 }
@@ -238,11 +241,13 @@ json SceneSerializer::SerializeComponent(Component* component) {
     if (!component) return json();
     
     json compJson;
-    compJson["type"] = component->GetName();
+    std::string type = component->GetName();
+    compJson["type"] = type;
     compJson["active"] = component->IsActive();
     
+    core::Logger::Debug("[SceneSerializer] Serializing component type: %s", type.c_str());
+    
     // Component-specific serialization
-    std::string type = component->GetName();
     if (type == "TransformComponent" || type == "Transform") {
         json data = SerializeTransformComponent(component);
         compJson["data"] = data;
@@ -255,10 +260,19 @@ json SceneSerializer::SerializeComponent(Component* component) {
     } else {
         // Try registered custom component serializers
         auto& registry = CustomSerializerRegistry();
+        core::Logger::Debug("[SceneSerializer] Looking for custom serializer for type: %s (registry size: %zu)", 
+            type.c_str(), registry.size());
         auto it = registry.find(type);
         if (it != registry.end() && it->second.serialize) {
+            core::Logger::Info("[SceneSerializer] Found custom serializer for type: %s", type.c_str());
             json customData = it->second.serialize(component);
-            compJson["data"] = customData;
+            if (!customData.is_null() && !customData.empty()) {
+                compJson["data"] = customData;
+                core::Logger::Info("[SceneSerializer] Successfully serialized component: %s", type.c_str());
+            } else {
+                core::Logger::Warning("[SceneSerializer] Custom serializer returned empty data for type: %s", type.c_str());
+                return json(); // Return null to skip
+            }
         } else {
             // Unknown component type - skip
             core::Logger::Warning("[SceneSerializer] Unknown component type: %s (skipping)",
@@ -272,10 +286,14 @@ json SceneSerializer::SerializeComponent(Component* component) {
 
 void SceneSerializer::DeserializeComponent(GameObject* obj, const json& componentJson) {
     if (!componentJson.contains("type") || !componentJson["type"].is_string()) {
+        core::Logger::Warning("[SceneSerializer] Component missing type field");
         return;
     }
     
     std::string type = componentJson["type"].get<std::string>();
+    core::Logger::Debug("[SceneSerializer] Deserializing component type: %s for GameObject: %s", 
+        type.c_str(), obj ? obj->GetName().c_str() : "null");
+    
     bool active = true;
     if (componentJson.contains("active") && componentJson["active"].is_boolean()) {
         active = componentJson["active"].get<bool>();
@@ -297,9 +315,18 @@ void SceneSerializer::DeserializeComponent(GameObject* obj, const json& componen
     } else {
         // Try registered custom component deserializers
         auto& registry = CustomSerializerRegistry();
+        core::Logger::Debug("[SceneSerializer] Looking for custom serializer for type: %s (registry size: %zu)", 
+            type.c_str(), registry.size());
         auto it = registry.find(type);
         if (it != registry.end() && it->second.deserialize) {
+            core::Logger::Info("[SceneSerializer] Found custom deserializer for type: %s", type.c_str());
             component = it->second.deserialize(obj, data);
+            if (component) {
+                core::Logger::Info("[SceneSerializer] Custom deserializer returned component: %s", 
+                    component->GetName().c_str());
+            } else {
+                core::Logger::Warning("[SceneSerializer] Custom deserializer returned null for type: %s", type.c_str());
+            }
         } else {
             core::Logger::Warning(
                 "[SceneSerializer] Unknown component type during load: %s (skipping)",
@@ -310,6 +337,10 @@ void SceneSerializer::DeserializeComponent(GameObject* obj, const json& componen
     // Set component active state
     if (component) {
         component->SetActive(active);
+        core::Logger::Debug("[SceneSerializer] Component %s set active=%s", 
+            component->GetName().c_str(), active ? "true" : "false");
+    } else {
+        core::Logger::Warning("[SceneSerializer] Failed to deserialize component type: %s", type.c_str());
     }
 }
 

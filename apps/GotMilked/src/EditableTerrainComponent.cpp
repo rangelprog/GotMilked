@@ -11,6 +11,7 @@
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/core/Input.hpp"
 #include "gm/core/input/InputSystem.hpp"
+#include "gm/core/Logger.hpp"
 
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -30,7 +31,13 @@ EditableTerrainComponent::EditableTerrainComponent() {
 }
 
 void EditableTerrainComponent::Init() {
-    InitializeHeightmap();
+    // Only initialize heightmap if it's empty (not loaded from file)
+    // This prevents overwriting terrain data loaded from scene files
+    if (m_heights.empty()) {
+        InitializeHeightmap();
+    }
+    // Always mark mesh as dirty to ensure it gets rebuilt
+    // This is important after loading scenes or when resources are reapplied
     m_meshDirty = true;
 }
 
@@ -88,45 +95,48 @@ void EditableTerrainComponent::Update(float deltaTime) {
 }
 
 void EditableTerrainComponent::Render() {
+    // Rebuild mesh if dirty (this will create the mesh if it doesn't exist)
+    // Note: RebuildMesh doesn't need shader, only rendering does
     if (m_meshDirty) {
-        if (!RebuildMesh()) {
-            return;
+        if (RebuildMesh()) {
+            m_meshDirty = false;
+            gm::core::Logger::Debug("[EditableTerrain] Mesh rebuilt successfully");
+        } else {
+            gm::core::Logger::Warning("[EditableTerrain] Failed to rebuild mesh: heights=%zu, resolution=%d, shader=%s",
+                m_heights.size(), m_resolution, m_shader ? "set" : "null");
         }
-        m_meshDirty = false;
     }
 
-    if (!m_mesh || !m_shader) {
-        return;
+    // Render the mesh if we have all required resources
+    if (m_mesh && m_shader) {
+        auto owner = GetOwner();
+        if (owner) {
+            auto transform = owner->EnsureTransform();
+            if (transform) {
+                const glm::mat4 model = transform->GetMatrix();
+                const glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(model)));
+
+                m_shader->Use();
+                m_shader->SetMat4("uModel", model);
+                m_shader->SetMat3("uNormalMat", normalMat);
+
+                if (m_camera) {
+                    m_shader->SetVec3("uViewPos", m_camera->Position());
+                }
+
+                if (m_material) {
+                    m_material->Apply(*m_shader);
+                }
+
+                m_mesh->Draw();
+            }
+        }
     }
 
-    auto owner = GetOwner();
-    if (!owner) {
-        return;
-    }
-    auto transform = owner->EnsureTransform();
-    if (!transform) {
-        return;
-    }
-
-    const glm::mat4 model = transform->GetMatrix();
-    const glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(model)));
-
-    m_shader->Use();
-    m_shader->SetMat4("uModel", model);
-    m_shader->SetMat3("uNormalMat", normalMat);
-
-    if (m_camera) {
-        m_shader->SetVec3("uViewPos", m_camera->Position());
-    }
-
-    if (m_material) {
-        m_material->Apply(*m_shader);
-    }
-
-    m_mesh->Draw();
-
-    if (ImGui::GetCurrentContext()) {
-        bool windowOpen = true;
+    // Always render the editor window if visible, even if mesh/shader aren't ready
+    // This allows the window to be shown for configuration
+    if (ImGui::GetCurrentContext() && m_editorWindowVisible) {
+        bool windowOpen = m_editorWindowVisible;
         if (ImGui::Begin("Terrain Editor", &windowOpen, ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::Checkbox("Enable Editing", &m_editingEnabled);
             ImGui::Separator();
@@ -163,6 +173,7 @@ void EditableTerrainComponent::Render() {
         }
         ImGui::End();
         if (!windowOpen) {
+            m_editorWindowVisible = false;
             m_editingEnabled = false;
         }
     }

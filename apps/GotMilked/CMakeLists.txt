@@ -8,6 +8,7 @@ add_executable(GotMilked
   src/RigidBodyComponent.cpp
   src/CowComponent.cpp
   src/EditableTerrainComponent.cpp
+  src/DebugMenu.cpp
 )
 
 set_target_properties(GotMilked PROPERTIES OUTPUT_NAME "GotMilked")

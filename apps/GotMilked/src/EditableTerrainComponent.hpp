@@ -35,6 +35,8 @@ public:
     void SetFovProvider(std::function<float()> provider) { m_fovProvider = std::move(provider); }
 
     bool IsEditingEnabled() const { return m_editingEnabled; }
+    void SetEditorWindowVisible(bool visible) { m_editorWindowVisible = visible; }
+    bool IsEditorWindowVisible() const { return m_editorWindowVisible; }
 
     int GetResolution() const { return m_resolution; }
     float GetTerrainSize() const { return m_size; }
@@ -47,6 +49,9 @@ public:
                        float minHeight,
                        float maxHeight,
                        const std::vector<float>& heights);
+
+    // Force mesh rebuild (useful after loading scenes)
+    void MarkMeshDirty() { m_meshDirty = true; }
 
 private:
     void InitializeHeightmap();
@@ -69,6 +74,7 @@ private:
     float m_brushStrength = 1.0f;
 
     bool m_editingEnabled = false;
+    bool m_editorWindowVisible = false;
     bool m_meshDirty = false;
 
     std::vector<float> m_heights;

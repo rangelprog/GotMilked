@@ -56,6 +56,7 @@ public:
 private:
     std::filesystem::path SlotPath(const std::string& slotName) const;
     std::filesystem::path QuickSavePath() const;
+    std::filesystem::path GetMostRecentQuickSave() const;
 
     std::filesystem::path m_saveDirectory;
 };
