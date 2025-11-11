@@ -50,7 +50,10 @@ void StaticMeshComponent::RestoreResources(
     std::function<gm::Shader*(const std::string&)> shaderResolver,
     std::function<std::shared_ptr<gm::Material>(const std::string&)> materialResolver) {
     
-    std::string ownerName = GetOwner() ? GetOwner()->GetName() : "unknown";
+    // Use const reference to avoid string copy when owner exists (GetName returns const reference)
+    // For the "unknown" case, we need a string literal which is fine for logging
+    const std::string* ownerNamePtr = GetOwner() ? &GetOwner()->GetName() : nullptr;
+    const char* ownerName = ownerNamePtr ? ownerNamePtr->c_str() : "unknown";
     bool allResolved = true;
     
     // Restore mesh
@@ -61,24 +64,24 @@ void StaticMeshComponent::RestoreResources(
                 m_mesh = mesh;
                 core::Logger::Debug(
                     "[StaticMeshComponent] Successfully restored mesh from GUID '%s' for GameObject '%s'",
-                    m_meshGuid.c_str(), ownerName.c_str());
+                    m_meshGuid.c_str(), ownerName);
             } else {
                 core::Logger::Warning(
                     "[StaticMeshComponent] Failed to resolve mesh GUID '%s' for GameObject '%s'. "
                     "Component will not render correctly.",
-                    m_meshGuid.c_str(), ownerName.c_str());
+                    m_meshGuid.c_str(), ownerName);
                 allResolved = false;
             }
         } else {
             core::Logger::Warning(
                 "[StaticMeshComponent] Mesh resolver not provided for GUID '%s' on GameObject '%s'",
-                m_meshGuid.c_str(), ownerName.c_str());
+                m_meshGuid.c_str(), ownerName);
             allResolved = false;
         }
     } else if (!m_mesh) {
         core::Logger::Debug(
             "[StaticMeshComponent] No mesh GUID or mesh set for GameObject '%s'",
-            ownerName.c_str());
+            ownerName);
     }
     
     // Restore shader
@@ -89,24 +92,24 @@ void StaticMeshComponent::RestoreResources(
                 m_shader = shader;
                 core::Logger::Debug(
                     "[StaticMeshComponent] Successfully restored shader from GUID '%s' for GameObject '%s'",
-                    m_shaderGuid.c_str(), ownerName.c_str());
+                    m_shaderGuid.c_str(), ownerName);
             } else {
                 core::Logger::Warning(
                     "[StaticMeshComponent] Failed to resolve shader GUID '%s' for GameObject '%s'. "
                     "Component will not render correctly.",
-                    m_shaderGuid.c_str(), ownerName.c_str());
+                    m_shaderGuid.c_str(), ownerName);
                 allResolved = false;
             }
         } else {
             core::Logger::Warning(
                 "[StaticMeshComponent] Shader resolver not provided for GUID '%s' on GameObject '%s'",
-                m_shaderGuid.c_str(), ownerName.c_str());
+                m_shaderGuid.c_str(), ownerName);
             allResolved = false;
         }
     } else if (!m_shader) {
         core::Logger::Debug(
             "[StaticMeshComponent] No shader GUID or shader set for GameObject '%s'",
-            ownerName.c_str());
+            ownerName);
     }
     
     // Restore material (optional)
@@ -117,19 +120,19 @@ void StaticMeshComponent::RestoreResources(
                 m_material = material;
                 core::Logger::Debug(
                     "[StaticMeshComponent] Successfully restored material from GUID '%s' for GameObject '%s'",
-                    m_materialGuid.c_str(), ownerName.c_str());
+                    m_materialGuid.c_str(), ownerName);
             } else {
                 core::Logger::Warning(
                     "[StaticMeshComponent] Failed to resolve material GUID '%s' for GameObject '%s'. "
                     "Component will render without material.",
-                    m_materialGuid.c_str(), ownerName.c_str());
+                    m_materialGuid.c_str(), ownerName);
                 // Material is optional, so don't mark as failed
             }
         } else {
             core::Logger::Debug(
                 "[StaticMeshComponent] Material resolver not provided for GUID '%s' on GameObject '%s' "
                 "(material is optional)",
-                m_materialGuid.c_str(), ownerName.c_str());
+                m_materialGuid.c_str(), ownerName);
         }
     }
     
@@ -138,13 +141,13 @@ void StaticMeshComponent::RestoreResources(
         core::Logger::Warning(
             "[StaticMeshComponent] GameObject '%s' is missing required resources after restoration "
             "(mesh: %s, shader: %s). Component will not render.",
-            ownerName.c_str(),
+            ownerName,
             m_mesh ? "present" : "missing",
             m_shader ? "present" : "missing");
     } else if (allResolved) {
         core::Logger::Debug(
             "[StaticMeshComponent] Successfully restored all resources for GameObject '%s'",
-            ownerName.c_str());
+            ownerName);
     }
 }
 

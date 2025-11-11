@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <string>
 #include <string_view>
+#include <glm/glm.hpp>
 #include "SceneSystem.hpp"
 #include "gm/rendering/LightManager.hpp"
 
@@ -27,6 +28,38 @@ private:
     bool parallelGameObjectUpdatesEnabled = false;
     std::vector<SceneSystemPtr> systems;
     LightManager m_lightManager;  // Cached LightManager to avoid per-frame allocation
+    
+    // Optimized lists for active GameObjects (avoid iterating inactive ones)
+    std::vector<std::shared_ptr<GameObject>> m_activeRenderables;
+    std::vector<std::shared_ptr<GameObject>> m_activeUpdatables;
+    bool m_activeListsDirty = true;  // Flag to track if lists need rebuilding
+    
+    // Frustum culling
+    struct FrustumPlane {
+        glm::vec4 plane;  // (a, b, c, d) where ax + by + cz + d = 0
+    };
+    
+    struct Frustum {
+        FrustumPlane planes[6];  // left, right, bottom, top, near, far
+    };
+    
+    Frustum CalculateFrustum(const glm::mat4& viewProj) const;
+    bool IsInFrustum(const GameObject& obj, const Frustum& frustum) const;
+    bool m_frustumCullingEnabled = true;  // Enable/disable frustum culling
+    
+    // Instanced rendering
+    struct InstancedBatch {
+        class Mesh* mesh = nullptr;
+        class Shader* shader = nullptr;
+        std::shared_ptr<class Material> material;
+        std::vector<glm::mat4> modelMatrices;
+        std::vector<glm::mat3> normalMatrices;
+        std::vector<std::shared_ptr<GameObject>> gameObjects;  // Keep reference for camera access
+    };
+    
+    void CollectInstancedBatches(std::vector<InstancedBatch>& batches, const Frustum* frustum) const;
+    void RenderInstancedBatch(const InstancedBatch& batch, Shader& shader, const Camera& cam) const;
+    bool m_instancedRenderingEnabled = true;  // Enable/disable instanced rendering
 
 public:
     Scene(const std::string& name = "Unnamed Scene");
@@ -70,6 +103,17 @@ public:
     // Serialization
     bool SaveToFile(const std::string& filepath);
     bool LoadFromFile(const std::string& filepath);
+    
+    // Optimization: Mark active lists as dirty (call when GameObject active state changes)
+    void MarkActiveListsDirty() { m_activeListsDirty = true; }
+    
+    // Frustum culling
+    void SetFrustumCullingEnabled(bool enabled) { m_frustumCullingEnabled = enabled; }
+    bool IsFrustumCullingEnabled() const { return m_frustumCullingEnabled; }
+    
+    // Instanced rendering
+    void SetInstancedRenderingEnabled(bool enabled) { m_instancedRenderingEnabled = enabled; }
+    bool IsInstancedRenderingEnabled() const { return m_instancedRenderingEnabled; }
 
 private:
     void UpdateGameObjects(float deltaTime);
@@ -77,6 +121,7 @@ private:
     void InitializeSystems();
     void ShutdownSystems();
     void RunSystems(float deltaTime);
+    void UpdateActiveLists();  // Rebuild active renderable/updatable lists
 
     friend class GameObjectUpdateSystem;
 };

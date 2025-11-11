@@ -14,14 +14,15 @@ class TransformComponent;
 class GameObject {
 private:
     std::vector<std::shared_ptr<Component>> components;
-    mutable std::unordered_map<std::type_index, std::shared_ptr<Component>> componentCache;
+    // Direct map for O(1) component lookup (stores first component of each type)
+    std::unordered_map<std::type_index, std::shared_ptr<Component>> m_componentMap;
     bool isActive = true;
     bool isDestroyed = false;
     std::string name;
     std::unordered_set<std::string> tags;
     int layer = 0;  // For layer-based queries/rendering
 
-    void InvalidateCache() const;
+    void UpdateComponentMap();  // Update map when components change
 
 public:
     GameObject() = default;
@@ -39,7 +40,7 @@ public:
         auto component = std::make_shared<T>();
         component->SetOwner(this);
         components.push_back(component);
-        InvalidateCache(); // Cache is invalidated when components are added
+        UpdateComponentMap(); // Update map when components are added
         return component;
     }
 
@@ -47,23 +48,21 @@ public:
     std::shared_ptr<T> GetComponent() const {
         std::type_index typeId = std::type_index(typeid(T));
         
-        // Check cache first
-        auto cacheIt = componentCache.find(typeId);
-        if (cacheIt != componentCache.end()) {
-            return std::dynamic_pointer_cast<T>(cacheIt->second);
+        // Try direct O(1) lookup in map first (exact type match, common case)
+        auto it = m_componentMap.find(typeId);
+        if (it != m_componentMap.end() && it->second) {
+            // Use static_cast since we know the type from the map key
+            return std::static_pointer_cast<T>(it->second);
         }
         
-        // Search components
-        for (auto& component : components) {
+        // Fall back to linear search for base class lookups (e.g., GetComponent<Component>())
+        // This is slower but handles inheritance correctly
+        for (const auto& component : components) {
             if (auto result = std::dynamic_pointer_cast<T>(component)) {
-                // Cache the result
-                componentCache[typeId] = result;
                 return result;
             }
         }
         
-        // Cache nullptr to avoid repeated searches
-        componentCache[typeId] = nullptr;
         return nullptr;
     }
 
@@ -107,7 +106,7 @@ public:
                 }
             }
             components.erase(it, components.end());
-            InvalidateCache();
+            UpdateComponentMap(); // Update map when components are removed
         }
         return removed;
     }
@@ -117,7 +116,7 @@ public:
         if (it != components.end()) {
             (*it)->OnDestroy(); // Call OnDestroy before removing
             components.erase(it);
-            InvalidateCache();
+            UpdateComponentMap(); // Update map when components are removed
             return true;
         }
         return false;

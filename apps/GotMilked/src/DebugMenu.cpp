@@ -797,6 +797,11 @@ void DebugMenu::RenderInspector() {
     bool isActive = selected->IsActive();
     if (ImGui::Checkbox("Active", &isActive)) {
         selected->SetActive(isActive);
+        // Mark active lists as dirty when GameObject active state changes
+        auto scene = m_scene.lock();
+        if (scene) {
+            scene->MarkActiveListsDirty();
+        }
     }
 
     ImGui::Separator();

@@ -30,6 +30,7 @@ namespace {
 
 // Helper: Convert glm::vec3 to JSON array
 static json vec3ToJson(const glm::vec3& v) {
+    // nlohmann::json doesn't support reserve(), but we can use initializer list for efficiency
     return json::array({v.x, v.y, v.z});
 }
 
@@ -43,6 +44,8 @@ static glm::vec3 jsonToVec3(const json& j) {
 
 // Helper: Convert glm::mat4 to JSON (store as array of 16 floats)
 static json mat4ToJson(const glm::mat4& m) {
+    // nlohmann::json doesn't support reserve(), but we can pre-allocate with initializer list
+    // or just build the array (nlohmann::json handles memory efficiently internally)
     json arr = json::array();
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
@@ -54,16 +57,35 @@ static json mat4ToJson(const glm::mat4& m) {
 
 bool SceneSerializer::SaveToFile(Scene& scene, const std::string& filepath) {
     try {
-        std::string jsonString = Serialize(scene);
+        // Build JSON object
+        json sceneJson;
         
-        std::ofstream file(filepath);
+        // Scene metadata
+        sceneJson["name"] = scene.GetName();
+        sceneJson["isPaused"] = scene.IsPaused();
+        
+        // Serialize all GameObjects
+        const auto& allObjects = scene.GetAllGameObjects();
+        json gameObjectsJson = json::array();
+        for (const auto& obj : allObjects) {
+            if (obj && !obj->IsDestroyed()) {
+                gameObjectsJson.push_back(SerializeGameObject(obj));
+            }
+        }
+        sceneJson["gameObjects"] = gameObjectsJson;
+        
+        // Write directly to file with compact format (no indentation) to reduce memory
+        // Use compact format for smaller file size and less memory during dump
+        std::ofstream file(filepath, std::ios::binary);
         if (!file.is_open()) {
             core::Logger::Error("[SceneSerializer] Failed to open file for writing: %s",
                                 filepath.c_str());
             return false;
         }
         
-        file << jsonString;
+        // Use compact format (indent = -1) to reduce memory usage
+        // For debugging, use indent = 4, for production use indent = -1
+        file << sceneJson.dump(-1);  // -1 = compact (no indentation, minimal whitespace)
         file.close();
         
         core::Logger::Debug("[SceneSerializer] Saved scene to: %s", filepath.c_str());
@@ -76,18 +98,27 @@ bool SceneSerializer::SaveToFile(Scene& scene, const std::string& filepath) {
 
 bool SceneSerializer::LoadFromFile(Scene& scene, const std::string& filepath) {
     try {
-        std::ifstream file(filepath);
+        std::ifstream file(filepath, std::ios::binary | std::ios::ate);
         if (!file.is_open()) {
             core::Logger::Error("[SceneSerializer] Failed to open file for reading: %s",
                                 filepath.c_str());
             return false;
         }
         
-        std::stringstream buffer;
-        buffer << file.rdbuf();
+        // Get file size to reserve buffer capacity and avoid reallocations
+        std::streamsize fileSize = file.tellg();
+        file.seekg(0, std::ios::beg);
+        
+        // Reserve capacity to avoid reallocations during file read
+        std::string buffer;
+        if (fileSize > 0) {
+            buffer.reserve(static_cast<size_t>(fileSize));
+        }
+        
+        buffer.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
         file.close();
         
-        return Deserialize(scene, buffer.str());
+        return Deserialize(scene, buffer);
     } catch (const std::exception& e) {
         core::Logger::Error("[SceneSerializer] Error loading scene: %s", e.what());
         return false;
@@ -102,8 +133,10 @@ std::string SceneSerializer::Serialize(Scene& scene) {
     sceneJson["isPaused"] = scene.IsPaused();
     
     // Serialize all GameObjects
+    const auto& allObjects = scene.GetAllGameObjects();
     json gameObjectsJson = json::array();
-    for (const auto& obj : scene.GetAllGameObjects()) {
+    // Note: nlohmann::json doesn't support reserve(), but handles memory efficiently internally
+    for (const auto& obj : allObjects) {
         if (obj && !obj->IsDestroyed()) {
             gameObjectsJson.push_back(SerializeGameObject(obj));
         }
@@ -113,8 +146,9 @@ std::string SceneSerializer::Serialize(Scene& scene) {
     // Note: Camera data is not stored in Scene, it's managed by Game
     // Camera position/rotation should be saved separately or via callbacks
     
-    // Pretty print with indentation
-    return sceneJson.dump(4);
+    // Use compact format (indent = -1) to reduce memory usage
+    // For debugging/readability, use indent = 4, for production use indent = -1
+    return sceneJson.dump(-1);  // -1 = compact (no indentation, minimal whitespace)
 }
 
 bool SceneSerializer::Deserialize(Scene& scene, const std::string& jsonString) {
@@ -175,15 +209,19 @@ json SceneSerializer::SerializeGameObject(std::shared_ptr<GameObject> obj) {
     objJson["active"] = obj->IsActive();
     
     // Serialize tags
+    const auto& tags = obj->GetTags();
     json tagsJson = json::array();
-    for (const auto& tag : obj->GetTags()) {
+    // Note: nlohmann::json doesn't support reserve(), but handles memory efficiently internally
+    for (const auto& tag : tags) {
         tagsJson.push_back(tag);
     }
     objJson["tags"] = tagsJson;
     
     // Serialize components (save all components, including inactive ones)
+    const auto& components = obj->GetComponents();
     json componentsJson = json::array();
-    for (const auto& component : obj->GetComponents()) {
+    // Note: nlohmann::json doesn't support reserve(), but handles memory efficiently internally
+    for (const auto& component : components) {
         if (component) {
             json compJson = SerializeComponent(component.get());
             if (!compJson.is_null()) {
@@ -214,6 +252,7 @@ std::shared_ptr<GameObject> SceneSerializer::DeserializeGameObject(Scene& scene,
     // Set active state
     if (objectJson.contains("active") && objectJson["active"].is_boolean()) {
         obj->SetActive(objectJson["active"].get<bool>());
+        // Note: Scene will need to mark active lists as dirty after deserialization
     }
     
     // Deserialize tags (register with scene for proper tag management)
@@ -241,7 +280,8 @@ json SceneSerializer::SerializeComponent(Component* component) {
     if (!component) return json();
     
     json compJson;
-    std::string type = component->GetName();
+    // GetName() returns const reference, use it directly to avoid copy
+    const std::string& type = component->GetName();
     compJson["type"] = type;
     compJson["active"] = component->IsActive();
     

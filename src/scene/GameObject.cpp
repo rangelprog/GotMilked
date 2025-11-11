@@ -52,8 +52,20 @@ std::shared_ptr<TransformComponent> GameObject::EnsureTransform() {
     return transform;
 }
 
-void GameObject::InvalidateCache() const {
-    componentCache.clear();
+void GameObject::UpdateComponentMap() {
+    m_componentMap.clear();
+    
+    // Build map from type_index to first component of each type
+    // This enables O(1) lookup instead of O(n) linear search
+    for (const auto& component : components) {
+        if (component) {
+            std::type_index typeId = std::type_index(typeid(*component));
+            // Only store first component of each type (GetComponent returns first match)
+            if (m_componentMap.find(typeId) == m_componentMap.end()) {
+                m_componentMap[typeId] = component;
+            }
+        }
+    }
 }
 
 }

@@ -61,6 +61,7 @@ private:
     bool m_debugMenuVisible = false;
 #endif
     bool m_overlayVisible = false;
+    bool m_vsyncEnabled = true;  // Track VSync state
     
     void PerformQuickSave();
     void PerformQuickLoad();

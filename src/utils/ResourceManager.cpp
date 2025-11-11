@@ -6,6 +6,7 @@
 #include "gm/core/Logger.hpp"
 
 #include <exception>
+#include <string_view>
 
 namespace gm {
 
@@ -52,8 +53,31 @@ std::shared_ptr<Shader> ResourceManager::GetShader(const std::string& name) {
     return nullptr;
 }
 
+std::shared_ptr<Shader> ResourceManager::GetShader(const char* name) {
+    // Use string_view for lookup to avoid string allocation
+    return GetShader(std::string_view(name));
+}
+
+std::shared_ptr<Shader> ResourceManager::GetShader(std::string_view name) {
+    // Create temporary string only for lookup (std::unordered_map requires string key)
+    // This is still more efficient than passing std::string by value
+    auto it = shaders.find(std::string(name));
+    if (it != shaders.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
 bool ResourceManager::HasShader(const std::string& name) {
     return shaders.find(name) != shaders.end();
+}
+
+bool ResourceManager::HasShader(const char* name) {
+    return HasShader(std::string_view(name));
+}
+
+bool ResourceManager::HasShader(std::string_view name) {
+    return shaders.find(std::string(name)) != shaders.end();
 }
 
 std::shared_ptr<Shader> ResourceManager::ReloadShader(const std::string& name,
@@ -72,8 +96,10 @@ std::shared_ptr<Shader> ResourceManager::ReloadShader(const std::string& name,
 
 std::shared_ptr<Texture> ResourceManager::LoadTexture(const std::string& name,
     const std::string& path) {
-    if (textures.find(name) != textures.end()) {
-        return textures[name];
+    // Use find() instead of operator[] to avoid default construction
+    auto it = textures.find(name);
+    if (it != textures.end()) {
+        return it->second;
     }
     
     try {
@@ -101,8 +127,31 @@ std::shared_ptr<Texture> ResourceManager::GetTexture(const std::string& name) {
     return nullptr;
 }
 
+std::shared_ptr<Texture> ResourceManager::GetTexture(const char* name) {
+    // Use string_view for lookup to avoid string allocation
+    return GetTexture(std::string_view(name));
+}
+
+std::shared_ptr<Texture> ResourceManager::GetTexture(std::string_view name) {
+    // Create temporary string only for lookup (std::unordered_map requires string key)
+    // This is still more efficient than passing std::string by value
+    auto it = textures.find(std::string(name));
+    if (it != textures.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
 bool ResourceManager::HasTexture(const std::string& name) {
     return textures.find(name) != textures.end();
+}
+
+bool ResourceManager::HasTexture(const char* name) {
+    return HasTexture(std::string_view(name));
+}
+
+bool ResourceManager::HasTexture(std::string_view name) {
+    return textures.find(std::string(name)) != textures.end();
 }
 
 std::shared_ptr<Texture> ResourceManager::ReloadTexture(const std::string& name,
@@ -126,8 +175,10 @@ std::shared_ptr<Texture> ResourceManager::ReloadTexture(const std::string& name,
 
 std::shared_ptr<Mesh> ResourceManager::LoadMesh(const std::string& name,
     const std::string& path) {
-    if (meshes.find(name) != meshes.end()) {
-        return meshes[name];
+    // Use find() instead of operator[] to avoid default construction
+    auto it = meshes.find(name);
+    if (it != meshes.end()) {
+        return it->second;
     }
     
     try {
@@ -155,8 +206,31 @@ std::shared_ptr<Mesh> ResourceManager::GetMesh(const std::string& name) {
     return nullptr;
 }
 
+std::shared_ptr<Mesh> ResourceManager::GetMesh(const char* name) {
+    // Use string_view for lookup to avoid string allocation
+    return GetMesh(std::string_view(name));
+}
+
+std::shared_ptr<Mesh> ResourceManager::GetMesh(std::string_view name) {
+    // Create temporary string only for lookup (std::unordered_map requires string key)
+    // This is still more efficient than passing std::string by value
+    auto it = meshes.find(std::string(name));
+    if (it != meshes.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
 bool ResourceManager::HasMesh(const std::string& name) {
     return meshes.find(name) != meshes.end();
+}
+
+bool ResourceManager::HasMesh(const char* name) {
+    return HasMesh(std::string_view(name));
+}
+
+bool ResourceManager::HasMesh(std::string_view name) {
+    return meshes.find(std::string(name)) != meshes.end();
 }
 
 std::shared_ptr<Mesh> ResourceManager::ReloadMesh(const std::string& name,

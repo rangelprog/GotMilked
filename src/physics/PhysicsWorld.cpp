@@ -169,6 +169,8 @@ void PhysicsWorld::Shutdown() {
         return;
     }
 
+    // Flush any pending operations before shutdown
+    FlushPendingOperations();
     DestroyAllBodies();
 
     m_objectVsBroadPhaseLayerFilter.reset();
@@ -182,6 +184,11 @@ void PhysicsWorld::Shutdown() {
     m_factory.reset();
 
     m_physicsSystem.reset();
+
+    // Reset accumulator and clear pending operations
+    m_accumulator = 0.0f;
+    m_pendingCreations.clear();
+    m_pendingRemovals.clear();
 
     m_initialized = false;
 }
@@ -315,8 +322,9 @@ PhysicsWorld::BodyHandle PhysicsWorld::CreateDynamicBox(gm::GameObject& object,
     JPH::BodyID id = body->GetID();
     bodyInterface.AddBody(id, JPH::EActivation::Activate);
 
+    BodyHandle handle{ id };
     m_dynamicBodies.push_back({ id, &object });
-    return { id };
+    return handle;
 }
 
 void PhysicsWorld::RemoveBody(const BodyHandle& handle) {
@@ -383,9 +391,21 @@ void PhysicsWorld::Step(float deltaTime) {
         return;
     }
 
-    constexpr int collisionSteps = 1;
-    m_physicsSystem->Update(deltaTime, collisionSteps, m_tempAllocator.get(), m_jobSystem.get());
+    // Fixed timestep implementation with accumulator
+    // Clamp deltaTime to prevent spiral of death
+    float clampedDeltaTime = std::min(deltaTime, m_maxTimeStep);
+    m_accumulator += clampedDeltaTime;
 
+    constexpr int collisionSteps = 1;
+    
+    // Run physics simulation at fixed timestep
+    // This ensures consistent physics regardless of frame rate
+    while (m_accumulator >= m_fixedTimeStep) {
+        m_physicsSystem->Update(m_fixedTimeStep, collisionSteps, m_tempAllocator.get(), m_jobSystem.get());
+        m_accumulator -= m_fixedTimeStep;
+    }
+
+    // Sync dynamic body transforms to GameObjects
     for (auto& record : m_dynamicBodies) {
         if (!record.gameObject || record.id.IsInvalid()) {
             continue;
@@ -408,6 +428,80 @@ void PhysicsWorld::Step(float deltaTime) {
         glm::quat glmQuat(rotation.GetW(), rotation.GetX(), rotation.GetY(), rotation.GetZ());
         glm::vec3 euler = glm::degrees(glm::eulerAngles(glmQuat));
         transform->SetRotation(euler);
+    }
+}
+
+void PhysicsWorld::QueueBodyCreation(BodyHandle handle, gm::GameObject* gameObject) {
+    if (!handle.IsValid() || !gameObject) {
+        return;
+    }
+    m_pendingCreations.push_back({ handle, gameObject });
+}
+
+void PhysicsWorld::QueueBodyRemoval(const BodyHandle& handle) {
+    if (!handle.IsValid()) {
+        return;
+    }
+    m_pendingRemovals.push_back(handle);
+}
+
+void PhysicsWorld::FlushPendingOperations() {
+    if (!m_initialized || !m_physicsSystem) {
+        m_pendingCreations.clear();
+        m_pendingRemovals.clear();
+        return;
+    }
+
+    // Early exit if nothing to do
+    if (m_pendingRemovals.empty() && m_pendingCreations.empty()) {
+        return;
+    }
+
+    auto& bodyInterface = m_physicsSystem->GetBodyInterface();
+
+    // Batch remove bodies first (to avoid creating then immediately removing)
+    // This is more efficient than removing one at a time
+    if (!m_pendingRemovals.empty()) {
+        // Reserve capacity for efficient removal
+        std::vector<JPH::BodyID> bodyIdsToRemove;
+        bodyIdsToRemove.reserve(m_pendingRemovals.size());
+        
+        for (const auto& handle : m_pendingRemovals) {
+            bodyIdsToRemove.push_back(handle.id);
+        }
+
+        // Batch remove from physics system
+        for (JPH::BodyID id : bodyIdsToRemove) {
+            bodyInterface.RemoveBody(id);
+            bodyInterface.DestroyBody(id);
+        }
+
+        // Batch remove from tracking vectors
+        for (const auto& handle : m_pendingRemovals) {
+            // Remove from dynamic bodies
+            auto it = std::remove_if(m_dynamicBodies.begin(), m_dynamicBodies.end(),
+                                     [&handle](const DynamicBodyRecord& record) { return record.id == handle.id; });
+            if (it != m_dynamicBodies.end()) {
+                m_dynamicBodies.erase(it, m_dynamicBodies.end());
+            } else {
+                // Remove from static bodies
+                auto staticIt = std::remove_if(m_staticBodies.begin(), m_staticBodies.end(),
+                                               [&handle](const JPH::BodyID& id) { return id == handle.id; });
+                if (staticIt != m_staticBodies.end()) {
+                    m_staticBodies.erase(staticIt, m_staticBodies.end());
+                }
+            }
+        }
+        m_pendingRemovals.clear();
+    }
+
+    // Batch add bodies (if any were queued for creation)
+    // Note: Most bodies are created immediately, but this allows for future batching
+    if (!m_pendingCreations.empty()) {
+        // For now, pending creations are just for tracking
+        // Actual creation happens in CreateStaticPlane/CreateDynamicBox
+        // This structure allows for future deferred creation if needed
+        m_pendingCreations.clear();
     }
 }
 

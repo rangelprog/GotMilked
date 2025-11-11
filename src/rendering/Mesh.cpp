@@ -123,4 +123,16 @@ void Mesh::Draw() const {
     glBindVertexArray(0);
 }
 
+void Mesh::DrawInstanced(unsigned int instanceCount) const {
+    if (!VAO || instanceCount == 0)
+        return;
+
+    glBindVertexArray(VAO);
+    if (hasIndices)
+        glDrawElementsInstanced(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, nullptr, instanceCount);
+    else
+        glDrawArraysInstanced(GL_TRIANGLES, 0, vertexCount, instanceCount);
+    glBindVertexArray(0);
+}
+
 } // namespace gm

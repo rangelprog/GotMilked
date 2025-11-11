@@ -42,6 +42,9 @@ public:
     void Init(const glm::vec3& gravity = glm::vec3(0.0f, -9.81f, 0.0f));
     void Shutdown();
     bool IsInitialized() const { return m_initialized; }
+    
+    // Reset physics accumulator (useful when pausing/unpausing or loading new scenes)
+    void ResetAccumulator() { m_accumulator = 0.0f; }
 
     void Step(float deltaTime);
 
@@ -54,6 +57,11 @@ public:
                                 float mass);
 
     void RemoveBody(const BodyHandle& handle);
+
+    // Batch operations - call FlushPendingOperations() to apply
+    void QueueBodyCreation(BodyHandle handle, gm::GameObject* gameObject);
+    void QueueBodyRemoval(const BodyHandle& handle);
+    void FlushPendingOperations();
 
     BodyStats GetBodyStats() const;
 
@@ -72,6 +80,19 @@ private:
     void DestroyAllBodies();
 
     bool m_initialized = false;
+
+    // Fixed timestep accumulator
+    float m_accumulator = 0.0f;
+    static constexpr float m_fixedTimeStep = 1.0f / 60.0f;  // 60 Hz fixed timestep
+    static constexpr float m_maxTimeStep = 0.25f;  // Cap max timestep to prevent spiral of death
+
+    // Batching for body operations
+    struct PendingBodyCreation {
+        BodyHandle handle;
+        gm::GameObject* gameObject;
+    };
+    std::vector<PendingBodyCreation> m_pendingCreations;
+    std::vector<BodyHandle> m_pendingRemovals;
 
     std::unique_ptr<JPH::TempAllocatorImpl> m_tempAllocator;
     std::unique_ptr<JPH::JobSystemThreadPool> m_jobSystem;

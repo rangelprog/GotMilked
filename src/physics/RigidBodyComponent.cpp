@@ -78,7 +78,8 @@ void RigidBodyComponent::DestroyPhysicsBody() {
 
     auto& physics = PhysicsWorld::Instance();
     if (physics.IsInitialized()) {
-        physics.RemoveBody(m_bodyHandle);
+        // Use batched removal for better performance when many bodies are destroyed
+        physics.QueueBodyRemoval(m_bodyHandle);
     }
 
     m_bodyHandle = PhysicsWorld::BodyHandle{};

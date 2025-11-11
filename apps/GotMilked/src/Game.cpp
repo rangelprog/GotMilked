@@ -51,6 +51,7 @@ Game::~Game() = default;
 
 bool Game::Init(GLFWwindow* window) {
     m_window = window;
+    m_vsyncEnabled = m_config.window.vsync;  // Initialize VSync state from config
     if (!m_window) {
         gm::core::Logger::Error("[Game] Invalid window handle");
         return false;
@@ -327,10 +328,29 @@ void Game::Update(float dt) {
 
     auto& physics = gm::physics::PhysicsWorld::Instance();
     if (physics.IsInitialized()) {
+        // Flush any pending body operations before stepping
+        physics.FlushPendingOperations();
         physics.Step(dt);
     }
 
     auto& input = gm::core::Input::Instance();
+    
+    // Handle V key to toggle VSync
+    auto* inputSys = input.GetInputSystem();
+    if (inputSys && inputSys->IsKeyJustPressed(GLFW_KEY_V)) {
+        // Check if ImGui wants keyboard input (don't trigger if typing in a field)
+        bool imguiWantsInput = false;
+        if (m_imgui && m_imgui->IsInitialized()) {
+            ImGuiIO& io = ImGui::GetIO();
+            imguiWantsInput = io.WantCaptureKeyboard;
+        }
+        
+        if (!imguiWantsInput) {
+            m_vsyncEnabled = !m_vsyncEnabled;
+            glfwSwapInterval(m_vsyncEnabled ? 1 : 0);
+            gm::core::Logger::Info("[Game] VSync %s", m_vsyncEnabled ? "enabled" : "disabled");
+        }
+    }
 
     if (input.IsActionJustPressed("Exit")) {
         glfwSetWindowShouldClose(m_window, 1);

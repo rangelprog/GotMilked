@@ -14,7 +14,9 @@ Shader::~Shader() {
 
 Shader::Shader(Shader&& other) noexcept {
     m_id = other.m_id;
+    m_uniformCache = std::move(other.m_uniformCache);
     other.m_id = 0;
+    other.m_uniformCache.clear();
 }
 
 Shader& Shader::operator=(Shader&& other) noexcept {
@@ -22,7 +24,9 @@ Shader& Shader::operator=(Shader&& other) noexcept {
         if (m_id)
             glDeleteProgram(m_id);
         m_id = other.m_id;
+        m_uniformCache = std::move(other.m_uniformCache);
         other.m_id = 0;
+        other.m_uniformCache.clear();
     }
     return *this;
 }
@@ -99,11 +103,43 @@ bool Shader::loadFromFiles(const std::string& vertPath, const std::string& fragP
     if (m_id)
         glDeleteProgram(m_id);
     m_id = prog;
+    
+    // Clear uniform cache when shader is reloaded
+    ClearUniformCache();
+    
     return true;
 }
 
+void Shader::ClearUniformCache() const {
+    m_uniformCache.clear();
+}
+
 GLint Shader::uniformLoc(const char* name) const {
-    return glGetUniformLocation(m_id, name);
+    return uniformLoc(std::string_view(name));
+}
+
+GLint Shader::uniformLoc(std::string_view name) const {
+    if (!m_id || name.empty()) {
+        return -1;
+    }
+    
+    // Convert string_view to string for map lookup
+    // We need to store as string in the cache anyway
+    std::string nameStr(name);
+    
+    // Check cache first
+    auto it = m_uniformCache.find(nameStr);
+    if (it != m_uniformCache.end()) {
+        return it->second;
+    }
+    
+    // Not in cache, query OpenGL
+    GLint location = glGetUniformLocation(m_id, nameStr.c_str());
+    
+    // Cache the result (even if -1, to avoid repeated lookups for missing uniforms)
+    m_uniformCache[nameStr] = location;
+    
+    return location;
 }
 
 void Shader::SetMat4(const char* name, const glm::mat4& m) const {

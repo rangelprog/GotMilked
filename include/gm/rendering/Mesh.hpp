@@ -19,6 +19,7 @@ public:
                           const std::vector<unsigned int>& indices);
 
     void Draw() const;
+    void DrawInstanced(unsigned int instanceCount) const;
 
 private:
     GLuint VAO{0};

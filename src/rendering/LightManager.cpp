@@ -13,6 +13,8 @@ LightManager::LightManager() {
 
 void LightManager::CollectLights(const std::vector<std::shared_ptr<GameObject>>& gameObjects) {
     m_lights.clear();
+    // Reserve capacity to avoid reallocations (most scenes have few lights)
+    m_lights.reserve(std::min(MAX_LIGHTS, gameObjects.size()));
     
     for (const auto& obj : gameObjects) {
         if (!obj || !obj->IsActive() || obj->IsDestroyed()) continue;
