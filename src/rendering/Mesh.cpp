@@ -73,7 +73,7 @@ Mesh Mesh::fromPositions(const std::vector<float>& positions) {
     return m;
 }
 
-Mesh Mesh::fromIndexed(const std::vector<float>& positions,
+Mesh Mesh::fromIndexed(const std::vector<float>& vertexData,
                       const std::vector<unsigned int>& indices) {
     Mesh m;
     glGenVertexArrays(1, &m.VAO);
@@ -81,16 +81,29 @@ Mesh Mesh::fromIndexed(const std::vector<float>& positions,
 
     glGenBuffers(1, &m.VBO);
     glBindBuffer(GL_ARRAY_BUFFER, m.VBO);
-    glBufferData(GL_ARRAY_BUFFER, positions.size() * sizeof(float), positions.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertexData.size() * sizeof(float), vertexData.data(), GL_STATIC_DRAW);
 
     glGenBuffers(1, &m.EBO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m.EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int),
                  indices.data(), GL_STATIC_DRAW);
 
-    // Position attribute
+    // Determine stride (supports position-only or position/normal/uv data)
+    const std::size_t componentStrideFloats =
+        (vertexData.size() % 8 == 0) ? 8 : 3;
+    const GLsizei stride = static_cast<GLsizei>(componentStrideFloats * sizeof(float));
+
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+
+    if (componentStrideFloats >= 6) {
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+    }
+    if (componentStrideFloats >= 8) {
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+    }
 
     glBindVertexArray(0);
     m.hasIndices = true;

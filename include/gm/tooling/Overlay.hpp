@@ -24,6 +24,10 @@ namespace gm::utils {
 class HotReloader;
 }
 
+namespace gm::physics {
+class PhysicsWorld;
+}
+
 namespace gm::tooling {
 
 class Overlay {
@@ -49,6 +53,7 @@ public:
     void SetCamera(gm::Camera* camera) { m_camera = camera; }
     void SetScene(const std::shared_ptr<gm::Scene>& scene);
     void SetWorldInfoProvider(WorldInfoProvider provider) { m_worldInfoProvider = std::move(provider); }
+    void SetPhysicsWorld(gm::physics::PhysicsWorld* physics) { m_physicsWorld = physics; }
 
     void AddNotification(const std::string& message);
 
@@ -59,6 +64,7 @@ private:
     void RenderHotReloadSection();
     void RenderSaveSection();
     void RenderWorldSection();
+    void RenderPhysicsSection();
     void RenderNotifications();
     void RefreshSaveList();
     void PruneNotifications();
@@ -66,6 +72,7 @@ private:
     gm::save::SaveManager* m_saveManager = nullptr;
     gm::utils::HotReloader* m_hotReloader = nullptr;
     gm::Camera* m_camera = nullptr;
+    gm::physics::PhysicsWorld* m_physicsWorld = nullptr;
     std::weak_ptr<gm::Scene> m_scene;
 
     Callbacks m_callbacks;

@@ -58,6 +58,20 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glm)
 
+# Jolt Physics (header-only with single implementation file)
+set(JPH_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(JPH_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(JPH_DOUBLE_PRECISION OFF CACHE BOOL "" FORCE)
+set(JPH_PROFILE OFF CACHE BOOL "" FORCE)
+set(USE_STATIC_MSVC_RUNTIME_LIBRARY OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+  Jolt
+  GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
+  GIT_TAG        v5.0.0
+  SOURCE_SUBDIR  Build
+)
+FetchContent_MakeAvailable(Jolt)
+
 # Dear ImGui
 FetchContent_Declare(
   imgui
@@ -140,6 +154,13 @@ add_library(GotMilkedEngine
     src/utils/Config.cpp
     src/utils/HotReloader.cpp
 
+    # Physics
+    src/physics/PhysicsWorld.cpp
+    src/physics/JoltImpl.cpp
+
+    # Prototypes
+    src/prototypes/Primitives.cpp
+
     # Gameplay
     src/gameplay/FlyCameraController.cpp
 
@@ -156,6 +177,8 @@ target_include_directories(GotMilkedEngine
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/rendering
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/scene
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/utils
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/physics
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/prototypes
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/gameplay
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/save
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/tooling
@@ -165,11 +188,16 @@ target_include_directories(GotMilkedEngine
         ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering
         ${CMAKE_CURRENT_SOURCE_DIR}/src/scene
         ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/physics
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/prototypes
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay
         ${CMAKE_CURRENT_SOURCE_DIR}/src/save
         ${CMAKE_CURRENT_SOURCE_DIR}/src/tooling
 )
-target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm::glm imgui)
+target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm::glm imgui Jolt)
 
-# Include nlohmann/json (header-only, so just need include directory)
+# Include directories for dependencies
 target_include_directories(GotMilkedEngine PUBLIC ${json_SOURCE_DIR}/include)
+# Jolt include directory - FetchContent populates jolt_SOURCE_DIR (lowercase)
+target_include_directories(GotMilkedEngine PUBLIC ${jolt_SOURCE_DIR})
+# Note: Jolt is header-only with JPH_IMPLEMENTATION in JoltImpl.cpp, so no library linking needed

@@ -3,11 +3,21 @@
 #include "gm/rendering/Shader.hpp"
 #include "gm/rendering/Texture.hpp"
 #include "gm/rendering/Mesh.hpp"
+#include "gm/rendering/Material.hpp"
+#include "gm/prototypes/Primitives.hpp"
 #include "gm/utils/ObjLoader.hpp"
 #include "gm/utils/ResourceRegistry.hpp"
 
 #include <cstdio>
 #include <exception>
+#include <glm/vec3.hpp>
+
+namespace {
+std::shared_ptr<gm::Material> CreateMaterial(const glm::vec3& diffuse, float shininess = 32.0f) {
+    auto material = std::make_shared<gm::Material>(gm::Material::CreatePhong(diffuse, glm::vec3(0.5f), shininess));
+    return material;
+}
+} // namespace
 
 bool GameResources::Load(const std::string& assetsDir) {
     shaderGuid = "game_shader";
@@ -16,8 +26,8 @@ bool GameResources::Load(const std::string& assetsDir) {
 
     shaderVertPath = assetsDir + "/shaders/simple.vert.glsl";
     shaderFragPath = assetsDir + "/shaders/simple.frag.glsl";
-    texturePath = assetsDir + "/textures/cow.png";  // Using cow texture as demo asset
-    meshPath = assetsDir + "/models/cow.obj";       // Using cow mesh as demo asset
+    texturePath = assetsDir + "/textures/cow.png";
+    meshPath = assetsDir + "/models/cow.obj";
 
     shader = std::make_unique<gm::Shader>();
     if (!shader->loadFromFiles(shaderVertPath, shaderFragPath)) {
@@ -37,6 +47,16 @@ bool GameResources::Load(const std::string& assetsDir) {
     registry.RegisterShader(shaderGuid, shaderVertPath, shaderFragPath);
     registry.RegisterTexture(textureGuid, texturePath);
     registry.RegisterMesh(meshGuid, meshPath);
+
+    planeMesh = std::make_unique<gm::Mesh>(gm::prototypes::CreatePlane(50.0f, 50.0f, 10.0f));
+    cubeMesh = std::make_unique<gm::Mesh>(gm::prototypes::CreateCube(1.5f));
+
+    planeMaterial = CreateMaterial(glm::vec3(0.2f, 0.5f, 0.2f), 16.0f);
+    planeMaterial->SetName("Ground Material");
+    planeMaterial->SetDiffuseTexture(texture.get());
+
+    cubeMaterial = CreateMaterial(glm::vec3(0.75f, 0.2f, 0.2f));
+    cubeMaterial->SetName("Cube Material");
 
     return true;
 }
@@ -71,6 +91,9 @@ bool GameResources::ReloadTexture() {
     try {
         auto newTexture = std::make_unique<gm::Texture>(gm::Texture::loadOrDie(texturePath, true));
         texture = std::move(newTexture);
+        if (planeMaterial) {
+            planeMaterial->SetDiffuseTexture(texture.get());
+        }
         gm::ResourceRegistry::Instance().RegisterTexture(textureGuid, texturePath);
         return true;
     } catch (const std::exception& ex) {
@@ -121,6 +144,10 @@ void GameResources::Release() {
     shader.reset();
     texture.reset();
     mesh.reset();
+    planeMesh.reset();
+    cubeMesh.reset();
+    planeMaterial.reset();
+    cubeMaterial.reset();
     shaderGuid.clear();
     shaderVertPath.clear();
     shaderFragPath.clear();

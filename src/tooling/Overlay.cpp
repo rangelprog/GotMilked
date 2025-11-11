@@ -8,8 +8,10 @@
 #include "imgui.h"
 #include "gm/rendering/Camera.hpp"
 #include "gm/scene/Scene.hpp"
+#include "gm/scene/GameObject.hpp"
 #include "gm/save/SaveManager.hpp"
 #include "gm/utils/HotReloader.hpp"
+#include "gm/physics/PhysicsWorld.hpp"
 
 namespace gm::tooling {
 
@@ -67,6 +69,7 @@ void Overlay::Render(bool& overlayOpen) {
     RenderHotReloadSection();
     RenderSaveSection();
     RenderWorldSection();
+    RenderPhysicsSection();
     RenderNotifications();
 
     ImGui::End();
@@ -182,6 +185,45 @@ void Overlay::RenderWorldSection() {
 
     if (auto scene = m_scene.lock()) {
         ImGui::Text("GameObjects: %zu", scene->GetAllGameObjects().size());
+    }
+}
+
+void Overlay::RenderPhysicsSection() {
+    if (!ImGui::CollapsingHeader("Physics", ImGuiTreeNodeFlags_DefaultOpen)) {
+        return;
+    }
+
+    if (!m_physicsWorld) {
+        ImGui::TextUnformatted("Physics world unavailable.");
+        return;
+    }
+
+    if (!m_physicsWorld->IsInitialized()) {
+        ImGui::TextUnformatted("Physics world not initialized.");
+        return;
+    }
+
+    ImGui::TextUnformatted("Status: Active");
+
+    // Count physics bodies in the scene
+    if (auto scene = m_scene.lock()) {
+        int staticBodies = 0;
+        int dynamicBodies = 0;
+        
+        for (const auto& obj : scene->GetAllGameObjects()) {
+            if (!obj || !obj->IsActive()) continue;
+            
+            // Check if object has RigidBodyComponent (we'll need to forward declare or include)
+            // For now, we'll use tags as a proxy
+            if (obj->HasTag("ground")) {
+                staticBodies++;
+            } else if (obj->HasTag("dynamic")) {
+                dynamicBodies++;
+            }
+        }
+        
+        ImGui::Text("Static Bodies: %d", staticBodies);
+        ImGui::Text("Dynamic Bodies: %d", dynamicBodies);
     }
 }
 

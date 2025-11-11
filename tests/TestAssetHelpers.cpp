@@ -3,6 +3,8 @@
 #include "gm/rendering/Shader.hpp"
 #include "gm/rendering/Texture.hpp"
 #include "gm/rendering/Mesh.hpp"
+#include "gm/rendering/Material.hpp"
+#include "gm/prototypes/Primitives.hpp"
 #include "gm/utils/ObjLoader.hpp"
 #include "gm/utils/ResourceRegistry.hpp"
 
@@ -11,6 +13,7 @@
 #include <random>
 #include <vector>
 #include <system_error>
+#include <glm/vec3.hpp>
 
 namespace {
 
@@ -95,6 +98,14 @@ void PopulateGameResourcesFromTestAssets(const TestAssetBundle& bundle, GameReso
     resources.texture = std::move(texture);
 
     resources.mesh = std::make_unique<gm::Mesh>(gm::ObjLoader::LoadObjPNUV(bundle.meshPath));
+    resources.planeMesh = std::make_unique<gm::Mesh>(gm::prototypes::CreatePlane(5.0f, 5.0f, 2.0f));
+    resources.cubeMesh = std::make_unique<gm::Mesh>(gm::prototypes::CreateCube(1.0f));
+
+    resources.planeMaterial = std::make_shared<gm::Material>(gm::Material::CreatePhong(glm::vec3(0.4f, 0.7f, 0.4f),
+                                                                                       glm::vec3(0.2f), 16.0f));
+    resources.planeMaterial->SetDiffuseTexture(resources.texture.get());
+    resources.cubeMaterial = std::make_shared<gm::Material>(gm::Material::CreatePhong(glm::vec3(0.75f, 0.25f, 0.25f),
+                                                                                      glm::vec3(0.4f), 32.0f));
 
     resources.shaderGuid = "test_shader_" + bundle.root.filename().string();
     resources.textureGuid = "test_texture_" + bundle.root.filename().string();

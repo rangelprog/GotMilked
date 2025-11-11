@@ -15,7 +15,7 @@ public:
     Mesh& operator=(Mesh&& other) noexcept;
 
     static Mesh fromPositions(const std::vector<float>& positions);
-    static Mesh fromIndexed(const std::vector<float>& positions,
+    static Mesh fromIndexed(const std::vector<float>& vertexData,
                           const std::vector<unsigned int>& indices);
 
     void Draw() const;

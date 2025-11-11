@@ -4,6 +4,8 @@
 #include "Game.hpp"
 #include "GameSceneHelpers.hpp"
 #include "SceneSerializerExtensions.hpp"
+#include "StaticMeshComponent.hpp"
+#include "gm/physics/PhysicsWorld.hpp"
 
 #include <cstdio>
 #include <filesystem>
@@ -14,8 +16,6 @@
 #include "gm/rendering/Camera.hpp"
 #include "gm/scene/Transform.hpp"
 #include "gm/scene/TransformComponent.hpp"
-#include "gm/scene/MaterialComponent.hpp"
-#include "gm/scene/LightComponent.hpp"
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/SceneManager.hpp"
 #include "gm/rendering/Material.hpp"
@@ -39,8 +39,19 @@ Game::~Game() = default;
 
 bool Game::Init(GLFWwindow* window) {
     m_window = window;
+    if (!m_window) {
+        gm::core::Logger::Error("[Game] Invalid window handle");
+        return false;
+    }
 
-    if (!m_resources.Load(m_assetsDir.string())) {
+    auto& physics = gm::physics::PhysicsWorld::Instance();
+    if (!physics.IsInitialized()) {
+        physics.Init();
+    }
+
+    const std::string assetsPath = m_assetsDir.string();
+    if (!m_resources.Load(assetsPath)) {
+        gm::core::Logger::Error("[Game] Failed to load resources from %s", assetsPath.c_str());
         return false;
     }
 
@@ -78,6 +89,7 @@ bool Game::Init(GLFWwindow* window) {
         m_tooling->SetHotReloader(&m_hotReloader);
         m_tooling->SetCamera(m_camera.get());
         m_tooling->SetScene(m_gameScene);
+        m_tooling->SetPhysicsWorld(&gm::physics::PhysicsWorld::Instance());
         m_tooling->SetWorldInfoProvider([this]() -> std::optional<gm::tooling::Overlay::WorldInfo> {
             if (!m_gameplay || !m_camera) return std::nullopt;
             gm::tooling::Overlay::WorldInfo info;
@@ -91,7 +103,6 @@ bool Game::Init(GLFWwindow* window) {
     }
 
     SetupResourceHotReload();
-
     return true;
 }
 
@@ -111,6 +122,7 @@ void Game::SetupScene() {
     if (m_gameScene->GetAllGameObjects().empty()) {
         gotmilked::PopulateInitialScene(*m_gameScene, *m_camera, m_resources);
     }
+    ApplyResourcesToScene();
 
     if (m_gameplay) {
         m_gameplay->SetScene(m_gameScene);
@@ -119,6 +131,11 @@ void Game::SetupScene() {
 
 void Game::Update(float dt) {
     if (!m_window) return;
+
+    auto& physics = gm::physics::PhysicsWorld::Instance();
+    if (physics.IsInitialized()) {
+        physics.Step(dt);
+    }
 
     auto& input = gm::core::Input::Instance();
 
@@ -157,7 +174,11 @@ void Game::Update(float dt) {
 
 
 void Game::Render() {
-    if (!m_window || !m_resources.shader) return;
+    if (!m_window) return;
+    if (!m_resources.shader) {
+        std::printf("[Game] Warning: Cannot render - shader not loaded\n");
+        return;
+    }
 
     int fbw, fbh;
     glfwGetFramebufferSize(m_window, &fbw, &fbh);
@@ -207,6 +228,8 @@ void Game::Shutdown() {
     
     // InputManager is a singleton, no need to manually reset
     printf("[Game] Shutdown complete\n");
+
+    gm::physics::PhysicsWorld::Instance().Shutdown();
 }
 
 void Game::SetupResourceHotReload() {
@@ -264,8 +287,31 @@ void Game::ApplyResourcesToScene() {
         return;
     }
 
-    // Update resources on scene objects if needed
-    // (Future: add resource rehydration logic here for game-specific components)
+    auto applyToObject = [this](const std::string& name,
+                                gm::Mesh* mesh,
+                                const std::shared_ptr<gm::Material>& material) {
+        if (!m_gameScene || !mesh || !material || !m_resources.shader) {
+            return;
+        }
+
+        auto object = m_gameScene->FindGameObjectByName(name);
+        if (!object) {
+            return;
+        }
+
+        auto renderer = object->GetComponent<StaticMeshComponent>();
+        if (!renderer) {
+            return;
+        }
+
+        renderer->SetMesh(mesh);
+        renderer->SetShader(m_resources.shader.get());
+        renderer->SetMaterial(material);
+        renderer->SetCamera(m_camera.get());
+    };
+
+    applyToObject("GroundPlane", m_resources.planeMesh.get(), m_resources.planeMaterial);
+    applyToObject("FloatingCube", m_resources.cubeMesh.get(), m_resources.cubeMaterial);
 
     if (m_tooling) {
         m_tooling->SetScene(m_gameScene);

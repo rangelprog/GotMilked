@@ -4,6 +4,8 @@ add_executable(GotMilked
   src/SceneSerializerExtensions.cpp
   src/GameResources.cpp
   src/GameSceneHelpers.cpp
+  src/StaticMeshComponent.cpp
+  src/RigidBodyComponent.cpp
 )
 
 set_target_properties(GotMilked PROPERTIES OUTPUT_NAME "GotMilked")

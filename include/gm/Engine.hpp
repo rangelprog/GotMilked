@@ -32,6 +32,12 @@
 #include "gm/utils/ImGuiManager.hpp"
 #include "gm/utils/HotReloader.hpp"
 
+// Prototypes
+#include "gm/prototypes/Primitives.hpp"
+
+// Physics
+#include "gm/physics/PhysicsWorld.hpp"
+
 // Gameplay
 #include "gm/gameplay/FlyCameraController.hpp"
 

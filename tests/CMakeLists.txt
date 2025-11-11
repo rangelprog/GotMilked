@@ -7,6 +7,8 @@ add_executable(GotMilkedTests
     TestAssetHelpers.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameResources.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameSceneHelpers.cpp
+    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/StaticMeshComponent.cpp
+    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/RigidBodyComponent.cpp
     TestMain.cpp
 )
 target_link_libraries(GotMilkedTests PRIVATE

@@ -386,6 +386,9 @@ void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovD
     glm::mat4 view = cam.View();
 
     shader.Use();
+    shader.SetMat4("uView", view);
+    shader.SetMat4("uProj", proj);
+    shader.SetVec3("uViewPos", cam.Position());
 
     // Collect and apply lights
     LightManager lightManager;
