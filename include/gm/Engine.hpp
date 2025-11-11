@@ -21,6 +21,7 @@
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/scene/MaterialComponent.hpp"
 #include "gm/scene/LightComponent.hpp"
+#include "gm/scene/SceneSerializer.hpp"
 
 // Utilities
 #include "gm/utils/ObjLoader.hpp"

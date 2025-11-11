@@ -47,6 +47,9 @@ public:
     void TagGameObject(std::shared_ptr<GameObject> gameObject, const std::string& tag);
     void UntagGameObject(std::shared_ptr<GameObject> gameObject, const std::string& tag);
 
+    // Serialization
+    bool SaveToFile(const std::string& filepath);
+    bool LoadFromFile(const std::string& filepath);
 
 private:
     void UpdateGameObjects(float deltaTime);

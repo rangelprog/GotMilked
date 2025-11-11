@@ -65,6 +65,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(imgui)
 
+# nlohmann/json (header-only JSON library)
+FetchContent_Declare(
+  json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG        v3.11.3
+)
+FetchContent_MakeAvailable(json)
+
 # Create imgui library manually since it doesn't have a CMakeLists.txt
 if(NOT TARGET imgui)
   add_library(imgui STATIC
@@ -112,6 +120,7 @@ add_library(GotMilkedEngine
     src/scene/TransformComponent.cpp
     src/scene/MaterialComponent.cpp
     src/scene/LightComponent.cpp
+    src/scene/SceneSerializer.cpp
 
     # Utils
     src/utils/ObjLoader.cpp
@@ -135,3 +144,6 @@ target_include_directories(GotMilkedEngine
         ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
 )
 target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm::glm imgui)
+
+# Include nlohmann/json (header-only, so just need include directory)
+target_include_directories(GotMilkedEngine PUBLIC ${json_SOURCE_DIR}/include)

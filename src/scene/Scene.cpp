@@ -1,5 +1,6 @@
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/GameObject.hpp"
+#include "gm/scene/SceneSerializer.hpp"
 #include "gm/rendering/Shader.hpp"
 #include "gm/rendering/Camera.hpp"
 #include "gm/rendering/LightManager.hpp"
@@ -179,6 +180,14 @@ void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovD
             gameObject->Render();
         }
     }
+}
+
+bool Scene::SaveToFile(const std::string& filepath) {
+    return SceneSerializer::SaveToFile(*this, filepath);
+}
+
+bool Scene::LoadFromFile(const std::string& filepath) {
+    return SceneSerializer::LoadFromFile(*this, filepath);
 }
 
 } // namespace gm
