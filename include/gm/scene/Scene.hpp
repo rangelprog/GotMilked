@@ -3,14 +3,12 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
-#include "gm/scene/SceneEntity.hpp"
 #include "gm/scene/GameObject.hpp"
 
 namespace gm {
 
 class Scene {
 private:
-    std::vector<std::shared_ptr<SceneEntity>> entities;
     std::vector<std::shared_ptr<GameObject>> gameObjects;
     std::unordered_map<std::string, std::vector<std::shared_ptr<GameObject>>> objectsByTag;
     std::unordered_map<std::string, std::shared_ptr<GameObject>> objectsByName;
@@ -49,28 +47,6 @@ public:
     void TagGameObject(std::shared_ptr<GameObject> gameObject, const std::string& tag);
     void UntagGameObject(std::shared_ptr<GameObject> gameObject, const std::string& tag);
 
-    // Entity management (legacy support - DEPRECATED: Use GameObjects instead)
-    [[deprecated("Use GameObjects instead of SceneEntity. This will be removed in a future version.")]]
-    void AddEntity(std::shared_ptr<SceneEntity> entity) {
-        if (entity) {
-            entities.push_back(entity);
-        }
-    }
-
-    template<typename T>
-    [[deprecated("Use GameObjects instead of SceneEntity. This will be removed in a future version.")]]
-    std::vector<std::shared_ptr<T>> GetEntitiesOfType() {
-        std::vector<std::shared_ptr<T>> result;
-        for (const auto& entity : entities) {
-            if (auto typed = std::dynamic_pointer_cast<T>(entity)) {
-                result.push_back(typed);
-            }
-        }
-        return result;
-    }
-
-    [[deprecated("Use FindGameObjectByName instead. This will be removed in a future version.")]]
-    std::shared_ptr<SceneEntity> FindEntityByName(const std::string& name);
 
 private:
     void UpdateGameObjects(float deltaTime);

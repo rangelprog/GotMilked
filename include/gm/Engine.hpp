@@ -10,6 +10,8 @@
 #include "gm/rendering/Mesh.hpp"
 #include "gm/rendering/Shader.hpp"
 #include "gm/rendering/Texture.hpp"
+#include "gm/rendering/Material.hpp"
+#include "gm/rendering/LightManager.hpp"
 
 // Scene Management
 #include "gm/scene/Component.hpp"
@@ -17,6 +19,8 @@
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/Transform.hpp"
 #include "gm/scene/TransformComponent.hpp"
+#include "gm/scene/MaterialComponent.hpp"
+#include "gm/scene/LightComponent.hpp"
 
 // Utilities
 #include "gm/utils/ObjLoader.hpp"

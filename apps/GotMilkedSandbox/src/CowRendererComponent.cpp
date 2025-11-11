@@ -3,8 +3,10 @@
 #include "gm/rendering/Texture.hpp"
 #include "gm/rendering/Mesh.hpp"
 #include "gm/rendering/Camera.hpp"
+#include "gm/rendering/Material.hpp"
 #include "gm/scene/GameObject.hpp"
 #include "gm/scene/TransformComponent.hpp"
+#include "gm/scene/MaterialComponent.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -33,7 +35,7 @@ void CowRendererComponent::Update(float deltaTime) {
 }
 
 void CowRendererComponent::Render() {
-    if (!mesh || !texture || !shader || !camera || !owner) {
+    if (!mesh || !shader || !camera || !owner) {
         return;
     }
 
@@ -56,14 +58,35 @@ void CowRendererComponent::Render() {
     if (GLint loc = shader->uniformLoc("uViewPos"); loc >= 0)
         glUniform3fv(loc, 1, glm::value_ptr(camera->Position()));
 
-    if (GLint loc = shader->uniformLoc("uLightDir"); loc >= 0)
-        glUniform3fv(loc, 1, glm::value_ptr(glm::normalize(glm::vec3(-0.4f, -1.0f, -0.3f))));
-    if (GLint loc = shader->uniformLoc("uLightColor"); loc >= 0)
-        glUniform3fv(loc, 1, glm::value_ptr(glm::vec3(1.0f)));
+    // Lights are now handled by LightManager in Scene::Draw()
+    // Legacy light uniforms removed - use LightComponent instead
 
-    if (GLint loc = shader->uniformLoc("uUseTex"); loc >= 0)
-        glUniform1i(loc, 1);
+    // Apply material if MaterialComponent exists, otherwise use fallback
+    if (auto materialComp = owner->GetComponent<gm::MaterialComponent>()) {
+        if (auto material = materialComp->GetMaterial()) {
+            material->Apply(*shader);
+        } else {
+            // Fallback: use texture if available
+            if (texture) {
+                shader->SetInt("uUseTex", 1);
+                texture->bind(0);
+                shader->SetInt("uTex", 0);
+            } else {
+                shader->SetInt("uUseTex", 0);
+                shader->SetVec3("uSolidColor", glm::vec3(0.8f));
+            }
+        }
+    } else {
+        // Legacy: use texture directly if no material component
+        if (texture) {
+            shader->SetInt("uUseTex", 1);
+            texture->bind(0);
+            shader->SetInt("uTex", 0);
+        } else {
+            shader->SetInt("uUseTex", 0);
+            shader->SetVec3("uSolidColor", glm::vec3(0.8f));
+        }
+    }
     
-    texture->bind(0);
     mesh->Draw();
 }

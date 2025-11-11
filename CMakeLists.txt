@@ -101,6 +101,8 @@ add_library(GotMilkedEngine
     src/rendering/Shader.cpp
     src/rendering/Texture.cpp
     src/rendering/Mesh.cpp
+    src/rendering/Material.cpp
+    src/rendering/LightManager.cpp
     src/rendering/stb_image_impl.cpp
 
     # Scene management
@@ -108,6 +110,8 @@ add_library(GotMilkedEngine
     src/scene/SceneManager.cpp
     src/scene/GameObject.cpp
     src/scene/TransformComponent.cpp
+    src/scene/MaterialComponent.cpp
+    src/scene/LightComponent.cpp
 
     # Utils
     src/utils/ObjLoader.cpp

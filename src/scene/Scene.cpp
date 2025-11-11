@@ -2,6 +2,7 @@
 #include "gm/scene/GameObject.hpp"
 #include "gm/rendering/Shader.hpp"
 #include "gm/rendering/Camera.hpp"
+#include "gm/rendering/LightManager.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
 
@@ -62,7 +63,6 @@ void Scene::Cleanup() {
     gameObjects.clear();
     objectsByTag.clear();
     objectsByName.clear();
-    entities.clear();
     isInitialized = false;
 }
 
@@ -168,29 +168,10 @@ void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovD
 
     shader.Use();
 
-    // Draw legacy entities (DEPRECATED - will be removed in future version)
-    for (const auto& entity : entities) {
-        if (!entity) continue;
-
-        glm::mat4 model = entity->transform.getMatrix();
-        glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(model)));
-
-        shader.SetMat4("uModel", model);
-        shader.SetMat4("uView", view);
-        shader.SetMat4("uProj", proj);
-        shader.SetMat3("uNormalMat", normalMat);
-
-        if (entity->texture) {
-            shader.SetInt("uUseTex", 1);
-            entity->texture->bind(0);
-        } else {
-            shader.SetInt("uUseTex", 0);
-        }
-
-        if (entity->mesh) {
-            entity->mesh->Draw();
-        }
-    }
+    // Collect and apply lights
+    LightManager lightManager;
+    lightManager.CollectLights(gameObjects);
+    lightManager.ApplyLights(shader, cam.Position());
 
     // Draw GameObjects
     for (const auto& gameObject : gameObjects) {
@@ -198,11 +179,6 @@ void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovD
             gameObject->Render();
         }
     }
-}
-
-std::shared_ptr<SceneEntity> Scene::FindEntityByName(const std::string& name) {
-    // TODO: Implement entity name lookup if needed
-    return nullptr;
 }
 
 } // namespace gm

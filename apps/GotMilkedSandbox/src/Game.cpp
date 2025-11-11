@@ -14,8 +14,11 @@
 #include "gm/rendering/Texture.hpp"
 #include "gm/scene/Transform.hpp"
 #include "gm/scene/TransformComponent.hpp"
+#include "gm/scene/MaterialComponent.hpp"
+#include "gm/scene/LightComponent.hpp"
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/SceneManager.hpp"
+#include "gm/rendering/Material.hpp"
 #include "gm/core/input/InputManager.hpp"
 #include "gm/core/input/InputAction.hpp"
 #include "gm/utils/CoordinateDisplay.hpp"
@@ -126,10 +129,22 @@ void Game::SetupScene() {
         transform->SetPosition(xPos, 0.0f, -5.0f);
         transform->SetScale(1.0f); // Uniform scale
         
+        // Create and assign material
+        auto material = std::make_shared<gm::Material>();
+        material->SetName("Cow Material " + std::to_string(i + 1));
+        material->SetDiffuseTexture(m_cowTex.get());
+        material->SetDiffuseColor(glm::vec3(1.0f, 1.0f, 1.0f));
+        material->SetSpecularColor(glm::vec3(0.3f, 0.3f, 0.3f));
+        material->SetShininess(32.0f);
+
+        // Add MaterialComponent
+        auto materialComp = cowObject->AddComponent<gm::MaterialComponent>();
+        materialComp->SetMaterial(material);
+        
         // Add the CowRendererComponent
         auto cowRenderer = cowObject->AddComponent<CowRendererComponent>();
         cowRenderer->SetMesh(m_cowMesh.get());
-        cowRenderer->SetTexture(m_cowTex.get());
+        cowRenderer->SetTexture(m_cowTex.get()); // Keep for backward compatibility
         cowRenderer->SetShader(m_shader.get());
         cowRenderer->SetCamera(m_camera.get());
         
@@ -147,11 +162,22 @@ void Game::SetupScene() {
         m_cowObjects.push_back(cowObject);
     }
 
+    // Create a directional light (sun)
+    auto sunLight = m_gameScene->CreateGameObject("Sun");
+    auto sunTransform = sunLight->EnsureTransform();
+    sunTransform->SetPosition(0.0f, 10.0f, 0.0f);
+    auto sunLightComp = sunLight->AddComponent<gm::LightComponent>();
+    sunLightComp->SetType(gm::LightComponent::LightType::Directional);
+    sunLightComp->SetDirection(glm::vec3(-0.4f, -1.0f, -0.3f));
+    sunLightComp->SetColor(glm::vec3(1.0f, 1.0f, 1.0f));
+    sunLightComp->SetIntensity(1.5f); // Increased intensity
+    printf("[Game] Created directional light (Sun)\n");
+
     // Demonstrate finding objects by tag
     auto animals = m_gameScene->FindGameObjectsByTag("animal");
     printf("[Game] Found %zu animals in scene\n", animals.size());
     
-    printf("[Game] Scene setup complete with %zu cows\n", m_cowObjects.size());
+    printf("[Game] Scene setup complete with %zu cows and 1 light\n", m_cowObjects.size());
 }
 
 
