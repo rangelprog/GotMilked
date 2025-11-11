@@ -40,10 +40,6 @@ bool Game::Init(GLFWwindow* window) {
 
     m_camera = std::make_unique<gm::Camera>();
 
-    using namespace gm::core;
-    auto& inputManager = InputManager::Instance();
-    inputManager.Init(window);
-
     SetupScene();
 
     return true;
@@ -58,7 +54,6 @@ void Game::SetupScene() {
         return;
     }
 
-    sceneManager.InitActiveScene();
     m_gameScene->SetParallelGameObjectUpdates(true);
     std::printf("[Game] Game scene initialized successfully\n");
 
@@ -74,10 +69,6 @@ void Game::SetupScene() {
 
 void Game::Update(float dt) {
     if (!m_window) return;
-
-    // Update the scene (updates all GameObjects)
-    auto& sceneManager = gm::SceneManager::Instance();
-    sceneManager.UpdateActiveScene(dt);
 
     // Get input system (Update() already called in main loop before glfwPollEvents)
     auto& inputManager = gm::core::InputManager::Instance();
@@ -177,7 +168,6 @@ void Game::Shutdown() {
     
     // Clean up scene and scene manager
     m_gameScene.reset();
-    gm::SceneManager::Instance().Shutdown();
 
     gm::SceneSerializerExtensions::UnregisterSerializers();
     m_resources.Release();

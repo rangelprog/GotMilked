@@ -1,79 +1,32 @@
-#include <cstdio>
 #include <string>
 
-#define GLFW_INCLUDE_NONE
-#include <GLFW/glfw3.h>
-#include <glad/glad.h>
-
 #include "Game.hpp"
-#include "gm/core/input/InputManager.hpp"
-
-static void error_callback(int code, const char *desc) {
-  std::fprintf(stderr, "GLFW error %d: %s\n", code, desc);
-}
+#include "gm/core/GameApp.hpp"
 
 int main() {
-  // --- GLFW / OpenGL ---
-  glfwSetErrorCallback(error_callback);
-  if (!glfwInit())
-    return 1;
-
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-  GLFWwindow *window = glfwCreateWindow(1280, 720, "GotMilkedSandbox", nullptr, nullptr);
-  if (!window)
-    return 1;
-  glfwMakeContextCurrent(window);
-
-  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    return 1;
-  glEnable(GL_DEPTH_TEST);
-
   const std::string assetsDir = std::string(GM_ASSETS_DIR);
   Game game(assetsDir);
-  if (!game.Init(window)) {
-    return 1;
-  }
 
-  double lastTime = glfwGetTime();
-  double lastTitle = lastTime;
-  int frames = 0;
+  gm::core::GameAppConfig config;
+  config.width = 1280;
+  config.height = 720;
+  config.title = "GotMilkedSandbox";
 
-  bool vsyncOn = true;
-  glfwSwapInterval(vsyncOn ? 1 : 0);
+  gm::core::GameApp app(config);
 
-  while (!glfwWindowShouldClose(window)) {
-    double now = glfwGetTime();
-    float dt = (float)(now - lastTime);
-    lastTime = now;
-
-    // Update input state transitions BEFORE polling new events
-    gm::core::InputManager::Instance().Update();
-
-    // Poll events which trigger input callbacks
-    glfwPollEvents();
-
+  gm::core::GameAppCallbacks callbacks;
+  callbacks.onInit = [&](gm::core::GameAppContext& ctx) {
+    return game.Init(ctx.window);
+  };
+  callbacks.onUpdate = [&](gm::core::GameAppContext&, float dt) {
     game.Update(dt);
+  };
+  callbacks.onRender = [&](gm::core::GameAppContext&) {
     game.Render();
+  };
+  callbacks.onShutdown = [&](gm::core::GameAppContext&) {
+    game.Shutdown();
+  };
 
-    // FPS title
-    frames++;
-    if (now - lastTitle >= 0.5) {
-      double fps = frames / (now - lastTitle);
-      lastTitle = now;
-      frames = 0;
-      char buf[160];
-      std::snprintf(buf, sizeof(buf), "GotMilkedSandbox | FPS: %.1f", fps);
-      glfwSetWindowTitle(window, buf);
-    }
-
-    glfwSwapBuffers(window);
-  }
-
-  game.Shutdown();
-  glfwDestroyWindow(window);
-  glfwTerminate();
-  return 0;
+  return app.Run(callbacks);
 }
