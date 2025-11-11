@@ -3,10 +3,13 @@
 #include <vector>
 #include <unordered_map>
 #include <string>
+#include <string_view>
+#include "SceneSystem.hpp"
 
 namespace gm {
 
 class GameObject;
+class GameObjectUpdateSystem;
 
 class Shader;
 class Camera;
@@ -19,6 +22,9 @@ private:
     bool isInitialized = false;
     bool isPaused = false;
     std::string sceneName;
+    bool systemsInitialized = false;
+    bool parallelGameObjectUpdatesEnabled = false;
+    std::vector<SceneSystemPtr> systems;
 
 public:
     Scene(const std::string& name = "Unnamed Scene");
@@ -42,6 +48,14 @@ public:
     void DestroyGameObject(std::shared_ptr<GameObject> gameObject);
     void DestroyGameObjectByName(const std::string& name);
 
+    // Systems
+    void RegisterSystem(const SceneSystemPtr& system);
+    bool UnregisterSystem(std::string_view name);
+    void ClearSystems();
+    const std::vector<SceneSystemPtr>& GetSystems() const { return systems; }
+    void SetParallelGameObjectUpdates(bool enabled) { parallelGameObjectUpdatesEnabled = enabled; }
+    bool GetParallelGameObjectUpdates() const { return parallelGameObjectUpdatesEnabled; }
+
     // Querying
     std::shared_ptr<GameObject> FindGameObjectByName(const std::string& name);
     std::vector<std::shared_ptr<GameObject>> FindGameObjectsByTag(const std::string& tag);
@@ -58,6 +72,11 @@ public:
 private:
     void UpdateGameObjects(float deltaTime);
     void CleanupDestroyedObjects();
+    void InitializeSystems();
+    void ShutdownSystems();
+    void RunSystems(float deltaTime);
+
+    friend class GameObjectUpdateSystem;
 };
 
 }

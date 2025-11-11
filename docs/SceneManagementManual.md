@@ -9,6 +9,7 @@ This manual explains how to create, update, serialize, and manage scenes in the 
 - **Scene**: The top-level container for game objects, components, and systems. Defined in `gm::Scene`.
 - **GameObject**: A named entity inside a scene. Owns a set of components and metadata.
 - **Component**: Behaviour or data attached to a `GameObject` (e.g., transform, material, light).
+- **SceneSystem**: Frame-level service that plugs into the scene lifecycle (init/update/shutdown). See [Section 5](#5-scene-systems-and-async-updates).
 - **SceneManager**: Singleton that owns all scenes, handles loading/unloading, and tracks the active scene.
 
 ---
@@ -34,8 +35,8 @@ scene->Update(deltaTime);   // Call every frame
 scene->Draw(shader, camera, width, height, fovDegrees);
 ```
 
-- `Init()` propagates to all active game objects.
-- `Update()` skips execution when the scene is paused.
+- `Init()` propagates to all active game objects and notifies registered systems.
+- `Update()` runs registered systems (optionally async) and then updates game objects when the scene is not paused.
 - `Draw()` handles lighting and rendering for every active `GameObject`.
 
 ### 2.3 Cleaning Up
@@ -198,6 +199,58 @@ gm::SceneSerializer::RegisterComponentSerializer(
 ```
 
 Call `RegisterComponentSerializer` during startup (before saving or loading scenes) and optionally `UnregisterComponentSerializer` on shutdown. Games can provide thin wrappers (see `SceneSerializerExtensions` in the sandbox) to keep registration code organized.
+
+---
+
+## 5. Scene Systems and Async Updates
+
+### 5.1 Overview
+
+- Systems derive from `gm::SceneSystem` and register with a `Scene` via `Scene::RegisterSystem`.
+- The engine installs a built-in `GameObjectUpdate` system that drives the legacy game-object/component loop.
+- Systems participate in the scene lifecycle: `OnRegister`, `OnSceneInit`, `Update`, `OnSceneShutdown`, and `OnUnregister`.
+- Order matters: systems run in the order they were registered.
+
+```cpp
+class AnimationSystem final : public gm::SceneSystem {
+public:
+    std::string_view GetName() const override { return "Animation"; }
+    void Update(gm::Scene& scene, float dt) override {
+        // Iterate objects/components, or maintain your own data
+    }
+    bool RunsAsync() const override { return true; } // opt into worker execution
+};
+
+auto scene = gm::SceneManager::Instance().CreateScene("Level1");
+scene->RegisterSystem(std::make_shared<AnimationSystem>());
+```
+
+### 5.2 Asynchronous Execution
+
+- Systems that override `RunsAsync()` to return `true` execute on a worker thread via `std::async`.
+- Async systems must be thread-safe. Avoid touching APIs that mutate global/shared state without synchronization.
+- Exceptions thrown inside async systems propagate when the future is joined at the end of the frame.
+
+### 5.3 Parallel GameObject Updates
+
+- `Scene::SetParallelGameObjectUpdates(true)` enables multi-threaded `GameObject::Update` using a chunked fan-out.
+- This feature is opt-in: the default remains single-threaded to maximize compatibility.
+- When enabled, avoid spawning/destroying objects or mutating shared containers from `Update()` without proper locking.
+
+```cpp
+scene->SetParallelGameObjectUpdates(true);   // enable before the main loop
+
+while (running) {
+    scene->Update(deltaTime);                // fan-outs run in parallel
+    scene->Draw(shader, camera, width, height, fov);
+}
+```
+
+### 5.4 Managing Systems
+
+- `Scene::UnregisterSystem("Animation")` removes a system (except the built-in `GameObjectUpdate` system).
+- `Scene::ClearSystems()` removes all custom systems and re-installs the `GameObjectUpdate` system.
+- Systems are automatically re-initialized when the scene is re-initialized or after `ClearSystems()`.
 
 #### Resource GUIDs
 

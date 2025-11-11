@@ -31,6 +31,8 @@ The sandbox demonstrates engine features (scene management, rendering, serializa
 
 Each module is built into the `GotMilkedEngine` library. Applications (like the sandbox) link against this library and provide their own components, resources, and serialization extensions.
 
+> New in this revision: scenes own a stack of `SceneSystem` instances. The built-in `GameObjectUpdate` system preserves existing behaviour, while custom systems (AI, animation, physics) can slot in and even opt into async execution.
+
 ---
 
 ## 3. Scene Workflow Summary
@@ -76,11 +78,17 @@ Use it as a template for your own demo or gameplay scenes.
 
 Ideas for future expansion:
 
-- Promote generic components (physics, animation, AI) by moving them from app to engine once they are widely useful.
+- Promote generic components (physics, animation, AI) by moving them from app to engine once they are widely useful. Consider implementing them as `SceneSystem` derivatives for cleaner lifecycle management.
 - Expand serialization to cover new component types; ensure each component exposes a unique `GetName()`.
 - Implement a resource registry with GUIDs to avoid path-dependent references.
 - Add cross-platform build targets (Linux/macOS) by providing the appropriate CMake toolchains.
 - Expose runtime configuration via environment variables; e.g., set `GM_LOG_DEBUG=0` to silence debug logging in debug builds or `=1` to re-enable it without recompiling.
+
+### 6.1 Parallel Updates
+
+- Call `scene->SetParallelGameObjectUpdates(true);` to fan out `GameObject::Update` across worker tasks.
+- Only opt in once your component code is thread-safe; spawning/destroying objects during update still defers to the main thread at the end of the frame.
+- Combine with custom async `SceneSystem` implementations to keep heavy work off the main thread.
 
 For more detailed scene usage, consult `docs/SceneManagementManual.md`. The sandbox code (`apps/GotMilkedSandbox/`) showcases how the pieces fit together in practice.
 

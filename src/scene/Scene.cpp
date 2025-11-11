@@ -1,23 +1,49 @@
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/GameObject.hpp"
 #include "gm/scene/SceneSerializer.hpp"
+#include "gm/scene/SceneSystem.hpp"
 #include "gm/rendering/Shader.hpp"
 #include "gm/rendering/Camera.hpp"
 #include "gm/rendering/LightManager.hpp"
 #include "gm/core/Logger.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
+#include <future>
+#include <thread>
 
 namespace gm {
 
-Scene::Scene(const std::string& name) : sceneName(name) {}
+namespace {
+constexpr std::string_view kGameObjectSystemName = "GameObjectUpdate";
+} // namespace
+
+class GameObjectUpdateSystem final : public SceneSystem {
+public:
+    std::string_view GetName() const override { return kGameObjectSystemName; }
+    void Update(Scene& scene, float deltaTime) override {
+        scene.UpdateGameObjects(deltaTime);
+    }
+};
+
+Scene::Scene(const std::string& name)
+    : sceneName(name) {
+    RegisterSystem(std::make_shared<GameObjectUpdateSystem>());
+}
 
 void Scene::Init() {
     if (isInitialized) return;
     
+    InitializeSystems();
+    
     for (auto& gameObject : gameObjects) {
         if (gameObject && gameObject->IsActive()) {
             gameObject->Init();
+        }
+    }
+    
+    for (auto& system : systems) {
+        if (system) {
+            system->OnSceneInit(*this);
         }
     }
     
@@ -27,14 +53,66 @@ void Scene::Init() {
 void Scene::Update(float deltaTime) {
     if (isPaused) return;
 
-    UpdateGameObjects(deltaTime);
+    InitializeSystems();
+
+    RunSystems(deltaTime);
     CleanupDestroyedObjects();
 }
 
 void Scene::UpdateGameObjects(float deltaTime) {
-    for (auto& gameObject : gameObjects) {
-        if (gameObject && gameObject->IsActive() && !gameObject->IsDestroyed()) {
-            gameObject->Update(deltaTime);
+    if (!parallelGameObjectUpdatesEnabled) {
+        for (auto& gameObject : gameObjects) {
+            if (gameObject && gameObject->IsActive() && !gameObject->IsDestroyed()) {
+                gameObject->Update(deltaTime);
+            }
+        }
+        return;
+    }
+
+    const std::size_t count = gameObjects.size();
+    if (count <= 1) {
+        for (auto& gameObject : gameObjects) {
+            if (gameObject && gameObject->IsActive() && !gameObject->IsDestroyed()) {
+                gameObject->Update(deltaTime);
+            }
+        }
+        return;
+    }
+
+    const unsigned int hwThreads = std::max(1u, std::thread::hardware_concurrency());
+    const std::size_t workerCount = std::min<std::size_t>(hwThreads, count);
+
+    const std::size_t chunkSize = (count + workerCount - 1) / workerCount;
+
+    auto processRange = [this, deltaTime](std::size_t begin, std::size_t end) {
+        for (std::size_t idx = begin; idx < end; ++idx) {
+            auto& gameObject = gameObjects[idx];
+            if (gameObject && gameObject->IsActive() && !gameObject->IsDestroyed()) {
+                gameObject->Update(deltaTime);
+            }
+        }
+    };
+
+    std::vector<std::future<void>> workers;
+    workers.reserve(workerCount > 0 ? workerCount - 1 : 0);
+
+    std::size_t start = chunkSize;
+    for (std::size_t worker = 1; worker < workerCount; ++worker, start += chunkSize) {
+        const std::size_t begin = std::min(start, count);
+        const std::size_t end = std::min(begin + chunkSize, count);
+        if (begin >= end) {
+            break;
+        }
+
+        workers.emplace_back(std::async(std::launch::async, processRange, begin, end));
+    }
+
+    const std::size_t primaryEnd = std::min(chunkSize, count);
+    processRange(0, primaryEnd);
+
+    for (auto& worker : workers) {
+        if (worker.valid()) {
+            worker.get();
         }
     }
 }
@@ -61,7 +139,71 @@ void Scene::CleanupDestroyedObjects() {
     gameObjects.erase(it, gameObjects.end());
 }
 
+void Scene::InitializeSystems() {
+    if (systemsInitialized) {
+        return;
+    }
+    for (auto& system : systems) {
+        if (system) {
+            system->OnRegister(*this);
+            if (isInitialized) {
+                system->OnSceneInit(*this);
+            }
+        }
+    }
+    systemsInitialized = true;
+}
+
+void Scene::ShutdownSystems() {
+    if (!systemsInitialized) {
+        return;
+    }
+    for (auto& system : systems) {
+        if (system) {
+            system->OnUnregister(*this);
+        }
+    }
+    systemsInitialized = false;
+}
+
+void Scene::RunSystems(float deltaTime) {
+    std::vector<std::future<void>> asyncJobs;
+    asyncJobs.reserve(systems.size());
+
+    for (auto& system : systems) {
+        if (!system) {
+            continue;
+        }
+
+        if (system->RunsAsync()) {
+            SceneSystemPtr sys = system;
+            asyncJobs.emplace_back(std::async(std::launch::async, [this, sys, deltaTime]() {
+                sys->Update(*this, deltaTime);
+            }));
+        } else {
+            system->Update(*this, deltaTime);
+        }
+    }
+
+    for (auto& job : asyncJobs) {
+        if (job.valid()) {
+            job.get();
+        }
+    }
+}
+
 void Scene::Cleanup() {
+    if (isInitialized) {
+        for (auto& system : systems) {
+            if (system) {
+                system->OnSceneShutdown(*this);
+            }
+        }
+        isInitialized = false;
+    }
+
+    ShutdownSystems();
+
     gameObjects.clear();
     objectsByTag.clear();
     objectsByName.clear();
@@ -122,6 +264,79 @@ std::shared_ptr<GameObject> Scene::FindGameObjectByName(const std::string& name)
         return it->second;
     }
     return nullptr;
+}
+
+void Scene::RegisterSystem(const SceneSystemPtr& system) {
+    if (!system) {
+        core::Logger::Warning("[Scene] Attempted to register null SceneSystem");
+        return;
+    }
+
+    const std::string name{system->GetName()};
+    if (name.empty()) {
+        core::Logger::Warning("[Scene] SceneSystem with empty name ignored");
+        return;
+    }
+
+    auto duplicate = std::find_if(systems.begin(), systems.end(),
+        [&name](const SceneSystemPtr& existing) {
+            return existing && existing->GetName() == name;
+        });
+
+    if (duplicate != systems.end()) {
+        core::Logger::Warning("[Scene] SceneSystem '%s' already registered", name.c_str());
+        return;
+    }
+
+    systems.push_back(system);
+
+    if (systemsInitialized) {
+        system->OnRegister(*this);
+        if (isInitialized) {
+            system->OnSceneInit(*this);
+        }
+    }
+}
+
+bool Scene::UnregisterSystem(std::string_view name) {
+    if (name == kGameObjectSystemName) {
+        core::Logger::Warning("[Scene] '%s' is a built-in system and cannot be unregistered",
+                              name.data());
+        return false;
+    }
+
+    auto it = std::find_if(systems.begin(), systems.end(),
+        [name](const SceneSystemPtr& system) {
+            return system && system->GetName() == name;
+        });
+
+    if (it == systems.end()) {
+        return false;
+    }
+
+    if (isInitialized && *it) {
+        (*it)->OnSceneShutdown(*this);
+    }
+    if (systemsInitialized && *it) {
+        (*it)->OnUnregister(*this);
+    }
+
+    systems.erase(it);
+    return true;
+}
+
+void Scene::ClearSystems() {
+    if (isInitialized) {
+        for (auto& system : systems) {
+            if (system) {
+                system->OnSceneShutdown(*this);
+            }
+        }
+    }
+    ShutdownSystems();
+
+    systems.clear();
+    RegisterSystem(std::make_shared<GameObjectUpdateSystem>());
 }
 
 std::vector<std::shared_ptr<GameObject>> Scene::FindGameObjectsByTag(const std::string& tag) {

@@ -59,6 +59,7 @@ void Game::SetupScene() {
     }
 
     sceneManager.InitActiveScene();
+    m_gameScene->SetParallelGameObjectUpdates(true);
     std::printf("[Game] Game scene initialized successfully\n");
 
     sandbox::RehydrateMeshSpinnerComponents(*m_gameScene, m_resources, m_camera.get());
