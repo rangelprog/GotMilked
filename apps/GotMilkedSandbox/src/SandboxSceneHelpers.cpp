@@ -60,8 +60,11 @@ void PopulateSandboxScene(
             spinner->SetShader(resources.shader.get());
         }
         spinner->SetCamera(&camera);
+        spinner->SetMeshGuid(resources.meshGuid);
         spinner->SetMeshPath(resources.meshPath);
+        spinner->SetTextureGuid(resources.textureGuid);
         spinner->SetTexturePath(resources.texturePath);
+        spinner->SetShaderGuid(resources.shaderGuid);
         spinner->SetShaderPaths(resources.shaderVertPath, resources.shaderFragPath);
         spinner->SetRotationSpeed(15.0f + i * 5.0f);
         spinner->Init();
@@ -98,19 +101,22 @@ void RehydrateMeshSpinnerComponents(
         if (!spinner) continue;
 
         if (!spinner->GetMesh() && resources.mesh &&
-            (!spinner->GetMeshPath().empty() ? spinner->GetMeshPath() == resources.meshPath : true))
+            ((!spinner->GetMeshGuid().empty() && spinner->GetMeshGuid() == resources.meshGuid) ||
+             (!spinner->GetMeshPath().empty() && spinner->GetMeshPath() == resources.meshPath)))
         {
             spinner->SetMesh(resources.mesh.get());
         }
 
         if (!spinner->GetTexture() && resources.texture &&
-            (!spinner->GetTexturePath().empty() ? spinner->GetTexturePath() == resources.texturePath : true))
+            ((!spinner->GetTextureGuid().empty() && spinner->GetTextureGuid() == resources.textureGuid) ||
+             (!spinner->GetTexturePath().empty() && spinner->GetTexturePath() == resources.texturePath)))
         {
             spinner->SetTexture(resources.texture.get());
         }
 
         if (!spinner->GetShader() && resources.shader &&
-            (!spinner->GetShaderVertPath().empty() ? spinner->GetShaderVertPath() == resources.shaderVertPath : true))
+            ((!spinner->GetShaderGuid().empty() && spinner->GetShaderGuid() == resources.shaderGuid) ||
+             (!spinner->GetShaderVertPath().empty() && spinner->GetShaderVertPath() == resources.shaderVertPath)))
         {
             spinner->SetShader(resources.shader.get());
         }

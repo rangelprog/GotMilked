@@ -55,6 +55,7 @@ The engine supplies basic rendering wrappers but leaves resource ownership to th
 - Use `gm::Texture::loadOrDie`, `gm::Shader::loadFromFiles`, and `gm::Mesh` (via `ObjLoader`) to load data.
 - Use `gm::ResourceManager` for centralized resource loading and caching. Resources are loaded by name and automatically cached, preventing duplicate loads. `Has*` helpers let you check cache state, while `Reload*` APIs force a refresh from disk and log any failures.
 - When serializing, store asset identifiers (paths or GUIDs) in the component JSON so resources can be rehydrated on load.
+- Register asset GUIDs with `gm::ResourceRegistry` so scenes can resolve resources even if files move between releases.
 
 ---
 

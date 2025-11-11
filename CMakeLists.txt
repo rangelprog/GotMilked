@@ -133,6 +133,7 @@ add_library(GotMilkedEngine
     src/utils/ResourceManager.cpp
     src/utils/CoordinateDisplay.cpp
     src/utils/ImGuiManager.cpp
+    src/utils/ResourceRegistry.cpp
 )
 
 target_include_directories(GotMilkedEngine 

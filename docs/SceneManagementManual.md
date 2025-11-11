@@ -199,6 +199,10 @@ gm::SceneSerializer::RegisterComponentSerializer(
 
 Call `RegisterComponentSerializer` during startup (before saving or loading scenes) and optionally `UnregisterComponentSerializer` on shutdown. Games can provide thin wrappers (see `SceneSerializerExtensions` in the sandbox) to keep registration code organized.
 
+#### Resource GUIDs
+
+To avoid hardcoding file paths into scene JSON, register assets with `gm::ResourceRegistry` and persist a GUID alongside the path. During load you can resolve the GUID back to a path—even if assets have been moved—while older scenes continue to function because the serializer still records the original path as a fallback.
+
 ---
 
 ## 5. Managing Multiple Scenes with SceneManager

@@ -27,10 +27,10 @@ void Material::Apply(Shader& shader) const {
 
     // Texture slots
     int textureSlot = 1;
-    
+
     if (m_specularTexture) {
         m_specularTexture->bind(textureSlot);
-        shader.SetInt("uMaterial.specularTex", textureSlot);
+        shader.SetInt("uMaterial_specularTex", textureSlot);
         shader.SetInt("uMaterial.useSpecularTex", 1);
         textureSlot++;
     } else {
@@ -39,7 +39,7 @@ void Material::Apply(Shader& shader) const {
 
     if (m_normalTexture) {
         m_normalTexture->bind(textureSlot);
-        shader.SetInt("uMaterial.normalTex", textureSlot);
+        shader.SetInt("uMaterial_normalTex", textureSlot);
         shader.SetInt("uMaterial.useNormalTex", 1);
         textureSlot++;
     } else {
@@ -48,7 +48,7 @@ void Material::Apply(Shader& shader) const {
 
     if (m_emissionTexture) {
         m_emissionTexture->bind(textureSlot);
-        shader.SetInt("uMaterial.emissionTex", textureSlot);
+        shader.SetInt("uMaterial_emissionTex", textureSlot);
         shader.SetInt("uMaterial.useEmissionTex", 1);
         textureSlot++;
     } else {

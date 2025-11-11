@@ -17,9 +17,15 @@ struct Material {
     vec3 specular;
     float shininess;
     vec3 emission;
+    int useSpecularTex;
+    int useNormalTex;
+    int useEmissionTex;
 };
 
 uniform Material uMaterial;
+uniform sampler2D uMaterial_specularTex;
+uniform sampler2D uMaterial_normalTex;
+uniform sampler2D uMaterial_emissionTex;
 
 // Lighting
 struct Light {
@@ -84,6 +90,29 @@ vec3 CalculateLight(Light light, vec3 normal, vec3 fragPos, vec3 viewDir, vec3 a
 void main() {
     vec3 N = normalize(vNormal);
     vec3 V = normalize(uViewPos - vFragPos);
+
+    if (uMaterial.useNormalTex == 1) {
+        vec3 tangentNormal = texture(uMaterial_normalTex, vUV).xyz * 2.0 - 1.0;
+
+        vec3 dp1 = dFdx(vFragPos);
+        vec3 dp2 = dFdy(vFragPos);
+        vec2 duv1 = dFdx(vUV);
+        vec2 duv2 = dFdy(vUV);
+
+        vec3 T = vec3(0.0);
+        vec3 B = vec3(0.0);
+        float det = duv1.x * duv2.y - duv1.y * duv2.x;
+        if (abs(det) > 1e-6) {
+            T = normalize((dp1 * duv2.y - dp2 * duv1.y) / det);
+            B = normalize((dp2 * duv1.x - dp1 * duv2.x) / det);
+        } else {
+            T = normalize(dp1);
+            B = normalize(cross(N, T));
+        }
+
+        mat3 TBN = mat3(T, B, N);
+        N = normalize(TBN * tangentNormal);
+    }
     
     // Albedo from texture or solid color
     vec3 albedo = (uUseTex == 1) ? texture(uTex, vUV).rgb : uSolidColor;
@@ -92,6 +121,11 @@ void main() {
     vec3 materialDiffuse = uMaterial.diffuse;
     vec3 materialSpecular = uMaterial.specular;
     float materialShininess = uMaterial.shininess;
+    vec3 materialEmission = uMaterial.emission;
+
+    if (uMaterial.useSpecularTex == 1) {
+        materialSpecular *= texture(uMaterial_specularTex, vUV).rgb;
+    }
     
     // Combine texture with material diffuse color
     // If material diffuse is set, multiply texture by it; otherwise use texture directly
@@ -122,7 +156,10 @@ void main() {
     }
     
     // Add emission
-    lighting += uMaterial.emission;
+    if (uMaterial.useEmissionTex == 1) {
+        materialEmission += texture(uMaterial_emissionTex, vUV).rgb;
+    }
+    lighting += materialEmission;
     
     FragColor = vec4(lighting, 1.0);
 }

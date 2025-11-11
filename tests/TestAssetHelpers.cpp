@@ -4,8 +4,10 @@
 #include "gm/rendering/Texture.hpp"
 #include "gm/rendering/Mesh.hpp"
 #include "gm/utils/ObjLoader.hpp"
+#include "gm/utils/ResourceRegistry.hpp"
 
 #include <fstream>
+#include <iterator>
 #include <random>
 #include <vector>
 #include <system_error>
@@ -24,10 +26,20 @@ std::filesystem::path MakeTempDirectory() {
     return dir;
 }
 
+std::string LoadTextFile(const std::filesystem::path& path) {
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        throw std::runtime_error("Failed to read file: " + path.string());
+    }
+    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+}
+
 void WriteFile(const std::filesystem::path& path, const std::string& contents) {
-    std::ofstream out(path);
+    std::ofstream out(path, std::ios::binary);
+    if (!out) {
+        throw std::runtime_error("Failed to write file: " + path.string());
+    }
     out << contents;
-    out.close();
 }
 
 } // namespace
@@ -36,22 +48,9 @@ TestAssetBundle CreateMeshSpinnerTestAssets() {
     TestAssetBundle bundle;
     bundle.root = MakeTempDirectory();
 
-    const std::string vertSrc =
-        "#version 330 core\n"
-        "layout(location = 0) in vec3 aPos;\n"
-        "uniform mat4 uModel;\n"
-        "uniform mat4 uView;\n"
-        "uniform mat4 uProj;\n"
-        "void main() {\n"
-        "    gl_Position = uProj * uView * uModel * vec4(aPos, 1.0);\n"
-        "}\n";
-
-    const std::string fragSrc =
-        "#version 330 core\n"
-        "out vec4 FragColor;\n"
-        "void main() {\n"
-        "    FragColor = vec4(0.2, 0.6, 0.9, 1.0);\n"
-        "}\n";
+    const std::filesystem::path shaderDir = std::filesystem::path(GM_SANDBOX_SHADER_DIR);
+    const std::string vertSrc = LoadTextFile(shaderDir / "simple.vert.glsl");
+    const std::string fragSrc = LoadTextFile(shaderDir / "simple.frag.glsl");
 
     const std::string objContent =
         "v -0.5 -0.5 0.0\n"
@@ -97,9 +96,17 @@ void PopulateSandboxResourcesFromTestAssets(const TestAssetBundle& bundle, Sandb
 
     resources.mesh = std::make_unique<gm::Mesh>(gm::ObjLoader::LoadObjPNUV(bundle.meshPath));
 
+    resources.shaderGuid = "test_shader_" + bundle.root.filename().string();
+    resources.textureGuid = "test_texture_" + bundle.root.filename().string();
+    resources.meshGuid = "test_mesh_" + bundle.root.filename().string();
     resources.shaderVertPath = bundle.vertPath;
     resources.shaderFragPath = bundle.fragPath;
     resources.texturePath = bundle.textureTag;
     resources.meshPath = bundle.meshPath;
+
+    auto& registry = gm::ResourceRegistry::Instance();
+    registry.RegisterShader(resources.shaderGuid, resources.shaderVertPath, resources.shaderFragPath);
+    registry.RegisterTexture(resources.textureGuid, resources.texturePath);
+    registry.RegisterMesh(resources.meshGuid, resources.meshPath);
 }
 

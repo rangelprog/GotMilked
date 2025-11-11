@@ -23,6 +23,10 @@ target_include_directories(GotMilkedTests PRIVATE
     ${CMAKE_SOURCE_DIR}/apps/GotMilkedSandbox/src
 )
 
+set(GM_SANDBOX_SHADER_DIR "${CMAKE_SOURCE_DIR}/apps/GotMilkedSandbox/assets/shaders")
+string(REPLACE "\\" "/" GM_SANDBOX_SHADER_DIR "${GM_SANDBOX_SHADER_DIR}")
+target_compile_definitions(GotMilkedTests PRIVATE "GM_SANDBOX_SHADER_DIR=\"${GM_SANDBOX_SHADER_DIR}\"")
+
 gm_apply_warnings(GotMilkedTests)
 
 add_test(NAME SceneSerializer.RoundTrip COMMAND GotMilkedTests)

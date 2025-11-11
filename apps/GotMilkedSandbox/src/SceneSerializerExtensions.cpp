@@ -13,8 +13,17 @@ namespace {
 json SerializeMeshSpinnerComponent(MeshSpinnerComponent* comp) {
     json data;
     data["rotationSpeed"] = comp->GetRotationSpeed();
+    if (!comp->GetMeshGuid().empty()) {
+        data["meshGuid"] = comp->GetMeshGuid();
+    }
     data["meshPath"] = comp->GetMeshPath();
+    if (!comp->GetTextureGuid().empty()) {
+        data["textureGuid"] = comp->GetTextureGuid();
+    }
     data["texturePath"] = comp->GetTexturePath();
+    if (!comp->GetShaderGuid().empty()) {
+        data["shaderGuid"] = comp->GetShaderGuid();
+    }
     data["shaderVertPath"] = comp->GetShaderVertPath();
     data["shaderFragPath"] = comp->GetShaderFragPath();
     return data;
@@ -28,12 +37,15 @@ gm::Component* DeserializeMeshSpinnerComponent(gm::GameObject* obj, const json& 
     if (data.contains("rotationSpeed") && data["rotationSpeed"].is_number()) {
         comp->SetRotationSpeed(data["rotationSpeed"].get<float>());
     }
-    
-    // Note: Asset paths are stored but resources must be resolved externally
-    // (e.g., in Game::SetupScene or a resource manager)
-    // The Game class should resolve these paths and set the actual mesh/texture/shader pointers
+
+    if (data.contains("meshGuid") && data["meshGuid"].is_string()) {
+        comp->SetMeshGuid(data["meshGuid"].get<std::string>());
+    }
     if (data.contains("meshPath") && data["meshPath"].is_string()) {
         comp->SetMeshPath(data["meshPath"].get<std::string>());
+    }
+    if (data.contains("textureGuid") && data["textureGuid"].is_string()) {
+        comp->SetTextureGuid(data["textureGuid"].get<std::string>());
     }
     if (data.contains("texturePath") && data["texturePath"].is_string()) {
         comp->SetTexturePath(data["texturePath"].get<std::string>());
@@ -44,6 +56,9 @@ gm::Component* DeserializeMeshSpinnerComponent(gm::GameObject* obj, const json& 
             data["shaderVertPath"].get<std::string>(),
             data["shaderFragPath"].get<std::string>()
         );
+    }
+    if (data.contains("shaderGuid") && data["shaderGuid"].is_string()) {
+        comp->SetShaderGuid(data["shaderGuid"].get<std::string>());
     }
     
     return comp.get();

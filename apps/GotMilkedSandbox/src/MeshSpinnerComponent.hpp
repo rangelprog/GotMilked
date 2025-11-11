@@ -28,9 +28,12 @@ private:
     
     float rotationSpeed = 20.0f;  // Degrees per second
     
-    // Asset paths for serialization
+    // Asset identifiers for serialization
+    std::string meshGuid;
     std::string meshPath;
+    std::string textureGuid;
     std::string texturePath;
+    std::string shaderGuid;
     std::string shaderVertPath;
     std::string shaderFragPath;
 
@@ -50,9 +53,12 @@ public:
     void SetProjectionMatrix(const glm::mat4& proj) { projMatrix = proj; }
     void SetRotationSpeed(float speed) { rotationSpeed = speed; }
     
-    // Asset path setters (for serialization)
+    // Asset identifier setters (for serialization)
+    void SetMeshGuid(const std::string& guid) { meshGuid = guid; }
     void SetMeshPath(const std::string& path) { meshPath = path; }
+    void SetTextureGuid(const std::string& guid) { textureGuid = guid; }
     void SetTexturePath(const std::string& path) { texturePath = path; }
+    void SetShaderGuid(const std::string& guid) { shaderGuid = guid; }
     void SetShaderPaths(const std::string& vertPath, const std::string& fragPath) {
         shaderVertPath = vertPath;
         shaderFragPath = fragPath;
@@ -65,9 +71,12 @@ public:
     gm::Camera* GetCamera() const { return camera; }
     float GetRotationSpeed() const { return rotationSpeed; }
     
-    // Asset path getters (for serialization)
+    // Asset identifier getters (for serialization)
+    const std::string& GetMeshGuid() const { return meshGuid; }
     const std::string& GetMeshPath() const { return meshPath; }
+    const std::string& GetTextureGuid() const { return textureGuid; }
     const std::string& GetTexturePath() const { return texturePath; }
+    const std::string& GetShaderGuid() const { return shaderGuid; }
     const std::string& GetShaderVertPath() const { return shaderVertPath; }
     const std::string& GetShaderFragPath() const { return shaderFragPath; }
 };
