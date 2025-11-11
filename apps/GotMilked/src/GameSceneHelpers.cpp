@@ -1,6 +1,7 @@
 #include "GameSceneHelpers.hpp"
 
 #include "GameResources.hpp"
+#include "GameConstants.hpp"
 #include "EditableTerrainComponent.hpp"
 
 #include "gm/scene/Scene.hpp"
@@ -24,34 +25,34 @@ void PopulateInitialScene(
     // Directional light
     auto sunLight = scene.CreateGameObject("Sun");
     auto sunTransform = sunLight->EnsureTransform();
-    sunTransform->SetPosition(0.0f, 10.0f, 0.0f);
+    sunTransform->SetPosition(GameConstants::Light::SunPosition);
     auto sunLightComp = sunLight->AddComponent<gm::LightComponent>();
     sunLightComp->SetType(gm::LightComponent::LightType::Directional);
-    sunLightComp->SetDirection(glm::vec3(-0.4f, -1.0f, -0.3f));
-    sunLightComp->SetColor(glm::vec3(1.0f));
-    sunLightComp->SetIntensity(1.5f);
+    sunLightComp->SetDirection(GameConstants::Light::SunDirection);
+    sunLightComp->SetColor(GameConstants::Light::SunColor);
+    sunLightComp->SetIntensity(GameConstants::Light::SunIntensity);
     sunLight->AddTag("lighting");
 
     // Editable terrain
     auto terrainObject = scene.SpawnGameObject("Terrain");
     scene.TagGameObject(terrainObject, "terrain");
     auto terrainTransform = terrainObject->EnsureTransform();
-    terrainTransform->SetPosition(0.0f, 0.0f, 0.0f);
-    terrainTransform->SetScale(glm::vec3(1.0f));
+    terrainTransform->SetPosition(GameConstants::Transform::Origin);
+    terrainTransform->SetScale(GameConstants::Transform::UnitScale);
 
     auto terrainComponent = terrainObject->AddComponent<EditableTerrainComponent>();
     terrainComponent->SetCamera(&camera);
     if (resources.GetShader()) {
         terrainComponent->SetShader(resources.GetShader());
     }
-    if (resources.GetPlaneMaterial()) {
-        terrainComponent->SetMaterial(resources.GetPlaneMaterial());
+    if (resources.GetTerrainMaterial()) {
+        terrainComponent->SetMaterial(resources.GetTerrainMaterial());
     }
     terrainComponent->SetWindow(window);
     if (fovProvider) {
         terrainComponent->SetFovProvider(std::move(fovProvider));
     }
-    terrainComponent->SetTerrainSize(40.0f);
+    terrainComponent->SetTerrainSize(GameConstants::Terrain::InitialSize);
 
     gm::core::Logger::Info("[Game] Scene populated with editable terrain");
 }

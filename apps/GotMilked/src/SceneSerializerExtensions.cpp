@@ -1,4 +1,5 @@
 #include "SceneSerializerExtensions.hpp"
+#include "GameConstants.hpp"
 #include "gm/scene/ComponentFactory.hpp"
 #include "gm/scene/StaticMeshComponent.hpp"
 #include "gm/physics/RigidBodyComponent.hpp"
@@ -68,10 +69,10 @@ void RegisterSerializers() {
             gm::core::Logger::Info("[SceneSerializer] Created EditableTerrainComponent for GameObject '%s'", obj->GetName().c_str());
             
             // Deserialize terrain data
-            int resolution = data.value("resolution", 33);
-            float size = data.value("size", 20.0f);
-            float minHeight = data.value("minHeight", -2.0f);
-            float maxHeight = data.value("maxHeight", 4.0f);
+            int resolution = data.value("resolution", gotmilked::GameConstants::Terrain::DefaultResolution);
+            float size = data.value("size", gotmilked::GameConstants::Terrain::DefaultSize);
+            float minHeight = data.value("minHeight", gotmilked::GameConstants::Terrain::DefaultMinHeight);
+            float maxHeight = data.value("maxHeight", gotmilked::GameConstants::Terrain::DefaultMaxHeight);
             
             std::vector<float> heights;
             if (data.contains("heights") && data["heights"].is_array()) {
@@ -121,37 +122,160 @@ void RegisterSerializers() {
         [](gm::Component* component) -> nlohmann::json {
             auto* meshComp = dynamic_cast<gm::scene::StaticMeshComponent*>(component);
             if (!meshComp) {
+                gm::core::Logger::Warning("[SceneSerializer] StaticMeshComponent serialization: component is null");
                 return nlohmann::json();
             }
             
-            // Note: StaticMeshComponent stores raw pointers to resources
-            // We can't serialize the actual resource references without GUIDs
-            // For now, we just serialize that the component exists
-            // TODO: Add resource GUID storage to StaticMeshComponent for full serialization
             nlohmann::json data;
             data["hasComponent"] = true;
+            data["version"] = 1; // Version for future compatibility
+            
+            // Serialize resource GUIDs
+            const std::string& meshGuid = meshComp->GetMeshGuid();
+            const std::string& shaderGuid = meshComp->GetShaderGuid();
+            const std::string& materialGuid = meshComp->GetMaterialGuid();
+            
+            // Validate that we have at least mesh and shader (required for rendering)
+            bool hasRequiredResources = meshComp->GetMesh() != nullptr && meshComp->GetShader() != nullptr;
+            bool hasRequiredGUIDs = !meshGuid.empty() && !shaderGuid.empty();
+            
+            if (!hasRequiredGUIDs && hasRequiredResources) {
+                gm::core::Logger::Warning(
+                    "[SceneSerializer] StaticMeshComponent on GameObject '%s' has resources but no GUIDs. "
+                    "Resources will not be restored after load. Mesh GUID: %s, Shader GUID: %s",
+                    meshComp->GetOwner() ? meshComp->GetOwner()->GetName().c_str() : "unknown",
+                    meshGuid.empty() ? "missing" : meshGuid.c_str(),
+                    shaderGuid.empty() ? "missing" : shaderGuid.c_str());
+            }
+            
+            if (!meshGuid.empty()) {
+                data["meshGuid"] = meshGuid;
+            } else if (hasRequiredResources) {
+                gm::core::Logger::Warning("[SceneSerializer] StaticMeshComponent missing mesh GUID");
+            }
+            
+            if (!shaderGuid.empty()) {
+                data["shaderGuid"] = shaderGuid;
+            } else if (hasRequiredResources) {
+                gm::core::Logger::Warning("[SceneSerializer] StaticMeshComponent missing shader GUID");
+            }
+            
+            if (!materialGuid.empty()) {
+                data["materialGuid"] = materialGuid;
+            }
+            
+            // Log serialization success
+            gm::core::Logger::Debug(
+                "[SceneSerializer] Serialized StaticMeshComponent: meshGuid=%s, shaderGuid=%s, materialGuid=%s",
+                meshGuid.empty() ? "(none)" : meshGuid.c_str(),
+                shaderGuid.empty() ? "(none)" : shaderGuid.c_str(),
+                materialGuid.empty() ? "(none)" : materialGuid.c_str());
             
             return data;
         },
         [](gm::GameObject* obj, const nlohmann::json& data) -> gm::Component* {
             if (!data.is_object()) {
+                gm::core::Logger::Error("[SceneSerializer] StaticMeshComponent deserialization: data is not an object");
                 return nullptr;
+            }
+            
+            if (!obj) {
+                gm::core::Logger::Error("[SceneSerializer] StaticMeshComponent deserialization: GameObject is null");
+                return nullptr;
+            }
+            
+            // Check version for future compatibility
+            int version = data.value("version", 1);
+            if (version > 1) {
+                gm::core::Logger::Warning(
+                    "[SceneSerializer] StaticMeshComponent version %d is newer than supported (1). "
+                    "Some features may not be restored correctly.",
+                    version);
             }
             
             auto& factory = gm::scene::ComponentFactory::Instance();
             auto meshComp = std::dynamic_pointer_cast<gm::scene::StaticMeshComponent>(
                 factory.Create("StaticMeshComponent", obj));
             if (!meshComp) {
-                gm::core::Logger::Error("[SceneSerializer] Failed to create StaticMeshComponent");
+                gm::core::Logger::Error(
+                    "[SceneSerializer] Failed to create StaticMeshComponent for GameObject '%s'",
+                    obj->GetName().c_str());
                 return nullptr;
             }
             
-            gm::core::Logger::Info("[SceneSerializer] Created StaticMeshComponent for GameObject '%s'", 
-                obj->GetName().c_str());
+            // Restore GUIDs from serialized data
+            // Resource pointers will be restored later via RestoreResources()
+            bool hasMeshGuid = false;
+            bool hasShaderGuid = false;
+            bool hasMaterialGuid = false;
             
-            // Note: Resource references (mesh, shader, material) need to be restored
-            // by ApplyResourcesToScene() or similar mechanism after deserialization
-            // TODO: Restore resource references from GUIDs when GUID storage is added
+            if (data.contains("meshGuid")) {
+                if (data["meshGuid"].is_string()) {
+                    std::string meshGuid = data["meshGuid"].get<std::string>();
+                    if (!meshGuid.empty()) {
+                        meshComp->SetMesh(nullptr, meshGuid);
+                        hasMeshGuid = true;
+                    } else {
+                        gm::core::Logger::Warning(
+                            "[SceneSerializer] StaticMeshComponent on GameObject '%s' has empty mesh GUID",
+                            obj->GetName().c_str());
+                    }
+                } else {
+                    gm::core::Logger::Warning(
+                        "[SceneSerializer] StaticMeshComponent on GameObject '%s' has invalid meshGuid type (expected string)",
+                        obj->GetName().c_str());
+                }
+            }
+            
+            if (data.contains("shaderGuid")) {
+                if (data["shaderGuid"].is_string()) {
+                    std::string shaderGuid = data["shaderGuid"].get<std::string>();
+                    if (!shaderGuid.empty()) {
+                        meshComp->SetShader(nullptr, shaderGuid);
+                        hasShaderGuid = true;
+                    } else {
+                        gm::core::Logger::Warning(
+                            "[SceneSerializer] StaticMeshComponent on GameObject '%s' has empty shader GUID",
+                            obj->GetName().c_str());
+                    }
+                } else {
+                    gm::core::Logger::Warning(
+                        "[SceneSerializer] StaticMeshComponent on GameObject '%s' has invalid shaderGuid type (expected string)",
+                        obj->GetName().c_str());
+                }
+            }
+            
+            if (data.contains("materialGuid")) {
+                if (data["materialGuid"].is_string()) {
+                    std::string materialGuid = data["materialGuid"].get<std::string>();
+                    if (!materialGuid.empty()) {
+                        meshComp->SetMaterial(nullptr, materialGuid);
+                        hasMaterialGuid = true;
+                    }
+                } else {
+                    gm::core::Logger::Warning(
+                        "[SceneSerializer] StaticMeshComponent on GameObject '%s' has invalid materialGuid type (expected string)",
+                        obj->GetName().c_str());
+                }
+            }
+            
+            // Validate required GUIDs
+            if (!hasMeshGuid || !hasShaderGuid) {
+                gm::core::Logger::Warning(
+                    "[SceneSerializer] StaticMeshComponent on GameObject '%s' is missing required GUIDs "
+                    "(mesh: %s, shader: %s). Component may not render correctly after resource restoration.",
+                    obj->GetName().c_str(),
+                    hasMeshGuid ? "present" : "missing",
+                    hasShaderGuid ? "present" : "missing");
+            }
+            
+            gm::core::Logger::Debug(
+                "[SceneSerializer] Deserialized StaticMeshComponent for GameObject '%s': "
+                "meshGuid=%s, shaderGuid=%s, materialGuid=%s",
+                obj->GetName().c_str(),
+                meshComp->GetMeshGuid().empty() ? "(none)" : meshComp->GetMeshGuid().c_str(),
+                meshComp->GetShaderGuid().empty() ? "(none)" : meshComp->GetShaderGuid().c_str(),
+                meshComp->GetMaterialGuid().empty() ? "(none)" : meshComp->GetMaterialGuid().c_str());
             
             return meshComp.get();
         }

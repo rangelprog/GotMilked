@@ -3,11 +3,13 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
 
 namespace gm {
 class Scene;
+class GameObject;
 }
 
 namespace gm::save {
@@ -30,6 +32,9 @@ public:
         std::function<float()> getCameraFov;
         std::function<void(const glm::vec3&, const glm::vec3&, float)> setCamera;
         
+        // World time getter for save format compatibility
+        std::function<double()> getWorldTime;
+        
         // Rendering callbacks for GameObject labels
         std::function<glm::mat4()> getViewMatrix;
         std::function<glm::mat4()> getProjectionMatrix;
@@ -43,6 +48,13 @@ public:
     void SetWindowHandle(void* hwnd) { m_windowHandle = hwnd; }
 
     void Render(bool& menuVisible);
+    
+    // Public methods to trigger file dialogs (for keyboard shortcuts)
+    void TriggerSaveAs() { m_pendingSaveAs = true; }
+    void TriggerLoad() { m_pendingLoad = true; }
+    
+    // Load recent files from disk (call after construction)
+    void LoadRecentFilesFromDisk();
 
 private:
     void RenderMenuBar();
@@ -52,6 +64,15 @@ private:
     void RenderSaveAsDialog();
     void RenderLoadDialog();
     void RenderGameObjectLabels();
+    void RenderEditorWindow();
+    void RenderSceneHierarchy();
+    void RenderInspector();
+    void RenderSceneInfo();
+    void HandleSaveAs();
+    void HandleLoad();
+    void AddRecentFile(const std::string& filePath);
+    void LoadRecentFile(const std::string& filePath);
+    void SaveRecentFilesToDisk();
 
     Callbacks m_callbacks;
     gm::save::SaveManager* m_saveManager = nullptr;
@@ -64,10 +85,23 @@ private:
     bool m_optionsMenuOpen = false;
     bool m_showGameObjects = false;
 
+    // Editor windows
+    bool m_showInspector = false;
+    bool m_showSceneInfo = false;
+
+    // Selection
+    std::weak_ptr<gm::GameObject> m_selectedGameObject;
+
     // File dialogs
     bool m_showSaveAsDialog = false;
     bool m_showLoadDialog = false;
+    bool m_pendingSaveAs = false;
+    bool m_pendingLoad = false;
     char m_filePathBuffer[512] = {0};
     std::string m_defaultScenePath = "assets/scenes/";
-};
 
+    // Recent files (max 10)
+    static constexpr size_t kMaxRecentFiles = 10;
+    std::vector<std::string> m_recentFiles;
+    std::string m_recentFilesPath = "assets/scenes/.recent_files.txt";
+};

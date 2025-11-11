@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <glm/vec3.hpp>
+#include <nlohmann/json_fwd.hpp>
 
 namespace gm::save {
 
@@ -46,7 +47,9 @@ public:
     const std::filesystem::path& GetSaveDirectory() const { return m_saveDirectory; }
 
     SaveLoadResult QuickSave(const SaveGameData& data);
+    SaveLoadResult QuickSaveWithJson(const nlohmann::json& json);
     SaveLoadResult QuickLoad(SaveGameData& outData) const;
+    SaveLoadResult QuickLoadWithJson(nlohmann::json& outJson) const;
 
     SaveLoadResult SaveToSlot(const std::string& slotName, const SaveGameData& data);
     SaveLoadResult LoadFromSlot(const std::string& slotName, SaveGameData& outData) const;

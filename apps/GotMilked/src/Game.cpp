@@ -8,23 +8,29 @@
 
 #include "Game.hpp"
 #include "GameSceneHelpers.hpp"
+#include "GameConstants.hpp"
+#include "GameEvents.hpp"
 #include "SceneSerializerExtensions.hpp"
+#include "gm/scene/SceneSerializer.hpp"
 #include "EditableTerrainComponent.hpp"
 
 #include <filesystem>
 #include <optional>
 #include <glm/gtc/matrix_transform.hpp>
+#include <nlohmann/json.hpp>
 
 #include "gm/rendering/Camera.hpp"
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/SceneManager.hpp"
+#include "gm/scene/StaticMeshComponent.hpp"
 #include "gm/physics/PhysicsWorld.hpp"
 #include "gm/rendering/Material.hpp"
 #include "gm/core/Input.hpp"
 #include "gm/core/InputBindings.hpp"
 #include "gm/core/input/InputManager.hpp"
 #include "gm/core/Logger.hpp"
+#include "gm/core/Event.hpp"
 #include "gm/save/SaveManager.hpp"
 #include "gm/save/SaveSnapshotHelpers.hpp"
 #include "gm/utils/ImGuiManager.hpp"
@@ -69,6 +75,10 @@ bool Game::Init(GLFWwindow* window) {
     }
 
     SetupResourceHotReload();
+    SetupEventSubscriptions();
+    
+    // Trigger initialization event
+    gm::core::Event::Trigger(gotmilked::GameEvents::GameInitialized);
     return true;
 }
 
@@ -213,7 +223,7 @@ void Game::SetupDebugMenu() {
             return m_camera ? m_camera->Front() : glm::vec3(0.0f, 0.0f, -1.0f);
         },
         [this]() -> float {
-            return m_gameplay ? m_gameplay->GetFovDegrees() : 60.0f;
+            return m_gameplay ? m_gameplay->GetFovDegrees() : gotmilked::GameConstants::Camera::DefaultFovDegrees;
         },
         // Camera setter
         [this](const glm::vec3& position, const glm::vec3& forward, float fov) {
@@ -224,6 +234,10 @@ void Game::SetupDebugMenu() {
             if (m_gameplay && fov > 0.0f) {
                 m_gameplay->SetFovDegrees(fov);
             }
+        },
+        // World time getter
+        [this]() -> double {
+            return m_gameplay ? m_gameplay->GetWorldTimeSeconds() : 0.0;
         },
         // Rendering callbacks for GameObject labels
         [this]() -> glm::mat4 {
@@ -240,7 +254,11 @@ void Game::SetupDebugMenu() {
             }
             float aspect = static_cast<float>(fbw) / static_cast<float>(fbh);
             float fov = m_gameplay->GetFovDegrees();
-            return glm::perspective(glm::radians(fov), aspect, 0.1f, 200.0f);
+            return glm::perspective(
+                glm::radians(fov), 
+                aspect, 
+                gotmilked::GameConstants::Camera::NearPlane, 
+                gotmilked::GameConstants::Camera::FarPlane);
         },
         [this](int& width, int& height) {
             if (m_window) {
@@ -272,6 +290,9 @@ void Game::SetupDebugMenu() {
             }
         }
     }
+    
+    // Load recent files from disk
+    m_debugMenu->LoadRecentFilesFromDisk();
 }
 #endif
 
@@ -332,6 +353,33 @@ void Game::Update(float dt) {
         }
 #endif
     }
+
+#ifdef _DEBUG
+    // Handle Ctrl+S (Save Scene As) and Ctrl+O (Load Scene From) shortcuts
+    if (m_debugMenu && m_imgui && m_imgui->IsInitialized()) {
+        auto* inputSys = input.GetInputSystem();
+        if (inputSys) {
+            // Check for Ctrl+S (Save Scene As)
+            bool ctrlPressed = inputSys->IsKeyPressed(GLFW_KEY_LEFT_CONTROL) || 
+                              inputSys->IsKeyPressed(GLFW_KEY_RIGHT_CONTROL);
+            if (ctrlPressed && inputSys->IsKeyJustPressed(GLFW_KEY_S)) {
+                // Check if ImGui wants keyboard input (don't trigger if typing in a field)
+                ImGuiIO& io = ImGui::GetIO();
+                if (!io.WantCaptureKeyboard) {
+                    m_debugMenu->TriggerSaveAs();
+                }
+            }
+            
+            // Check for Ctrl+O (Load Scene From)
+            if (ctrlPressed && inputSys->IsKeyJustPressed(GLFW_KEY_O)) {
+                ImGuiIO& io = ImGui::GetIO();
+                if (!io.WantCaptureKeyboard) {
+                    m_debugMenu->TriggerLoad();
+                }
+            }
+        }
+    }
+#endif
 
     if (m_gameplay) {
         m_gameplay->SetWindow(m_window);
@@ -417,6 +465,78 @@ void Game::Shutdown() {
     gm::core::Logger::Info("[Game] Shutdown complete");
 
     gm::physics::PhysicsWorld::Instance().Shutdown();
+    
+    // Trigger shutdown event
+    gm::core::Event::Trigger(gotmilked::GameEvents::GameShutdown);
+}
+
+void Game::SetupEventSubscriptions() {
+    // Subscribe to resource events for logging and notifications
+        gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceShaderLoaded, [this]() {
+        gm::core::Logger::Debug("[Game] Event: Shader loaded");
+        if (m_tooling) {
+            m_tooling->AddNotification("Shader loaded");
+        }
+    });
+
+        gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceShaderReloaded, [this]() {
+        gm::core::Logger::Debug("[Game] Event: Shader reloaded");
+        if (m_tooling) {
+            m_tooling->AddNotification("Shader reloaded");
+        }
+    });
+
+        gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceTextureLoaded, [this]() {
+        gm::core::Logger::Debug("[Game] Event: Texture loaded");
+    });
+
+        gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceTextureReloaded, [this]() {
+        gm::core::Logger::Debug("[Game] Event: Texture reloaded");
+        if (m_tooling) {
+            m_tooling->AddNotification("Texture reloaded");
+        }
+    });
+
+        gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceMeshLoaded, [this]() {
+        gm::core::Logger::Debug("[Game] Event: Mesh loaded");
+    });
+
+        gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceMeshReloaded, [this]() {
+        gm::core::Logger::Debug("[Game] Event: Mesh reloaded");
+        if (m_tooling) {
+            m_tooling->AddNotification("Mesh reloaded");
+        }
+    });
+
+        gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceAllReloaded, [this]() {
+        gm::core::Logger::Info("[Game] Event: All resources reloaded");
+        if (m_tooling) {
+            m_tooling->AddNotification("All resources reloaded");
+        }
+    });
+
+        gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceLoadFailed, [this]() {
+        gm::core::Logger::Warning("[Game] Event: Resource load failed");
+        if (m_tooling) {
+            m_tooling->AddNotification("Resource load failed");
+        }
+    });
+
+        gm::core::Event::Subscribe(gotmilked::GameEvents::SceneQuickSaved, [this]() {
+        gm::core::Logger::Debug("[Game] Event: Scene quick saved");
+    });
+
+        gm::core::Event::Subscribe(gotmilked::GameEvents::SceneQuickLoaded, [this]() {
+        gm::core::Logger::Debug("[Game] Event: Scene quick loaded");
+    });
+
+        gm::core::Event::Subscribe(gotmilked::GameEvents::GameInitialized, [this]() {
+        gm::core::Logger::Info("[Game] Event: Game initialized");
+    });
+
+        gm::core::Event::Subscribe(gotmilked::GameEvents::GameShutdown, [this]() {
+        gm::core::Logger::Info("[Game] Event: Game shutdown");
+    });
 }
 
 void Game::SetupResourceHotReload() {
@@ -432,9 +552,11 @@ void Game::SetupResourceHotReload() {
             "game_shader",
             {std::filesystem::path(m_resources.GetShaderVertPath()), std::filesystem::path(m_resources.GetShaderFragPath())},
             [this]() {
+                gm::core::Event::Trigger(gotmilked::GameEvents::HotReloadShaderDetected);
                 bool ok = m_resources.ReloadShader();
                 if (ok) {
                     ApplyResourcesToScene();
+                    gm::core::Event::Trigger(gotmilked::GameEvents::HotReloadShaderReloaded);
                 }
                 return ok;
             });
@@ -445,9 +567,11 @@ void Game::SetupResourceHotReload() {
             "game_texture",
             {std::filesystem::path(m_resources.GetTexturePath())},
             [this]() {
+                gm::core::Event::Trigger(gotmilked::GameEvents::HotReloadTextureDetected);
                 bool ok = m_resources.ReloadTexture();
                 if (ok) {
                     ApplyResourcesToScene();
+                    gm::core::Event::Trigger(gotmilked::GameEvents::HotReloadTextureReloaded);
                 }
                 return ok;
             });
@@ -458,9 +582,11 @@ void Game::SetupResourceHotReload() {
             "game_mesh",
             {std::filesystem::path(m_resources.GetMeshPath())},
             [this]() {
+                gm::core::Event::Trigger(gotmilked::GameEvents::HotReloadMeshDetected);
                 bool ok = m_resources.ReloadMesh();
                 if (ok) {
                     ApplyResourcesToScene();
+                    gm::core::Event::Trigger(gotmilked::GameEvents::HotReloadMeshReloaded);
                 }
                 return ok;
             });
@@ -476,9 +602,58 @@ void Game::ApplyResourcesToScene() {
     }
 
     ApplyResourcesToTerrain();
+    ApplyResourcesToStaticMeshComponents();
 
     if (m_tooling) {
         m_tooling->SetScene(m_gameScene);
+    }
+}
+
+void Game::ApplyResourcesToStaticMeshComponents() {
+    if (!m_gameScene) {
+        return;
+    }
+
+    // Create resolver functions that map GUIDs to resource objects
+    auto meshResolver = [this](const std::string& guid) -> gm::Mesh* {
+        if (guid == m_resources.GetMeshGuid()) {
+            return m_resources.GetMesh();
+        }
+        // Could add more mesh GUID mappings here
+        return nullptr;
+    };
+
+    auto shaderResolver = [this](const std::string& guid) -> gm::Shader* {
+        if (guid == m_resources.GetShaderGuid()) {
+            return m_resources.GetShader();
+        }
+        // Could add more shader GUID mappings here
+        return nullptr;
+    };
+
+    auto materialResolver = [this](const std::string& /*guid*/) -> std::shared_ptr<gm::Material> {
+        // For now, materials don't have GUIDs in GameResources
+        // This could be extended later to support material GUIDs
+        // For now, return nullptr and let components use default materials
+        return nullptr;
+    };
+
+    // Find all StaticMeshComponents and restore their resources
+    for (const auto& gameObject : m_gameScene->GetAllGameObjects()) {
+        if (!gameObject || !gameObject->IsActive()) {
+            continue;
+        }
+
+        auto meshComp = gameObject->GetComponent<gm::scene::StaticMeshComponent>();
+        if (meshComp) {
+            // Only restore if component has GUIDs but no resources
+            if ((!meshComp->GetMeshGuid().empty() && !meshComp->GetMesh()) ||
+                (!meshComp->GetShaderGuid().empty() && !meshComp->GetShader())) {
+                meshComp->RestoreResources(meshResolver, shaderResolver, materialResolver);
+                gm::core::Logger::Info("[Game] Restored resources for StaticMeshComponent on GameObject '%s'",
+                    gameObject->GetName().c_str());
+            }
+        }
     }
 }
 
@@ -499,7 +674,7 @@ void Game::ApplyResourcesToTerrain() {
 
     // Apply resources to terrain component
     terrain->SetShader(m_resources.GetShader());
-    terrain->SetMaterial(m_resources.GetPlaneMaterial());
+    terrain->SetMaterial(m_resources.GetTerrainMaterial());
     terrain->SetWindow(m_window);
     terrain->SetCamera(m_camera.get());
 
@@ -544,13 +719,47 @@ void Game::PerformQuickSave() {
         }
     }
 
-    auto result = m_saveManager->QuickSave(data);
+    // Serialize the scene to include all GameObjects and their properties
+    std::string sceneJsonString = gm::SceneSerializer::Serialize(*m_gameScene);
+    nlohmann::json sceneJson = nlohmann::json::parse(sceneJsonString);
+    
+    // Merge SaveGameData into the scene JSON
+    nlohmann::json saveJson = {
+        {"version", data.version},
+        {"sceneName", data.sceneName},
+        {"camera", {
+            {"position", {data.cameraPosition.x, data.cameraPosition.y, data.cameraPosition.z}},
+            {"forward", {data.cameraForward.x, data.cameraForward.y, data.cameraForward.z}},
+            {"fov", data.cameraFov}
+        }},
+        {"worldTime", data.worldTime}
+    };
+    
+    if (data.terrainResolution > 0 && !data.terrainHeights.empty()) {
+        saveJson["terrain"] = {
+            {"resolution", data.terrainResolution},
+            {"size", data.terrainSize},
+            {"minHeight", data.terrainMinHeight},
+            {"maxHeight", data.terrainMaxHeight},
+            {"heights", data.terrainHeights}
+        };
+    }
+    
+    // Merge scene data with save data (scene data takes precedence for gameObjects)
+    saveJson["gameObjects"] = sceneJson["gameObjects"];
+    saveJson["name"] = sceneJson.value("name", data.sceneName);
+    saveJson["isPaused"] = sceneJson.value("isPaused", false);
+
+    // Save using SaveManager but with the merged JSON
+    auto result = m_saveManager->QuickSaveWithJson(saveJson);
     if (!result.success) {
         gm::core::Logger::Warning("[Game] QuickSave failed: %s", result.message.c_str());
         if (m_tooling) m_tooling->AddNotification("QuickSave failed");
+        gm::core::Event::Trigger(gotmilked::GameEvents::SceneSaveFailed);
     } else {
-        gm::core::Logger::Info("[Game] QuickSave completed");
+        gm::core::Logger::Info("[Game] QuickSave completed (with GameObjects)");
         if (m_tooling) m_tooling->AddNotification("QuickSave completed");
+        gm::core::Event::Trigger(gotmilked::GameEvents::SceneQuickSaved);
     }
 }
 
@@ -561,11 +770,62 @@ void Game::PerformQuickLoad() {
         return;
     }
 
+    // Try loading with JSON first (new format with GameObjects)
+    nlohmann::json saveJson;
+    auto jsonResult = m_saveManager->QuickLoadWithJson(saveJson);
+    
+    if (jsonResult.success && saveJson.contains("gameObjects") && saveJson["gameObjects"].is_array()) {
+        // New format with GameObjects - deserialize the scene
+        std::string jsonString = saveJson.dump();
+        if (!gm::SceneSerializer::Deserialize(*m_gameScene, jsonString)) {
+            gm::core::Logger::Warning("[Game] QuickLoad failed to deserialize scene");
+            if (m_tooling) m_tooling->AddNotification("QuickLoad failed");
+            gm::core::Event::Trigger(gotmilked::GameEvents::SceneLoadFailed);
+            return;
+        }
+        
+        // Apply camera if present
+        if (saveJson.contains("camera")) {
+            const auto& camera = saveJson["camera"];
+            if (camera.contains("position") && camera.contains("forward") && camera.contains("fov")) {
+                auto pos = camera["position"];
+                auto fwd = camera["forward"];
+                if (pos.is_array() && pos.size() == 3 && fwd.is_array() && fwd.size() == 3) {
+                    glm::vec3 cameraPos(pos[0].get<float>(), pos[1].get<float>(), pos[2].get<float>());
+                    glm::vec3 cameraFwd(fwd[0].get<float>(), fwd[1].get<float>(), fwd[2].get<float>());
+                    float cameraFov = camera.value("fov", 60.0f);
+                    if (m_camera) {
+                        m_camera->SetPosition(cameraPos);
+                        m_camera->SetForward(cameraFwd);
+                    }
+                    if (m_gameplay) {
+                        m_gameplay->SetFovDegrees(cameraFov);
+                    }
+                }
+            }
+        }
+        
+        // Apply world time if present
+        if (saveJson.contains("worldTime") && m_gameplay) {
+            double worldTime = saveJson.value("worldTime", 0.0);
+            m_gameplay->SetWorldTimeSeconds(worldTime);
+        }
+        
+        ApplyResourcesToScene();
+        if (m_tooling) {
+            m_tooling->AddNotification("QuickLoad applied (with GameObjects)");
+        }
+        gm::core::Event::Trigger(gotmilked::GameEvents::SceneQuickLoaded);
+        return;
+    }
+    
+    // Fall back to old format (no GameObjects)
     gm::save::SaveGameData data;
     auto result = m_saveManager->QuickLoad(data);
     if (!result.success) {
         gm::core::Logger::Warning("[Game] QuickLoad failed: %s", result.message.c_str());
         if (m_tooling) m_tooling->AddNotification("QuickLoad failed");
+        gm::core::Event::Trigger(gotmilked::GameEvents::SceneLoadFailed);
         return;
     }
 
@@ -609,6 +869,11 @@ void Game::PerformQuickLoad() {
     ApplyResourcesToScene();
     if (m_tooling) {
         m_tooling->AddNotification(applied ? "QuickLoad applied" : "QuickLoad partially applied");
+    }
+    
+    // Trigger event for successful load
+    if (applied) {
+        gm::core::Event::Trigger(gotmilked::GameEvents::SceneQuickLoaded);
     }
 }
 

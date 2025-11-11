@@ -5,6 +5,7 @@
 void RunSceneSerializerRoundTripTest();
 void RunResourceManagerCacheAndReloadTest();
 void RunSceneDrawSmokeTest();
+void RunGameResourcesTests();
 
 int main(int argc, char** argv) {
     try {
@@ -19,6 +20,7 @@ int main(int argc, char** argv) {
 
         RunSceneSerializerRoundTripTest();
         RunResourceManagerCacheAndReloadTest();
+        RunGameResourcesTests();
         std::cout << "All GotMilked tests passed.\n";
         return 0;
     } catch (const std::exception& ex) {

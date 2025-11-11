@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gm/scene/Component.hpp"
+#include "GameConstants.hpp"
 
 #include <functional>
 #include <memory>
@@ -35,13 +36,20 @@ public:
     void SetFovProvider(std::function<float()> provider) { m_fovProvider = std::move(provider); }
 
     bool IsEditingEnabled() const { return m_editingEnabled; }
+    void SetEditingEnabled(bool enabled) { m_editingEnabled = enabled; }
     void SetEditorWindowVisible(bool visible) { m_editorWindowVisible = visible; }
     bool IsEditorWindowVisible() const { return m_editorWindowVisible; }
 
     int GetResolution() const { return m_resolution; }
     float GetTerrainSize() const { return m_size; }
     float GetMinHeight() const { return m_minHeight; }
+    void SetMinHeight(float height);
     float GetMaxHeight() const { return m_maxHeight; }
+    void SetMaxHeight(float height);
+    float GetBrushRadius() const { return m_brushRadius; }
+    void SetBrushRadius(float radius);
+    float GetBrushStrength() const { return m_brushStrength; }
+    void SetBrushStrength(float strength);
     const std::vector<float>& GetHeights() const { return m_heights; }
 
     bool SetHeightData(int resolution,
@@ -66,12 +74,12 @@ private:
     std::shared_ptr<gm::Material> m_material;
     std::unique_ptr<gm::Mesh> m_mesh;
 
-    int m_resolution = 33;
-    float m_size = 20.0f;
-    float m_minHeight = -2.0f;
-    float m_maxHeight = 4.0f;
-    float m_brushRadius = 1.5f;
-    float m_brushStrength = 1.0f;
+    int m_resolution = gotmilked::GameConstants::Terrain::DefaultResolution;
+    float m_size = gotmilked::GameConstants::Terrain::DefaultSize;
+    float m_minHeight = gotmilked::GameConstants::Terrain::DefaultMinHeight;
+    float m_maxHeight = gotmilked::GameConstants::Terrain::DefaultMaxHeight;
+    float m_brushRadius = gotmilked::GameConstants::Terrain::DefaultBrushRadius;
+    float m_brushStrength = gotmilked::GameConstants::Terrain::DefaultBrushStrength;
 
     bool m_editingEnabled = false;
     bool m_editorWindowVisible = false;

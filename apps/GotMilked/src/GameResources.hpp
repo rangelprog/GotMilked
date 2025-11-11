@@ -41,13 +41,10 @@ public:
     void Release();
 
     // Resource accessors
-    gm::Shader* GetShader() const { return m_shader.get(); }
-    gm::Texture* GetTexture() const { return m_texture.get(); }
-    gm::Mesh* GetMesh() const { return m_mesh.get(); }
-    gm::Mesh* GetPlaneMesh() const { return m_planeMesh.get(); }
-    gm::Mesh* GetCubeMesh() const { return m_cubeMesh.get(); }
-    std::shared_ptr<gm::Material> GetPlaneMaterial() const { return m_planeMaterial; }
-    std::shared_ptr<gm::Material> GetCubeMaterial() const { return m_cubeMaterial; }
+    gm::Shader* GetShader() const { return m_shader ? m_shader.get() : nullptr; }
+    gm::Texture* GetTexture() const { return m_texture ? m_texture.get() : nullptr; }
+    gm::Mesh* GetMesh() const { return m_mesh ? m_mesh.get() : nullptr; }
+    std::shared_ptr<gm::Material> GetTerrainMaterial() const { return m_terrainMaterial; }
 
     // Path accessors (for hot reload)
     const std::string& GetShaderVertPath() const { return m_shaderVertPath; }
@@ -55,15 +52,16 @@ public:
     const std::string& GetTexturePath() const { return m_texturePath; }
     const std::string& GetMeshPath() const { return m_meshPath; }
 
-private:
-    std::unique_ptr<gm::Shader> m_shader;
-    std::unique_ptr<gm::Texture> m_texture;
-    std::unique_ptr<gm::Mesh> m_mesh;
+    // GUID accessors (for resource restoration)
+    const std::string& GetShaderGuid() const { return m_shaderGuid; }
+    const std::string& GetTextureGuid() const { return m_textureGuid; }
+    const std::string& GetMeshGuid() const { return m_meshGuid; }
 
-    std::unique_ptr<gm::Mesh> m_planeMesh;
-    std::unique_ptr<gm::Mesh> m_cubeMesh;
-    std::shared_ptr<gm::Material> m_planeMaterial;
-    std::shared_ptr<gm::Material> m_cubeMaterial;
+private:
+    std::shared_ptr<gm::Shader> m_shader;
+    std::shared_ptr<gm::Texture> m_texture;
+    std::shared_ptr<gm::Mesh> m_mesh;
+    std::shared_ptr<gm::Material> m_terrainMaterial;
 
     std::string m_shaderGuid;
     std::string m_shaderVertPath;

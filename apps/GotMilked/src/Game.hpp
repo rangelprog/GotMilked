@@ -82,4 +82,6 @@ private:
     void SetupResourceHotReload();
     void ApplyResourcesToScene();
     void ApplyResourcesToTerrain();
+    void ApplyResourcesToStaticMeshComponents();
+    void SetupEventSubscriptions();
 };

@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include "SceneSystem.hpp"
+#include "gm/rendering/LightManager.hpp"
 
 namespace gm {
 
@@ -25,6 +26,7 @@ private:
     bool systemsInitialized = false;
     bool parallelGameObjectUpdatesEnabled = false;
     std::vector<SceneSystemPtr> systems;
+    LightManager m_lightManager;  // Cached LightManager to avoid per-frame allocation
 
 public:
     Scene(const std::string& name = "Unnamed Scene");

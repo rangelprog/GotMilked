@@ -3,6 +3,8 @@
 #include "gm/scene/LightComponent.hpp"
 #include "gm/scene/GameObject.hpp"
 #include "gm/core/Logger.hpp"
+#include <cstdio>
+#include <cstring>
 
 namespace gm {
 
@@ -33,48 +35,65 @@ void LightManager::ApplyLights(Shader& shader, const glm::vec3& viewPos) const {
     // Set number of active lights
     shader.SetInt("uNumLights", static_cast<int>(m_lights.size()));
 
+    // Pre-allocate string buffer to avoid allocations (stack-allocated, no heap allocation)
+    char uniformName[64];  // Large enough for "uLights[7].propertyName"
+
     // Apply each light
     for (size_t i = 0; i < m_lights.size() && i < MAX_LIGHTS; ++i) {
         const auto* light = m_lights[i];
         if (!light) continue;
 
-        std::string prefix = "uLights[" + std::to_string(i) + "].";
+        // Build base prefix: "uLights[N]."
+        int prefixLen = std::snprintf(uniformName, sizeof(uniformName), "uLights[%zu].", i);
+        char* suffixPtr = uniformName + prefixLen;
 
         // Light type (0=Directional, 1=Point, 2=Spot)
         int type = static_cast<int>(light->GetType());
-        shader.SetInt((prefix + "type").c_str(), type);
+        std::strcpy(suffixPtr, "type");
+        shader.SetInt(uniformName, type);
 
         // Color and intensity
         glm::vec3 color = light->GetColor() * light->GetIntensity();
-        shader.SetVec3((prefix + "color").c_str(), color);
+        std::strcpy(suffixPtr, "color");
+        shader.SetVec3(uniformName, color);
 
         if (light->GetType() == LightComponent::LightType::Directional) {
             // Directional light
             glm::vec3 direction = light->GetWorldDirection();
-            shader.SetVec3((prefix + "direction").c_str(), direction);
+            std::strcpy(suffixPtr, "direction");
+            shader.SetVec3(uniformName, direction);
         } else if (light->GetType() == LightComponent::LightType::Point) {
             // Point light
             glm::vec3 position = light->GetWorldPosition();
-            shader.SetVec3((prefix + "position").c_str(), position);
+            std::strcpy(suffixPtr, "position");
+            shader.SetVec3(uniformName, position);
             glm::vec3 attenuation = light->GetAttenuation();
-            shader.SetVec3((prefix + "attenuation").c_str(), attenuation);
+            std::strcpy(suffixPtr, "attenuation");
+            shader.SetVec3(uniformName, attenuation);
         } else if (light->GetType() == LightComponent::LightType::Spot) {
             // Spot light
             glm::vec3 position = light->GetWorldPosition();
+            std::strcpy(suffixPtr, "position");
+            shader.SetVec3(uniformName, position);
             glm::vec3 direction = light->GetWorldDirection();
-            shader.SetVec3((prefix + "position").c_str(), position);
-            shader.SetVec3((prefix + "direction").c_str(), direction);
+            std::strcpy(suffixPtr, "direction");
+            shader.SetVec3(uniformName, direction);
             glm::vec3 attenuation = light->GetAttenuation();
-            shader.SetVec3((prefix + "attenuation").c_str(), attenuation);
-            shader.SetFloat((prefix + "innerCone").c_str(), glm::cos(light->GetInnerConeAngle())); // Already in radians
-            shader.SetFloat((prefix + "outerCone").c_str(), glm::cos(light->GetOuterConeAngle())); // Already in radians
+            std::strcpy(suffixPtr, "attenuation");
+            shader.SetVec3(uniformName, attenuation);
+            float innerCone = glm::cos(light->GetInnerConeAngle());
+            std::strcpy(suffixPtr, "innerCone");
+            shader.SetFloat(uniformName, innerCone);
+            float outerCone = glm::cos(light->GetOuterConeAngle());
+            std::strcpy(suffixPtr, "outerCone");
+            shader.SetFloat(uniformName, outerCone);
         }
     }
 
     // Fill remaining light slots with disabled lights
     for (size_t i = m_lights.size(); i < MAX_LIGHTS; ++i) {
-        std::string prefix = "uLights[" + std::to_string(i) + "].";
-        shader.SetInt((prefix + "type").c_str(), -1); // Disabled
+        std::snprintf(uniformName, sizeof(uniformName), "uLights[%zu].type", i);
+        shader.SetInt(uniformName, -1); // Disabled
     }
 }
 

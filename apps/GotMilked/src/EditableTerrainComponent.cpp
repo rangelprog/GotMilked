@@ -1,4 +1,5 @@
 #include "EditableTerrainComponent.hpp"
+#include "GameConstants.hpp"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -19,12 +20,6 @@
 
 #include <algorithm>
 #include <cmath>
-
-namespace {
-constexpr float kDefaultFovDegrees = 60.0f;
-constexpr float kNearPlane = 0.1f;
-constexpr float kFarPlane = 500.0f;
-}
 
 EditableTerrainComponent::EditableTerrainComponent() {
     SetName("EditableTerrainComponent");
@@ -48,6 +43,32 @@ void EditableTerrainComponent::SetTerrainSize(float sizeMeters) {
     m_size = sizeMeters;
     InitializeHeightmap();
     m_meshDirty = true;
+}
+
+void EditableTerrainComponent::SetMinHeight(float height) {
+    m_minHeight = height;
+    if (m_minHeight > m_maxHeight) {
+        m_minHeight = m_maxHeight;
+    }
+}
+
+void EditableTerrainComponent::SetMaxHeight(float height) {
+    m_maxHeight = height;
+    if (m_maxHeight < m_minHeight) {
+        m_maxHeight = m_minHeight;
+    }
+}
+
+void EditableTerrainComponent::SetBrushRadius(float radius) {
+    m_brushRadius = std::clamp(radius,
+        gotmilked::GameConstants::Terrain::MinBrushRadius,
+        gotmilked::GameConstants::Terrain::MaxBrushRadius);
+}
+
+void EditableTerrainComponent::SetBrushStrength(float strength) {
+    m_brushStrength = std::clamp(strength,
+        gotmilked::GameConstants::Terrain::MinBrushStrength,
+        gotmilked::GameConstants::Terrain::MaxBrushStrength);
 }
 
 void EditableTerrainComponent::SetResolution(int resolution) {
@@ -109,9 +130,9 @@ void EditableTerrainComponent::Render() {
 
     // Render the mesh if we have all required resources
     if (m_mesh && m_shader) {
-        auto owner = GetOwner();
-        if (owner) {
-            auto transform = owner->EnsureTransform();
+        auto* gameObject = GetOwner();
+        if (gameObject) {
+            auto transform = gameObject->EnsureTransform();
             if (transform) {
                 const glm::mat4 model = transform->GetMatrix();
                 const glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(model)));
@@ -133,50 +154,7 @@ void EditableTerrainComponent::Render() {
         }
     }
 
-    // Always render the editor window if visible, even if mesh/shader aren't ready
-    // This allows the window to be shown for configuration
-    if (ImGui::GetCurrentContext() && m_editorWindowVisible) {
-        bool windowOpen = m_editorWindowVisible;
-        if (ImGui::Begin("Terrain Editor", &windowOpen, ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::Checkbox("Enable Editing", &m_editingEnabled);
-            ImGui::Separator();
-            ImGui::TextUnformatted("Hold LMB to raise terrain.");
-            ImGui::TextUnformatted("Hold RMB to lower terrain.");
-            ImGui::Separator();
-            if (ImGui::SliderFloat("Brush Radius", &m_brushRadius, 0.5f, 5.0f, "%.2f m")) {
-                m_brushRadius = std::clamp(m_brushRadius, 0.1f, 20.0f);
-            }
-            if (ImGui::SliderFloat("Brush Strength", &m_brushStrength, 0.1f, 5.0f, "%.2f m/s")) {
-                m_brushStrength = std::clamp(m_brushStrength, 0.01f, 20.0f);
-            }
-            ImGui::Separator();
-            if (ImGui::SliderFloat("Min Height", &m_minHeight, -10.0f, 0.0f, "%.2f m")) {
-                if (m_minHeight > m_maxHeight) {
-                    m_minHeight = m_maxHeight;
-                }
-            }
-            if (ImGui::SliderFloat("Max Height", &m_maxHeight, 0.5f, 10.0f, "%.2f m")) {
-                if (m_maxHeight < m_minHeight) {
-                    m_maxHeight = m_minHeight;
-                }
-            }
-            if (ImGui::SliderFloat("Terrain Size", &m_size, 5.0f, 100.0f, "%.1f m")) {
-                m_size = std::max(1.0f, m_size);
-                m_meshDirty = true;
-            }
-            int resolution = m_resolution;
-            if (ImGui::InputInt("Resolution", &resolution)) {
-                if (resolution != m_resolution && resolution >= 2 && resolution <= 256) {
-                    SetResolution(resolution);
-                }
-            }
-        }
-        ImGui::End();
-        if (!windowOpen) {
-            m_editorWindowVisible = false;
-            m_editingEnabled = false;
-        }
-    }
+    // Terrain editor UI is now in the Inspector window
 }
 
 void EditableTerrainComponent::InitializeHeightmap() {
@@ -428,10 +406,14 @@ bool EditableTerrainComponent::ComputeTerrainHit(glm::vec3& outWorldPos, glm::ve
     const float ndcX = (2.0f * mousePos.x) / static_cast<float>(width) - 1.0f;
     const float ndcY = 1.0f - (2.0f * mousePos.y) / static_cast<float>(height);
 
-    const float fov = m_fovProvider ? m_fovProvider() : kDefaultFovDegrees;
+    const float fov = m_fovProvider ? m_fovProvider() : gotmilked::GameConstants::Camera::DefaultFovDegrees;
     const float aspect = static_cast<float>(width) / static_cast<float>(height);
 
-    const glm::mat4 projection = glm::perspective(glm::radians(fov), aspect, kNearPlane, kFarPlane);
+    const glm::mat4 projection = glm::perspective(
+        glm::radians(fov), 
+        aspect, 
+        gotmilked::GameConstants::Camera::NearPlane, 
+        gotmilked::GameConstants::Camera::FarPlane);
     const glm::mat4 view = m_camera->View();
     const glm::mat4 invProj = glm::inverse(projection);
     const glm::mat4 invView = glm::inverse(view);

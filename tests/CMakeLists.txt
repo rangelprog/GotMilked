@@ -4,6 +4,7 @@ add_executable(GotMilkedTests
     SceneSerializerTests.cpp
     ResourceManagerTests.cpp
     SceneDrawSmokeTest.cpp
+    GameResourcesTests.cpp
     TestAssetHelpers.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameResources.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameSceneHelpers.cpp

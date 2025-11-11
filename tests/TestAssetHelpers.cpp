@@ -7,6 +7,7 @@
 #include "gm/prototypes/Primitives.hpp"
 #include "gm/utils/ObjLoader.hpp"
 #include "gm/utils/ResourceRegistry.hpp"
+#include "gm/utils/ResourceManager.hpp"
 
 #include <fstream>
 #include <iterator>
@@ -79,14 +80,26 @@ TestAssetBundle CreateMeshSpinnerTestAssets() {
 
 void PopulateGameResourcesFromTestAssets(const TestAssetBundle& bundle, GameResources& resources) {
     // Friend function - can access private members
-    resources.m_shader = std::make_unique<gm::Shader>();
-    if (!resources.m_shader->loadFromFiles(bundle.vertPath, bundle.fragPath)) {
+    // Use ResourceManager for loading to maintain consistency with production code
+    resources.m_shaderGuid = "test_shader_" + bundle.root.filename().string();
+    resources.m_textureGuid = "test_texture_" + bundle.root.filename().string();
+    resources.m_meshGuid = "test_mesh_" + bundle.root.filename().string();
+    resources.m_shaderVertPath = bundle.vertPath;
+    resources.m_shaderFragPath = bundle.fragPath;
+    resources.m_texturePath = bundle.textureTag;
+    resources.m_meshPath = bundle.meshPath;
+
+    // Load shader through ResourceManager
+    resources.m_shader = gm::ResourceManager::LoadShader(resources.m_shaderGuid, bundle.vertPath, bundle.fragPath);
+    if (!resources.m_shader) {
         throw std::runtime_error("Failed to load shader from test assets");
     }
     resources.m_shader->Use();
     resources.m_shader->SetInt("uTex", 0);
 
-    auto texture = std::make_unique<gm::Texture>();
+    // Create procedural texture (not from file, so we create it directly)
+    // For file-based textures, we'd use ResourceManager::LoadTexture
+    auto texture = std::make_shared<gm::Texture>();
     std::vector<std::uint8_t> pixels = {
         255, 0, 0, 255,
         0, 255, 0, 255,
@@ -96,26 +109,20 @@ void PopulateGameResourcesFromTestAssets(const TestAssetBundle& bundle, GameReso
     if (!texture->createRGBA8(2, 2, pixels, false)) {
         throw std::runtime_error("Failed to create procedural texture");
     }
-    resources.m_texture = std::move(texture);
+    resources.m_texture = texture;
 
-    resources.m_mesh = std::make_unique<gm::Mesh>(gm::ObjLoader::LoadObjPNUV(bundle.meshPath));
-    resources.m_planeMesh = std::make_unique<gm::Mesh>(gm::prototypes::CreatePlane(5.0f, 5.0f, 2.0f));
-    resources.m_cubeMesh = std::make_unique<gm::Mesh>(gm::prototypes::CreateCube(1.0f));
+    // Load mesh through ResourceManager
+    resources.m_mesh = gm::ResourceManager::LoadMesh(resources.m_meshGuid, bundle.meshPath);
+    if (!resources.m_mesh) {
+        throw std::runtime_error("Failed to load mesh from test assets");
+    }
 
-    resources.m_planeMaterial = std::make_shared<gm::Material>(gm::Material::CreatePhong(glm::vec3(0.4f, 0.7f, 0.4f),
+    // Create terrain material for tests
+    resources.m_terrainMaterial = std::make_shared<gm::Material>(gm::Material::CreatePhong(glm::vec3(0.4f, 0.7f, 0.4f),
                                                                                        glm::vec3(0.2f), 16.0f));
-    resources.m_planeMaterial->SetDiffuseTexture(resources.m_texture.get());
-    resources.m_cubeMaterial = std::make_shared<gm::Material>(gm::Material::CreatePhong(glm::vec3(0.75f, 0.25f, 0.25f),
-                                                                                      glm::vec3(0.4f), 32.0f));
+    resources.m_terrainMaterial->SetDiffuseTexture(resources.m_texture.get());
 
-    resources.m_shaderGuid = "test_shader_" + bundle.root.filename().string();
-    resources.m_textureGuid = "test_texture_" + bundle.root.filename().string();
-    resources.m_meshGuid = "test_mesh_" + bundle.root.filename().string();
-    resources.m_shaderVertPath = bundle.vertPath;
-    resources.m_shaderFragPath = bundle.fragPath;
-    resources.m_texturePath = bundle.textureTag;
-    resources.m_meshPath = bundle.meshPath;
-
+    // Register with ResourceRegistry for GUID tracking
     auto& registry = gm::ResourceRegistry::Instance();
     registry.RegisterShader(resources.m_shaderGuid, resources.m_shaderVertPath, resources.m_shaderFragPath);
     registry.RegisterTexture(resources.m_textureGuid, resources.m_texturePath);

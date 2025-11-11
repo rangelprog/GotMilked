@@ -181,10 +181,10 @@ json SceneSerializer::SerializeGameObject(std::shared_ptr<GameObject> obj) {
     }
     objJson["tags"] = tagsJson;
     
-    // Serialize components
+    // Serialize components (save all components, including inactive ones)
     json componentsJson = json::array();
     for (const auto& component : obj->GetComponents()) {
-        if (component && component->IsActive()) {
+        if (component) {
             json compJson = SerializeComponent(component.get());
             if (!compJson.is_null()) {
                 componentsJson.push_back(compJson);

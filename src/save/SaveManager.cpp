@@ -135,8 +135,80 @@ SaveLoadResult SaveManager::QuickSave(const SaveGameData& data) {
     return SaveToSlot(slotName, data);
 }
 
+SaveLoadResult SaveManager::QuickSaveWithJson(const nlohmann::json& json) {
+    // Generate unique quick save filename with timestamp
+    auto now = std::chrono::system_clock::now();
+    auto timeT = std::chrono::system_clock::to_time_t(now);
+    std::tm tmLocal{};
+#ifdef _WIN32
+    localtime_s(&tmLocal, &timeT);
+#else
+    localtime_r(&timeT, &tmLocal);
+#endif
+    
+    std::ostringstream oss;
+    oss << "quick_save_"
+        << std::put_time(&tmLocal, "%Y%m%d_%H%M%S")
+        << ".json";
+    
+    std::string slotName = oss.str();
+    std::filesystem::path path = m_saveDirectory / slotName;
+    SaveLoadResult result;
+
+    std::error_code ec;
+    if (!std::filesystem::exists(m_saveDirectory, ec)) {
+        if (!std::filesystem::create_directories(m_saveDirectory, ec)) {
+            result.message = "Unable to create save directory: " + ec.message();
+            return result;
+        }
+    }
+
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (!out) {
+        result.message = "Failed to open save file for writing";
+        return result;
+    }
+
+    out << json.dump(2);
+    if (!out.good()) {
+        result.message = "Failed while writing save data";
+        return result;
+    }
+
+    gm::core::Logger::Info("[SaveManager] Saved quick save '%s' to %s",
+                           slotName.c_str(), path.string().c_str());
+    result.success = true;
+    return result;
+}
+
 SaveLoadResult SaveManager::QuickLoad(SaveGameData& outData) const {
     return LoadFromSlot("quick", outData);
+}
+
+SaveLoadResult SaveManager::QuickLoadWithJson(nlohmann::json& outJson) const {
+    std::filesystem::path path = GetMostRecentQuickSave();
+    SaveLoadResult result;
+    
+    if (path.empty()) {
+        result.message = "No quick save found";
+        return result;
+    }
+
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        result.message = "Save file not found: " + path.string();
+        return result;
+    }
+
+    try {
+        in >> outJson;
+    } catch (const nlohmann::json::exception& ex) {
+        result.message = std::string("Failed to parse save: ") + ex.what();
+        return result;
+    }
+
+    result.success = true;
+    return result;
 }
 
 SaveLoadResult SaveManager::SaveToSlot(const std::string& slotName, const SaveGameData& data) {

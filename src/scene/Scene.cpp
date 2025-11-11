@@ -421,10 +421,9 @@ void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovD
     shader.SetMat4("uProj", proj);
     shader.SetVec3("uViewPos", cam.Position());
 
-    // Collect and apply lights
-    LightManager lightManager;
-    lightManager.CollectLights(gameObjects);
-    lightManager.ApplyLights(shader, cam.Position());
+    // Collect and apply lights (using cached LightManager)
+    m_lightManager.CollectLights(gameObjects);
+    m_lightManager.ApplyLights(shader, cam.Position());
 
     // Draw GameObjects
     for (const auto& gameObject : gameObjects) {
