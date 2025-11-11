@@ -30,3 +30,12 @@
 #include "gm/utils/ResourceManager.hpp"
 #include "gm/utils/CoordinateDisplay.hpp"
 #include "gm/utils/ImGuiManager.hpp"
+#include "gm/utils/HotReloader.hpp"
+
+// Gameplay
+#include "gm/gameplay/FlyCameraController.hpp"
+
+// Save / Tooling
+#include "gm/save/SaveManager.hpp"
+#include "gm/save/SaveSnapshotHelpers.hpp"
+#include "gm/tooling/Overlay.hpp"

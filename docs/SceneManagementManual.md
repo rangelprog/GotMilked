@@ -181,24 +181,25 @@ The engine exposes a plug-in API so games can register serializers without touch
 
 ```cpp
 gm::SceneSerializer::RegisterComponentSerializer(
-    "MeshSpinnerComponent",
+    "CropComponent",
     [](gm::Component* component) -> nlohmann::json {
-        auto* spinner = dynamic_cast<MeshSpinnerComponent*>(component);
+        auto* crop = dynamic_cast<CropComponent*>(component);
         nlohmann::json data;
-        data["rotationSpeed"] = spinner->GetRotationSpeed();
-        data["meshPath"] = spinner->GetMeshPath();
+        data["growthStage"] = crop->GetGrowthStage();
+        data["cropType"] = crop->GetCropType();
         return data;
     },
     [](gm::GameObject* obj, const nlohmann::json& data) -> gm::Component* {
-        auto component = obj->AddComponent<MeshSpinnerComponent>();
-        if (data.contains("rotationSpeed"))
-            component->SetRotationSpeed(data["rotationSpeed"].get<float>());
-        component->SetMeshPath(data.value("meshPath", ""));
+        auto component = obj->AddComponent<CropComponent>();
+        if (data.contains("growthStage"))
+            component->SetGrowthStage(data["growthStage"].get<int>());
+        if (data.contains("cropType"))
+            component->SetCropType(data["cropType"].get<std::string>());
         return component.get();
     });
 ```
 
-Call `RegisterComponentSerializer` during startup (before saving or loading scenes) and optionally `UnregisterComponentSerializer` on shutdown. Games can provide thin wrappers (see `SceneSerializerExtensions` in the sandbox) to keep registration code organized.
+Call `RegisterComponentSerializer` during startup (before saving or loading scenes) and optionally `UnregisterComponentSerializer` on shutdown. Games can provide thin wrappers (see `SceneSerializerExtensions` in the GotMilked game) to keep registration code organized.
 
 ---
 

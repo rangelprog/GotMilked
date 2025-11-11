@@ -5,9 +5,8 @@ add_executable(GotMilkedTests
     ResourceManagerTests.cpp
     SceneDrawSmokeTest.cpp
     TestAssetHelpers.cpp
-    ${CMAKE_SOURCE_DIR}/apps/GotMilkedSandbox/src/MeshSpinnerComponent.cpp
-    ${CMAKE_SOURCE_DIR}/apps/GotMilkedSandbox/src/SandboxResources.cpp
-    ${CMAKE_SOURCE_DIR}/apps/GotMilkedSandbox/src/SandboxSceneHelpers.cpp
+    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameResources.cpp
+    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameSceneHelpers.cpp
     TestMain.cpp
 )
 target_link_libraries(GotMilkedTests PRIVATE
@@ -20,12 +19,12 @@ target_link_libraries(GotMilkedTests PRIVATE
 
 target_include_directories(GotMilkedTests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
-    ${CMAKE_SOURCE_DIR}/apps/GotMilkedSandbox/src
+    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src
 )
 
-set(GM_SANDBOX_SHADER_DIR "${CMAKE_SOURCE_DIR}/apps/GotMilkedSandbox/assets/shaders")
-string(REPLACE "\\" "/" GM_SANDBOX_SHADER_DIR "${GM_SANDBOX_SHADER_DIR}")
-target_compile_definitions(GotMilkedTests PRIVATE "GM_SANDBOX_SHADER_DIR=\"${GM_SANDBOX_SHADER_DIR}\"")
+set(GM_GAME_SHADER_DIR "${CMAKE_SOURCE_DIR}/apps/GotMilked/assets/shaders")
+string(REPLACE "\\" "/" GM_GAME_SHADER_DIR "${GM_GAME_SHADER_DIR}")
+target_compile_definitions(GotMilkedTests PRIVATE "GM_GAME_SHADER_DIR=\"${GM_GAME_SHADER_DIR}\"")
 
 gm_apply_warnings(GotMilkedTests)
 

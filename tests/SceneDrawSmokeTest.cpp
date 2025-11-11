@@ -2,7 +2,7 @@
 #include "gm/scene/GameObject.hpp"
 #include "gm/rendering/Camera.hpp"
 
-#include "SandboxSceneHelpers.hpp"
+#include "GameSceneHelpers.hpp"
 #include "TestAssetHelpers.hpp"
 
 #include <glad/glad.h>
@@ -68,8 +68,8 @@ void SceneDrawSmoke() {
     TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
     TempDir assets(bundle.root);
 
-    SandboxResources resources;
-    PopulateSandboxResourcesFromTestAssets(bundle, resources);
+    GameResources resources;
+    PopulateGameResourcesFromTestAssets(bundle, resources);
     assert(resources.shader);
     assert(resources.mesh);
 
@@ -77,8 +77,7 @@ void SceneDrawSmoke() {
 
     gm::Camera camera({0.0f, 0.0f, 0.0f});
 
-    std::vector<std::shared_ptr<gm::GameObject>> spinnerObjects;
-    sandbox::PopulateSandboxScene(scene, camera, resources, spinnerObjects);
+    gotmilked::PopulateInitialScene(scene, camera, resources);
     scene.Init();
 
     if (resources.shader) {

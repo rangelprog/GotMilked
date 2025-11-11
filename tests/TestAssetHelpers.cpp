@@ -20,7 +20,7 @@ std::filesystem::path MakeTempDirectory() {
     std::uniform_int_distribution<int> dist(0, 0xFFFFFF);
     std::filesystem::path dir;
     do {
-        dir = base / ("GotMilkedSandbox_" + std::to_string(dist(rd)));
+        dir = base / ("GotMilked_" + std::to_string(dist(rd)));
     } while (std::filesystem::exists(dir));
     std::filesystem::create_directories(dir);
     return dir;
@@ -48,7 +48,7 @@ TestAssetBundle CreateMeshSpinnerTestAssets() {
     TestAssetBundle bundle;
     bundle.root = MakeTempDirectory();
 
-    const std::filesystem::path shaderDir = std::filesystem::path(GM_SANDBOX_SHADER_DIR);
+    const std::filesystem::path shaderDir = std::filesystem::path(GM_GAME_SHADER_DIR);
     const std::string vertSrc = LoadTextFile(shaderDir / "simple.vert.glsl");
     const std::string fragSrc = LoadTextFile(shaderDir / "simple.frag.glsl");
 
@@ -74,7 +74,7 @@ TestAssetBundle CreateMeshSpinnerTestAssets() {
     return bundle;
 }
 
-void PopulateSandboxResourcesFromTestAssets(const TestAssetBundle& bundle, SandboxResources& resources) {
+void PopulateGameResourcesFromTestAssets(const TestAssetBundle& bundle, GameResources& resources) {
     resources.shader = std::make_unique<gm::Shader>();
     if (!resources.shader->loadFromFiles(bundle.vertPath, bundle.fragPath)) {
         throw std::runtime_error("Failed to load shader from test assets");

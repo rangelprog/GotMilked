@@ -25,6 +25,11 @@ public:
     float GetZoom() const { return zoom; }
     const glm::vec3& Position() const { return position; }
     const glm::vec3& Front() const { return front; }
+    
+    // Setters for save/load support
+    void SetPosition(const glm::vec3& pos) { position = pos; }
+    void SetForward(const glm::vec3& forward);
+    void SetFov(float fov) { zoom = fov; }
 
 private:
     void updateCameraVectors();

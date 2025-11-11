@@ -11,8 +11,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Option to build the sandbox app
-option(GM_BUILD_SANDBOX "Build GotMilked Sandbox app" ON)
+# Option to build the game app
+option(GM_BUILD_GAME "Build GotMilked game app" ON)
 option(GM_BUILD_TESTS "Build GotMilked tests" ON)
 
 # Warning helper function
@@ -95,8 +95,8 @@ endif()
 # ---------------------------
 # Applications / Executables
 # ---------------------------
-if (GM_BUILD_SANDBOX)
-    add_subdirectory(apps/GotMilkedSandbox)
+if (GM_BUILD_GAME)
+    add_subdirectory(apps/GotMilked)
 endif()
 
 if (GM_BUILD_TESTS)
@@ -138,6 +138,15 @@ add_library(GotMilkedEngine
     src/utils/ImGuiManager.cpp
     src/utils/ResourceRegistry.cpp
     src/utils/Config.cpp
+    src/utils/HotReloader.cpp
+
+    # Gameplay
+    src/gameplay/FlyCameraController.cpp
+
+    # Save / Tooling
+    src/save/SaveManager.cpp
+    src/save/SaveSnapshotHelpers.cpp
+    src/tooling/Overlay.cpp
 )
 
 target_include_directories(GotMilkedEngine 
@@ -147,12 +156,18 @@ target_include_directories(GotMilkedEngine
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/rendering
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/scene
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/utils
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/gameplay
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/save
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/tooling
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/src/core
         ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering
         ${CMAKE_CURRENT_SOURCE_DIR}/src/scene
         ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/save
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/tooling
 )
 target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm::glm imgui)
 

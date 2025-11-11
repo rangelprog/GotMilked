@@ -49,6 +49,31 @@ glm::mat4 Camera::View() const {
     return glm::lookAt(position, position + front, up);
 }
 
+void Camera::SetForward(const glm::vec3& forward) {
+    front = glm::normalize(forward);
+    
+    // Calculate yaw and pitch from forward vector
+    // Camera uses: front.x = cos(yaw) * cos(pitch), front.y = sin(pitch), front.z = sin(yaw) * cos(pitch)
+    glm::vec3 normalized = glm::normalize(front);
+    pitch = glm::degrees(asin(normalized.y));
+    
+    // Calculate yaw from x-z plane projection
+    // Project forward onto x-z plane: (normalized.x, normalized.z)
+    float cosPitch = cos(glm::radians(pitch));
+    if (cosPitch > 0.001f) { // Avoid division by zero
+        // From the camera equations: front.x = cos(yaw) * cos(pitch), front.z = sin(yaw) * cos(pitch)
+        // So: cos(yaw) = front.x / cos(pitch), sin(yaw) = front.z / cos(pitch)
+        yaw = glm::degrees(atan2(normalized.z / cosPitch, normalized.x / cosPitch));
+    }
+    // At gimbal lock (pitch near ±90°), yaw is undefined, so we preserve current value
+    
+    // Constrain pitch
+    if (pitch > 89.0f) pitch = 89.0f;
+    if (pitch < -89.0f) pitch = -89.0f;
+    
+    updateCameraVectors();
+}
+
 void Camera::updateCameraVectors() {
     glm::vec3 newFront;
     newFront.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));

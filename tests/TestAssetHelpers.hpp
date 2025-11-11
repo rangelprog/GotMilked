@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "apps/GotMilkedSandbox/src/SandboxResources.hpp"
+#include "apps/GotMilked/src/GameResources.hpp"
 
 namespace gm {
 class Shader;
@@ -22,5 +22,5 @@ struct TestAssetBundle {
 
 TestAssetBundle CreateMeshSpinnerTestAssets();
 
-void PopulateSandboxResourcesFromTestAssets(const TestAssetBundle& bundle, SandboxResources& resources);
+void PopulateGameResourcesFromTestAssets(const TestAssetBundle& bundle, GameResources& resources);
 
