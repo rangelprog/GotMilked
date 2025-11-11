@@ -205,25 +205,18 @@ void Overlay::RenderPhysicsSection() {
 
     ImGui::TextUnformatted("Status: Active");
 
-    // Count physics bodies in the scene
-    if (auto scene = m_scene.lock()) {
-        int staticBodies = 0;
-        int dynamicBodies = 0;
-        
-        for (const auto& obj : scene->GetAllGameObjects()) {
-            if (!obj || !obj->IsActive()) continue;
-            
-            // Check if object has RigidBodyComponent (we'll need to forward declare or include)
-            // For now, we'll use tags as a proxy
-            if (obj->HasTag("ground")) {
-                staticBodies++;
-            } else if (obj->HasTag("dynamic")) {
-                dynamicBodies++;
-            }
-        }
-        
-        ImGui::Text("Static Bodies: %d", staticBodies);
-        ImGui::Text("Dynamic Bodies: %d", dynamicBodies);
+    const auto stats = m_physicsWorld->GetBodyStats();
+    const int totalBodies = stats.staticBodies + stats.dynamicBodies;
+
+    ImGui::Text("Bodies: %d total", totalBodies);
+    ImGui::Text("  Static: %d", stats.staticBodies);
+    ImGui::Text("  Dynamic: %d", stats.dynamicBodies);
+    ImGui::Text("    Active: %d", stats.activeDynamicBodies);
+    ImGui::Text("    Sleeping: %d", stats.sleepingDynamicBodies);
+
+    const int unaccounted = stats.dynamicBodies - (stats.activeDynamicBodies + stats.sleepingDynamicBodies);
+    if (unaccounted > 0) {
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "    Unaccounted (locked): %d", unaccounted);
     }
 }
 

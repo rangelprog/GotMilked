@@ -24,6 +24,12 @@ struct SaveGameData {
     glm::vec3 cameraForward{0.0f, 0.0f, -1.0f};
     float cameraFov = 60.0f;
     double worldTime = 0.0;
+
+    int terrainResolution = 0;
+    float terrainSize = 0.0f;
+    float terrainMinHeight = 0.0f;
+    float terrainMaxHeight = 0.0f;
+    std::vector<float> terrainHeights;
 };
 
 struct SaveLoadResult {

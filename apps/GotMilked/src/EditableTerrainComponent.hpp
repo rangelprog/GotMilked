@@ -1,0 +1,78 @@
+#pragma once
+
+#include "gm/scene/Component.hpp"
+
+#include <functional>
+#include <memory>
+#include <vector>
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
+
+struct GLFWwindow;
+
+namespace gm {
+class Mesh;
+class Shader;
+class Material;
+class Camera;
+class TransformComponent;
+}
+
+class EditableTerrainComponent : public gm::Component {
+public:
+    EditableTerrainComponent();
+
+    void Init() override;
+    void Update(float deltaTime) override;
+    void Render() override;
+
+    void SetCamera(gm::Camera* camera) { m_camera = camera; }
+    void SetShader(gm::Shader* shader) { m_shader = shader; }
+    void SetMaterial(std::shared_ptr<gm::Material> material) { m_material = std::move(material); }
+    void SetWindow(GLFWwindow* window) { m_window = window; }
+    void SetTerrainSize(float sizeMeters);
+    void SetResolution(int resolution);
+    void SetFovProvider(std::function<float()> provider) { m_fovProvider = std::move(provider); }
+
+    bool IsEditingEnabled() const { return m_editingEnabled; }
+
+    int GetResolution() const { return m_resolution; }
+    float GetTerrainSize() const { return m_size; }
+    float GetMinHeight() const { return m_minHeight; }
+    float GetMaxHeight() const { return m_maxHeight; }
+    const std::vector<float>& GetHeights() const { return m_heights; }
+
+    bool SetHeightData(int resolution,
+                       float size,
+                       float minHeight,
+                       float maxHeight,
+                       const std::vector<float>& heights);
+
+private:
+    void InitializeHeightmap();
+    bool RebuildMesh();
+    void BuildIndexBuffer();
+    void ApplyBrush(const glm::vec2& localXZ, float deltaTime, float direction);
+    bool ComputeTerrainHit(glm::vec3& outWorldPos, glm::vec2& outLocalXZ) const;
+
+    GLFWwindow* m_window = nullptr;
+    gm::Camera* m_camera = nullptr;
+    gm::Shader* m_shader = nullptr;
+    std::shared_ptr<gm::Material> m_material;
+    std::unique_ptr<gm::Mesh> m_mesh;
+
+    int m_resolution = 33;
+    float m_size = 20.0f;
+    float m_minHeight = -2.0f;
+    float m_maxHeight = 4.0f;
+    float m_brushRadius = 1.5f;
+    float m_brushStrength = 1.0f;
+
+    bool m_editingEnabled = false;
+    bool m_meshDirty = false;
+
+    std::vector<float> m_heights;
+    std::vector<unsigned int> m_indices;
+
+    std::function<float()> m_fovProvider;
+};

@@ -343,6 +343,41 @@ void PhysicsWorld::RemoveBody(const BodyHandle& handle) {
     }
 }
 
+PhysicsWorld::BodyStats PhysicsWorld::GetBodyStats() const {
+    BodyStats stats;
+    if (!m_initialized || !m_physicsSystem) {
+        return stats;
+    }
+
+    for (const auto& id : m_staticBodies) {
+        if (!id.IsInvalid()) {
+            ++stats.staticBodies;
+        }
+    }
+
+    for (const auto& record : m_dynamicBodies) {
+        if (record.id.IsInvalid()) {
+            continue;
+        }
+
+        ++stats.dynamicBodies;
+
+        JPH::BodyLockRead lock(m_physicsSystem->GetBodyLockInterface(), record.id);
+        if (!lock.Succeeded()) {
+            continue;
+        }
+
+        const JPH::Body& body = lock.GetBody();
+        if (body.IsActive()) {
+            ++stats.activeDynamicBodies;
+        } else {
+            ++stats.sleepingDynamicBodies;
+        }
+    }
+
+    return stats;
+}
+
 void PhysicsWorld::Step(float deltaTime) {
     if (!m_initialized || !m_physicsSystem) {
         return;

@@ -99,3 +99,17 @@ Ideas for future expansion:
 
 For more detailed scene usage, consult `docs/SceneManagementManual.md`. The game code (`apps/GotMilked/`) showcases how the pieces fit together in practice.
 
+## Terrain Editing
+
+The default game scene now includes an editable terrain component attached to the `GroundPlane` object. Open the tooling overlay (F1) to reveal the **Terrain Editor** panel. From there you can:
+
+- Toggle the `Enable Editing` checkbox to allow in-viewport sculpting.
+- Left-click and drag to raise the terrain, right-click and drag to lower it.
+- Adjust brush radius and strength to control the area of effect and sculpting speed.
+- Tune minimum and maximum height constraints to keep the landscape within bounds.
+- Resize the terrain or change the resolution (note: changing resolution resets the heightmap).
+
+The editor uses the active camera for ray casting, so you can freely reposition the camera while sculpting to work on different parts of the field. When hot reloading materials or shaders, the terrain component automatically rebinds to the updated resources.
+
+- Terrain edits are stored in the quick save file, so you can sculpt, quick-save, and quick-load to restore the landscape.
+

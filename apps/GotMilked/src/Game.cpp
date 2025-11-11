@@ -4,8 +4,8 @@
 #include "Game.hpp"
 #include "GameSceneHelpers.hpp"
 #include "SceneSerializerExtensions.hpp"
-#include "StaticMeshComponent.hpp"
 #include "gm/physics/PhysicsWorld.hpp"
+#include "EditableTerrainComponent.hpp"
 
 #include <cstdio>
 #include <filesystem>
@@ -120,7 +120,10 @@ void Game::SetupScene() {
 
     // Populate initial scene if empty
     if (m_gameScene->GetAllGameObjects().empty()) {
-        gotmilked::PopulateInitialScene(*m_gameScene, *m_camera, m_resources);
+        auto fovProvider = [this]() -> float {
+            return m_gameplay ? m_gameplay->GetFovDegrees() : 60.0f;
+        };
+        gotmilked::PopulateInitialScene(*m_gameScene, *m_camera, m_resources, m_window, fovProvider);
     }
     ApplyResourcesToScene();
 
@@ -287,31 +290,15 @@ void Game::ApplyResourcesToScene() {
         return;
     }
 
-    auto applyToObject = [this](const std::string& name,
-                                gm::Mesh* mesh,
-                                const std::shared_ptr<gm::Material>& material) {
-        if (!m_gameScene || !mesh || !material || !m_resources.shader) {
-            return;
+    auto terrainObject = m_gameScene->FindGameObjectByName("Terrain");
+    if (terrainObject) {
+        if (auto terrain = terrainObject->GetComponent<EditableTerrainComponent>()) {
+            terrain->SetShader(m_resources.shader.get());
+            terrain->SetMaterial(m_resources.planeMaterial);
+            terrain->SetWindow(m_window);
+            terrain->SetCamera(m_camera.get());
         }
-
-        auto object = m_gameScene->FindGameObjectByName(name);
-        if (!object) {
-            return;
-        }
-
-        auto renderer = object->GetComponent<StaticMeshComponent>();
-        if (!renderer) {
-            return;
-        }
-
-        renderer->SetMesh(mesh);
-        renderer->SetShader(m_resources.shader.get());
-        renderer->SetMaterial(material);
-        renderer->SetCamera(m_camera.get());
-    };
-
-    applyToObject("GroundPlane", m_resources.planeMesh.get(), m_resources.planeMaterial);
-    applyToObject("FloatingCube", m_resources.cubeMesh.get(), m_resources.cubeMaterial);
+    }
 
     if (m_tooling) {
         m_tooling->SetScene(m_gameScene);
@@ -332,7 +319,20 @@ void Game::PerformQuickSave() {
     
     // Add FOV to save data
     data.cameraFov = m_gameplay->GetFovDegrees();
-    
+
+    if (m_gameScene) {
+        auto terrainObject = m_gameScene->FindGameObjectByName("Terrain");
+        if (terrainObject) {
+            if (auto terrain = terrainObject->GetComponent<EditableTerrainComponent>()) {
+                data.terrainResolution = terrain->GetResolution();
+                data.terrainSize = terrain->GetTerrainSize();
+                data.terrainMinHeight = terrain->GetMinHeight();
+                data.terrainMaxHeight = terrain->GetMaxHeight();
+                data.terrainHeights = terrain->GetHeights();
+            }
+        }
+    }
+
     auto result = m_saveManager->QuickSave(data);
     if (!result.success) {
         gm::core::Logger::Warning("[Game] QuickSave failed: %s", result.message.c_str());
@@ -367,6 +367,25 @@ void Game::PerformQuickLoad() {
                 m_gameplay->SetWorldTimeSeconds(worldTime);
             }
         });
+    
+    if (applied && m_gameScene) {
+        if (data.terrainResolution > 0 && !data.terrainHeights.empty()) {
+            auto terrainObject = m_gameScene->FindGameObjectByName("Terrain");
+            if (terrainObject) {
+                if (auto terrain = terrainObject->GetComponent<EditableTerrainComponent>()) {
+                    bool ok = terrain->SetHeightData(
+                        data.terrainResolution,
+                        data.terrainSize,
+                        data.terrainMinHeight,
+                        data.terrainMaxHeight,
+                        data.terrainHeights);
+                    if (!ok) {
+                        gm::core::Logger::Warning("[Game] Failed to apply terrain data from save");
+                    }
+                }
+            }
+        }
+    }
     
     // Apply FOV if present
     if (data.cameraFov > 0.0f && m_gameplay) {

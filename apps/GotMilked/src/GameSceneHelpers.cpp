@@ -1,8 +1,7 @@
 #include "GameSceneHelpers.hpp"
 
 #include "GameResources.hpp"
-#include "StaticMeshComponent.hpp"
-#include "RigidBodyComponent.hpp"
+#include "EditableTerrainComponent.hpp"
 
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/GameObject.hpp"
@@ -11,33 +10,16 @@
 
 #include <cstdio>
 #include <glm/vec3.hpp>
+#include <utility>
 
 namespace gotmilked {
-
-namespace {
-
-void ConfigureStaticRenderer(const std::shared_ptr<gm::GameObject>& object,
-                             gm::Mesh* mesh,
-                             const std::shared_ptr<gm::Material>& material,
-                             gm::Shader* shader,
-                             const gm::Camera& camera) {
-    if (!object || !mesh || !shader || !material) {
-        return;
-    }
-
-    auto renderer = object->AddComponent<StaticMeshComponent>();
-    renderer->SetMesh(mesh);
-    renderer->SetShader(shader);
-    renderer->SetMaterial(material);
-    renderer->SetCamera(&camera);
-}
-
-} // namespace
 
 void PopulateInitialScene(
     gm::Scene& scene,
     gm::Camera& camera,
-    const GameResources& resources)
+    const GameResources& resources,
+    GLFWwindow* window,
+    std::function<float()> fovProvider)
 {
     // Directional light
     auto sunLight = scene.CreateGameObject("Sun");
@@ -46,51 +28,32 @@ void PopulateInitialScene(
     auto sunLightComp = sunLight->AddComponent<gm::LightComponent>();
     sunLightComp->SetType(gm::LightComponent::LightType::Directional);
     sunLightComp->SetDirection(glm::vec3(-0.4f, -1.0f, -0.3f));
-    sunLightComp->SetColor(glm::vec3(1.0f, 1.0f, 1.0f));
+    sunLightComp->SetColor(glm::vec3(1.0f));
     sunLightComp->SetIntensity(1.5f);
     sunLight->AddTag("lighting");
 
-    // Ground plane
-    auto ground = scene.SpawnGameObject("GroundPlane");
-    ground->AddTag("ground");
-    auto groundTransform = ground->EnsureTransform();
-    groundTransform->SetPosition(0.0f, 0.0f, 0.0f);
-    groundTransform->SetScale(glm::vec3(1.0f, 1.0f, 1.0f));
-    ConfigureStaticRenderer(ground,
-                            resources.planeMesh.get(),
-                            resources.planeMaterial,
-                            resources.shader.get(),
-                            camera);
-    
-    // Add physics component for ground plane
-    auto groundPhysics = ground->AddComponent<RigidBodyComponent>();
-    groundPhysics->SetBodyType(RigidBodyComponent::BodyType::Static);
-    groundPhysics->SetColliderShape(RigidBodyComponent::ColliderShape::Plane);
-    groundPhysics->SetPlaneNormal(glm::vec3(0.0f, 1.0f, 0.0f));
-    groundPhysics->SetPlaneConstant(0.0f);
-    groundPhysics->Init();
+    // Editable terrain
+    auto terrainObject = scene.SpawnGameObject("Terrain");
+    scene.TagGameObject(terrainObject, "terrain");
+    auto terrainTransform = terrainObject->EnsureTransform();
+    terrainTransform->SetPosition(0.0f, 0.0f, 0.0f);
+    terrainTransform->SetScale(glm::vec3(1.0f));
 
-    // Floating cube
-    auto cube = scene.SpawnGameObject("FloatingCube");
-    cube->AddTag("dynamic");
-    auto cubeTransform = cube->EnsureTransform();
-    cubeTransform->SetPosition(0.0f, 10.0f, 0.0f);
-    cubeTransform->SetScale(glm::vec3(1.0f));
-    ConfigureStaticRenderer(cube,
-                            resources.cubeMesh.get(),
-                            resources.cubeMaterial,
-                            resources.shader.get(),
-                            camera);
-    
-    // Add physics component for floating cube
-    auto cubePhysics = cube->AddComponent<RigidBodyComponent>();
-    cubePhysics->SetBodyType(RigidBodyComponent::BodyType::Dynamic);
-    cubePhysics->SetColliderShape(RigidBodyComponent::ColliderShape::Box);
-    cubePhysics->SetBoxHalfExtent(glm::vec3(0.75f));
-    cubePhysics->SetMass(5.0f);
-    cubePhysics->Init();
+    auto terrainComponent = terrainObject->AddComponent<EditableTerrainComponent>();
+    terrainComponent->SetCamera(&camera);
+    if (resources.shader) {
+        terrainComponent->SetShader(resources.shader.get());
+    }
+    if (resources.planeMaterial) {
+        terrainComponent->SetMaterial(resources.planeMaterial);
+    }
+    terrainComponent->SetWindow(window);
+    if (fovProvider) {
+        terrainComponent->SetFovProvider(std::move(fovProvider));
+    }
+    terrainComponent->SetTerrainSize(40.0f);
 
-    std::printf("[Game] Scene populated with ground plane and floating cube\n");
+    std::printf("[Game] Scene populated with editable terrain\n");
 }
 
 } // namespace gotmilked

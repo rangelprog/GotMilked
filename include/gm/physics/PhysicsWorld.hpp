@@ -30,6 +30,13 @@ public:
         bool IsValid() const { return !id.IsInvalid(); }
     };
 
+    struct BodyStats {
+        int staticBodies = 0;
+        int dynamicBodies = 0;
+        int activeDynamicBodies = 0;
+        int sleepingDynamicBodies = 0;
+    };
+
     static PhysicsWorld& Instance();
 
     void Init(const glm::vec3& gravity = glm::vec3(0.0f, -9.81f, 0.0f));
@@ -47,6 +54,8 @@ public:
                                 float mass);
 
     void RemoveBody(const BodyHandle& handle);
+
+    BodyStats GetBodyStats() const;
 
 private:
     PhysicsWorld() = default;

@@ -6,6 +6,8 @@ add_executable(GotMilked
   src/GameSceneHelpers.cpp
   src/StaticMeshComponent.cpp
   src/RigidBodyComponent.cpp
+  src/CowComponent.cpp
+  src/EditableTerrainComponent.cpp
 )
 
 set_target_properties(GotMilked PROPERTIES OUTPUT_NAME "GotMilked")

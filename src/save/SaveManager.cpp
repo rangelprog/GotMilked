@@ -16,7 +16,7 @@ constexpr const char* kQuickSaveFilename = "quick_save.json";
 constexpr const char* kSaveExtension = ".json";
 
 nlohmann::json ToJson(const SaveGameData& data) {
-    return {
+    nlohmann::json json = {
         {"version", data.version},
         {"sceneName", data.sceneName},
         {"camera", {
@@ -26,6 +26,18 @@ nlohmann::json ToJson(const SaveGameData& data) {
         }},
         {"worldTime", data.worldTime}
     };
+
+    if (data.terrainResolution > 0 && !data.terrainHeights.empty()) {
+        json["terrain"] = {
+            {"resolution", data.terrainResolution},
+            {"size", data.terrainSize},
+            {"minHeight", data.terrainMinHeight},
+            {"maxHeight", data.terrainMaxHeight},
+            {"heights", data.terrainHeights}
+        };
+    }
+
+    return json;
 }
 
 std::optional<SaveGameData> FromJson(const nlohmann::json& json, std::string& outError) {
@@ -58,6 +70,23 @@ std::optional<SaveGameData> FromJson(const nlohmann::json& json, std::string& ou
         }
 
         data.worldTime = json.value("worldTime", data.worldTime);
+
+        if (json.contains("terrain")) {
+            const auto& terrain = json["terrain"];
+            data.terrainResolution = terrain.value("resolution", data.terrainResolution);
+            data.terrainSize = terrain.value("size", data.terrainSize);
+            data.terrainMinHeight = terrain.value("minHeight", data.terrainMinHeight);
+            data.terrainMaxHeight = terrain.value("maxHeight", data.terrainMaxHeight);
+
+            if (terrain.contains("heights") && terrain["heights"].is_array()) {
+                const auto& heights = terrain["heights"];
+                data.terrainHeights.clear();
+                data.terrainHeights.reserve(heights.size());
+                for (const auto& value : heights) {
+                    data.terrainHeights.push_back(value.get<float>());
+                }
+            }
+        }
     } catch (const nlohmann::json::exception& ex) {
         outError = ex.what();
         return std::nullopt;

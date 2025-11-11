@@ -3,6 +3,27 @@
 #include "gm/scene/GameObject.hpp"
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/physics/PhysicsWorld.hpp"
+#include "gm/core/Logger.hpp"
+
+namespace {
+
+const char* ToString(RigidBodyComponent::BodyType type) {
+    switch (type) {
+        case RigidBodyComponent::BodyType::Static: return "Static";
+        case RigidBodyComponent::BodyType::Dynamic: return "Dynamic";
+    }
+    return "Unknown";
+}
+
+const char* ToString(RigidBodyComponent::ColliderShape shape) {
+    switch (shape) {
+        case RigidBodyComponent::ColliderShape::Plane: return "Plane";
+        case RigidBodyComponent::ColliderShape::Box: return "Box";
+    }
+    return "Unknown";
+}
+
+} // namespace
 
 RigidBodyComponent::RigidBodyComponent() = default;
 
@@ -35,7 +56,12 @@ void RigidBodyComponent::CreatePhysicsBody() {
     } else if (m_bodyType == BodyType::Dynamic && m_colliderShape == ColliderShape::Box) {
         m_bodyHandle = physics.CreateDynamicBox(*owner, m_boxHalfExtent, m_mass);
     } else {
-        // Unsupported combination
+        const char* ownerName = owner ? owner->GetName().c_str() : "<null>";
+        gm::core::Logger::Warning(
+            "[RigidBodyComponent] Unsupported body/collider combination (body=%s, collider=%s) on '%s'",
+            ToString(m_bodyType),
+            ToString(m_colliderShape),
+            ownerName);
         return;
     }
 

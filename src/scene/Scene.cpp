@@ -248,6 +248,24 @@ void Scene::DestroyGameObject(std::shared_ptr<GameObject> gameObject) {
         return;
     }
     
+    std::vector<std::string> existingTags;
+    existingTags.reserve(gameObject->GetTags().size());
+    for (const auto& tag : gameObject->GetTags()) {
+        existingTags.push_back(tag);
+    }
+
+    for (const auto& tag : existingTags) {
+        UntagGameObject(gameObject, tag);
+    }
+
+    const std::string& name = gameObject->GetName();
+    if (!name.empty()) {
+        auto nameIt = objectsByName.find(name);
+        if (nameIt != objectsByName.end() && nameIt->second == gameObject) {
+            objectsByName.erase(nameIt);
+        }
+    }
+
     gameObject->Destroy();
 }
 
@@ -348,15 +366,28 @@ std::vector<std::shared_ptr<GameObject>> Scene::FindGameObjectsByTag(const std::
 }
 
 void Scene::TagGameObject(std::shared_ptr<GameObject> gameObject, const std::string& tag) {
-    if (!gameObject) return;
-    gameObject->AddTag(tag);
-    objectsByTag[tag].push_back(gameObject);
+    if (!gameObject || tag.empty()) {
+        return;
+    }
+
+    if (!gameObject->HasTag(tag)) {
+        gameObject->AddTag(tag);
+    }
+
+    auto& bucket = objectsByTag[tag];
+    auto exists = std::find(bucket.begin(), bucket.end(), gameObject);
+    if (exists == bucket.end()) {
+        bucket.push_back(gameObject);
+    }
 }
 
 void Scene::UntagGameObject(std::shared_ptr<GameObject> gameObject, const std::string& tag) {
-    if (!gameObject) return;
-    gameObject->RemoveTag(tag);
-    
+    if (!gameObject || tag.empty()) return;
+
+    if (gameObject->HasTag(tag)) {
+        gameObject->RemoveTag(tag);
+    }
+
     auto it = objectsByTag.find(tag);
     if (it != objectsByTag.end()) {
         auto& objects = it->second;
