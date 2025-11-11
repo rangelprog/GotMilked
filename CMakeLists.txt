@@ -109,6 +109,8 @@ add_library(GotMilkedEngine
     src/core/Time.cpp
     src/core/Event.cpp
     src/core/GameApp.cpp
+    src/core/Input.cpp
+    src/core/InputBindings.cpp
     src/core/input/InputSystem.cpp
 
     # Rendering systems
@@ -135,6 +137,7 @@ add_library(GotMilkedEngine
     src/utils/CoordinateDisplay.cpp
     src/utils/ImGuiManager.cpp
     src/utils/ResourceRegistry.cpp
+    src/utils/Config.cpp
 )
 
 target_include_directories(GotMilkedEngine 

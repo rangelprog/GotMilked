@@ -115,7 +115,7 @@ void main() {
     }
     
     // Albedo from texture or solid color
-    vec3 albedo = (uUseTex == 1) ? texture(uTex, vUV).rgb : uSolidColor;
+    vec3 albedo = (uUseTex == 1) ? texture(uTex, vUV).rgb : uSolidColor * vec3(1.0, 0.5, 0.5);
     
     // Material properties (with fallback)
     vec3 materialDiffuse = uMaterial.diffuse;
@@ -147,7 +147,7 @@ void main() {
     if (materialShininess < 0.001) materialShininess = 32.0;
     
     // Ambient (increased for better visibility)
-    vec3 ambient = 0.3 * materialDiffuse;
+    vec3 ambient = 0.9 * materialDiffuse;
     
     // Accumulate lighting from all lights
     vec3 lighting = ambient;

@@ -5,6 +5,10 @@ add_executable(GotMilkedSandbox
   src/SceneSerializerExtensions.cpp
   src/SandboxResources.cpp
   src/SandboxSceneHelpers.cpp
+  src/ResourceHotReloader.cpp
+  src/gameplay/SandboxGameplay.cpp
+  src/tooling/ToolingOverlay.cpp
+  src/save/SaveManager.cpp
 )
 
 set_target_properties(GotMilkedSandbox PROPERTIES OUTPUT_NAME "GotMilkedSandbox")
@@ -23,7 +27,7 @@ if (APPLE)
   target_link_libraries(GotMilkedSandbox PRIVATE ${COCOA_LIBRARY} ${IOKIT_LIBRARY} ${COREVIDEO_LIBRARY})
 endif()
 
-# assets define
-set(GM_ASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets")
-string(REPLACE "\\" "/" GM_ASSETS_DIR "${GM_ASSETS_DIR}")
-target_compile_definitions(GotMilkedSandbox PRIVATE "GM_ASSETS_DIR=\"${GM_ASSETS_DIR}\"")
+# config define
+set(GM_CONFIG_PATH "${CMAKE_CURRENT_SOURCE_DIR}/config.json")
+string(REPLACE "\\" "/" GM_CONFIG_PATH "${GM_CONFIG_PATH}")
+target_compile_definitions(GotMilkedSandbox PRIVATE "GM_CONFIG_PATH=\"${GM_CONFIG_PATH}\"")

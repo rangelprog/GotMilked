@@ -1,7 +1,8 @@
 #pragma once
 
-#include <string>
 #include <memory>
+#include <string>
+#include <filesystem>
 #include <vector>
 struct GLFWwindow;
 
@@ -17,11 +18,20 @@ namespace gm {
 }
 
 #include "gm/scene/GameObject.hpp"
+#include "gm/utils/Config.hpp"
 #include "SandboxResources.hpp"
+#include "gameplay/SandboxGameplay.hpp"
+#include "ResourceHotReloader.hpp"
+#include "gm/utils/ImGuiManager.hpp"
+#include "tooling/ToolingOverlay.hpp"
+
+namespace sandbox::save {
+class SaveManager;
+}
 
 class Game {
 public:
-    Game(const std::string& assetsDir);
+    Game(const gm::utils::AppConfig& config);
     ~Game();
 
     bool Init(GLFWwindow* window);
@@ -30,7 +40,8 @@ public:
     void Shutdown();
 
 private:
-    std::string m_assetsDir;
+    gm::utils::AppConfig m_config;
+    std::filesystem::path m_assetsDir;
     GLFWwindow* m_window = nullptr;
 
     // Scene management
@@ -38,13 +49,22 @@ private:
     std::vector<std::shared_ptr<gm::GameObject>> m_spinnerObjects; // Mesh spinner objects for demonstration
 
     SandboxResources m_resources;
+    sandbox::ResourceHotReloader m_hotReloader;
 
     // camera / state
     std::unique_ptr<gm::Camera> m_camera;
-    bool m_mouseCaptured = false;
-    bool m_firstCapture = true;
-    bool m_wireframe = false;
+    std::unique_ptr<sandbox::gameplay::SandboxGameplay> m_gameplay;
+    std::unique_ptr<sandbox::save::SaveManager> m_saveManager;
+    std::unique_ptr<gm::utils::ImGuiManager> m_imgui;
+    std::unique_ptr<sandbox::tooling::ToolingOverlay> m_tooling;
+    bool m_overlayVisible = false;
     
+    void PerformQuickSave();
+    void PerformQuickLoad();
+    void ForceResourceReload();
+
     // Helper methods
     void SetupScene();
+    void SetupResourceHotReload();
+    void ApplyResourcesToScene();
 };

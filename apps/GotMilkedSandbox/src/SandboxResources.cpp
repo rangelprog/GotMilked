@@ -7,6 +7,7 @@
 #include "gm/utils/ResourceRegistry.hpp"
 
 #include <cstdio>
+#include <exception>
 
 bool SandboxResources::Load(const std::string& assetsDir) {
     shaderGuid = "sandbox_shader";
@@ -38,6 +39,77 @@ bool SandboxResources::Load(const std::string& assetsDir) {
     registry.RegisterMesh(meshGuid, meshPath);
 
     return true;
+}
+
+bool SandboxResources::ReloadShader() {
+    if (shaderVertPath.empty() || shaderFragPath.empty()) {
+        std::printf("[SandboxResources] Cannot reload shader: paths not set\n");
+        return false;
+    }
+
+    auto newShader = std::make_unique<gm::Shader>();
+    if (!newShader->loadFromFiles(shaderVertPath, shaderFragPath)) {
+        std::printf("[SandboxResources] Failed to reload shader: %s / %s\n",
+                    shaderVertPath.c_str(), shaderFragPath.c_str());
+        return false;
+    }
+
+    newShader->Use();
+    newShader->SetInt("uTex", 0);
+    shader = std::move(newShader);
+
+    gm::ResourceRegistry::Instance().RegisterShader(shaderGuid, shaderVertPath, shaderFragPath);
+    return true;
+}
+
+bool SandboxResources::ReloadTexture() {
+    if (texturePath.empty()) {
+        std::printf("[SandboxResources] Cannot reload texture: path not set\n");
+        return false;
+    }
+
+    try {
+        auto newTexture = std::make_unique<gm::Texture>(gm::Texture::loadOrDie(texturePath, true));
+        texture = std::move(newTexture);
+        gm::ResourceRegistry::Instance().RegisterTexture(textureGuid, texturePath);
+        return true;
+    } catch (const std::exception& ex) {
+        std::printf("[SandboxResources] Failed to reload texture %s: %s\n",
+                    texturePath.c_str(), ex.what());
+    } catch (...) {
+        std::printf("[SandboxResources] Failed to reload texture %s: unknown error\n",
+                    texturePath.c_str());
+    }
+    return false;
+}
+
+bool SandboxResources::ReloadMesh() {
+    if (meshPath.empty()) {
+        std::printf("[SandboxResources] Cannot reload mesh: path not set\n");
+        return false;
+    }
+
+    try {
+        auto newMesh = std::make_unique<gm::Mesh>(gm::ObjLoader::LoadObjPNUV(meshPath));
+        mesh = std::move(newMesh);
+        gm::ResourceRegistry::Instance().RegisterMesh(meshGuid, meshPath);
+        return true;
+    } catch (const std::exception& ex) {
+        std::printf("[SandboxResources] Failed to reload mesh %s: %s\n",
+                    meshPath.c_str(), ex.what());
+    } catch (...) {
+        std::printf("[SandboxResources] Failed to reload mesh %s: unknown error\n",
+                    meshPath.c_str());
+    }
+    return false;
+}
+
+bool SandboxResources::ReloadAll() {
+    bool ok = true;
+    ok = ReloadShader() && ok;
+    ok = ReloadTexture() && ok;
+    ok = ReloadMesh() && ok;
+    return ok;
 }
 
 void SandboxResources::Release() {

@@ -20,6 +20,14 @@ The sandbox demonstrates engine features (scene management, rendering, serializa
 
 ---
 
+### Configuration
+
+- Edit `apps/GotMilkedSandbox/config.json` to change window defaults, toggle VSync, enable/disable resource hot reload, or relocate asset/save directories. Relative paths resolve against the config file’s directory, so source and build trees stay in sync. Hot reload polls watched files every `pollIntervalSeconds` (default 0.5s) and rebinds assets in the running scene whenever they change.
+- Saves are written to the configured `paths.saves` directory. Press `F5` for a quick save and `F9` to load the most recent quick save (stubbed to capture camera and scene state). Slot-based saving lives in `sandbox::save::SaveManager` for future expansion.
+- Press `F1` to toggle the tooling overlay (ImGui) at runtime. The panel exposes quick save/load buttons, resource reload controls, hot-reload settings, and live world/camera stats. Disable hot reload or trigger a manual reload directly from the overlay when debugging assets.
+
+---
+
 ## 2. Engine Modules
 
 | Module | Key Responsibilities |

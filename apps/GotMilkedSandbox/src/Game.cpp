@@ -7,6 +7,7 @@
 #include "SceneSerializerExtensions.hpp"
 
 #include <cstdio>
+#include <filesystem>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -18,21 +19,25 @@
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/SceneManager.hpp"
 #include "gm/rendering/Material.hpp"
+#include "gm/core/Input.hpp"
+#include "gm/core/InputBindings.hpp"
 #include "gm/core/input/InputManager.hpp"
+#include "gm/core/Logger.hpp"
+#include "save/SaveManager.hpp"
+#include "gm/utils/ImGuiManager.hpp"
+#include "tooling/ToolingOverlay.hpp"
 
-namespace {
-static float &FovRef() { static float fov = 60.0f; return fov; }
-} // namespace
 
-Game::Game(const std::string& assetsDir)
-    : m_assetsDir(assetsDir) {}
+Game::Game(const gm::utils::AppConfig& config)
+    : m_config(config),
+      m_assetsDir(config.paths.assets) {}
 
 Game::~Game() = default;
 
 bool Game::Init(GLFWwindow* window) {
     m_window = window;
 
-    if (!m_resources.Load(m_assetsDir)) {
+    if (!m_resources.Load(m_assetsDir.string())) {
         return false;
     }
 
@@ -40,7 +45,41 @@ bool Game::Init(GLFWwindow* window) {
 
     m_camera = std::make_unique<gm::Camera>();
 
+    // Set up input action bindings
+    auto& inputManager = gm::core::InputManager::Instance();
+    gm::core::InputBindings::SetupDefaultBindings(inputManager);
+
     SetupScene();
+    ApplyResourcesToScene();
+
+    m_gameplay = std::make_unique<sandbox::gameplay::SandboxGameplay>(*m_camera, m_resources, m_spinnerObjects, m_window);
+    m_gameplay->SetScene(m_gameScene);
+
+    m_saveManager = std::make_unique<sandbox::save::SaveManager>(m_config.paths.saves);
+
+    m_imgui = std::make_unique<gm::utils::ImGuiManager>();
+    if (m_imgui && !m_imgui->Init(m_window)) {
+        gm::core::Logger::Warning("[Game] Failed to initialize ImGui; tooling overlay disabled");
+        m_imgui.reset();
+    }
+
+    m_tooling = std::make_unique<sandbox::tooling::ToolingOverlay>();
+    if (m_tooling) {
+        sandbox::tooling::ToolingOverlay::Callbacks callbacks{
+            [this]() { PerformQuickSave(); },
+            [this]() { PerformQuickLoad(); },
+            [this]() { ForceResourceReload(); }
+        };
+        m_tooling->SetCallbacks(std::move(callbacks));
+        m_tooling->SetSaveManager(m_saveManager.get());
+        m_tooling->SetHotReloader(&m_hotReloader);
+        m_tooling->SetGameplay(m_gameplay.get());
+        m_tooling->SetCamera(m_camera.get());
+        m_tooling->SetScene(m_gameScene);
+        m_tooling->AddNotification("Tooling overlay ready (F1)");
+    }
+
+    SetupResourceHotReload();
 
     return true;
 }
@@ -65,66 +104,50 @@ void Game::SetupScene() {
     } else {
         std::printf("[Game] Loaded %zu mesh spinner objects from scene\n", m_spinnerObjects.size());
     }
+
+    if (m_gameplay) {
+        m_gameplay->SetScene(m_gameScene);
+    }
 }
 
 void Game::Update(float dt) {
     if (!m_window) return;
 
-    // Get input system (Update() already called in main loop before glfwPollEvents)
-    auto& inputManager = gm::core::InputManager::Instance();
-    auto inputSys = inputManager.GetInputSystem();
+    auto& input = gm::core::Input::Instance();
 
-    // Close window on ESC
-    if (inputSys->IsKeyJustPressed(GLFW_KEY_ESCAPE))
+    if (input.IsActionJustPressed("Exit")) {
         glfwSetWindowShouldClose(m_window, 1);
-
-    // RMB capture toggle - check if button is held while captured, or just pressed
-    if (!m_mouseCaptured && inputSys->IsMouseButtonJustPressed(gm::core::MouseButton::Right)) {
-        // Start capture on RMB press
-        glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        m_mouseCaptured = true;
-        m_firstCapture = true;
-    } else if (m_mouseCaptured && inputSys->IsMouseButtonJustReleased(gm::core::MouseButton::Right)) {
-        // End capture on RMB release
-        glfwSetInputMode(m_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        m_mouseCaptured = false;
     }
 
-    // Mouse look with delta
-    if (m_mouseCaptured) {
-        if (m_firstCapture) {
-            m_firstCapture = false;
+    if (input.IsActionJustPressed("QuickSave")) {
+        PerformQuickSave();
+    }
+
+    if (input.IsActionJustPressed("QuickLoad")) {
+        PerformQuickLoad();
+    }
+
+    if (input.IsActionJustPressed("ToggleOverlay")) {
+        if (m_imgui && m_imgui->IsInitialized()) {
+            m_overlayVisible = !m_overlayVisible;
+            if (m_tooling) {
+                m_tooling->AddNotification(m_overlayVisible ? "Tooling overlay shown" : "Tooling overlay hidden");
+            }
+        } else {
+            gm::core::Logger::Warning("[Game] ImGui not initialized; overlay not available");
         }
-        double dx = inputSys->GetMouseDeltaX();
-        double dy = inputSys->GetMouseDeltaY();
-        m_camera->ProcessMouseMovement((float)dx, (float)dy);
     }
 
-    // Movement with speed boost for Shift
-    const float baseSpeed = 3.0f;
-    const float speed = baseSpeed * (inputSys->IsKeyPressed(GLFW_KEY_LEFT_SHIFT) ? 4.0f : 1.0f) * dt;
-    
-    if (inputSys->IsKeyPressed(GLFW_KEY_W)) m_camera->MoveForward(speed);
-    if (inputSys->IsKeyPressed(GLFW_KEY_S)) m_camera->MoveBackward(speed);
-    if (inputSys->IsKeyPressed(GLFW_KEY_A)) m_camera->MoveLeft(speed);
-    if (inputSys->IsKeyPressed(GLFW_KEY_D)) m_camera->MoveRight(speed);
-    if (inputSys->IsKeyPressed(GLFW_KEY_SPACE)) m_camera->MoveUp(speed);
-    if (inputSys->IsKeyPressed(GLFW_KEY_LEFT_CONTROL)) m_camera->MoveDown(speed);
-
-    // Wireframe toggle on F key
-    if (inputSys->IsKeyJustPressed(GLFW_KEY_F)) {
-        m_wireframe = !m_wireframe;
-        glPolygonMode(GL_FRONT_AND_BACK, m_wireframe ? GL_LINE : GL_FILL);
+    if (m_gameplay) {
+        m_gameplay->SetWindow(m_window);
+        m_gameplay->SetScene(m_gameScene);
+        m_gameplay->SetInputSuppressed(m_overlayVisible);
+        m_gameplay->Update(dt);
     }
 
-    // Handle scroll for FOV
-    double scrollY = inputSys->GetMouseScrollY();
-    if (scrollY != 0.0) {
-        FovRef() -= (float)scrollY * 2.0f;
-        if (FovRef() < 30.0f) FovRef() = 30.0f;
-        if (FovRef() > 100.0f) FovRef() = 100.0f;
-    }
+    m_hotReloader.Update(dt);
 }
+
 
 void Game::Render() {
     if (!m_window || !m_resources.shader) return;
@@ -136,9 +159,13 @@ void Game::Render() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     float aspect = (float)fbw / (float)fbh;
-    float fov = FovRef();
+    float fov = m_gameplay ? m_gameplay->GetFovDegrees() : 60.0f;
     glm::mat4 proj = glm::perspective(glm::radians(fov), aspect, 0.1f, 200.0f);
     glm::mat4 view = m_camera->View();
+
+    if (m_imgui && m_imgui->IsInitialized()) {
+        m_imgui->NewFrame();
+    }
 
     if (m_gameScene) {
         sandbox::CollectMeshSpinnerObjects(*m_gameScene, m_spinnerObjects);
@@ -160,6 +187,14 @@ void Game::Render() {
         m_gameScene->Draw(*m_resources.shader, *m_camera, fbw, fbh, fov);
     }
     
+    if (m_imgui && m_imgui->IsInitialized()) {
+        if (m_tooling) {
+            bool open = m_overlayVisible;
+            m_tooling->Render(open);
+            m_overlayVisible = open;
+        }
+        m_imgui->Render();
+    }
 }
 
 void Game::Shutdown() {
@@ -172,8 +207,141 @@ void Game::Shutdown() {
     gm::SceneSerializerExtensions::UnregisterSerializers();
     m_resources.Release();
     
+    m_gameplay.reset();
+    m_saveManager.reset();
+    if (m_imgui) {
+        m_imgui->Shutdown();
+        m_imgui.reset();
+    }
+    m_tooling.reset();
     m_camera.reset();
     
     // InputManager is a singleton, no need to manually reset
     printf("[Game] Shutdown complete\n");
+}
+
+void Game::SetupResourceHotReload() {
+    m_hotReloader.SetEnabled(m_config.hotReload.enable);
+    m_hotReloader.SetPollInterval(m_config.hotReload.pollIntervalSeconds);
+
+    if (!m_config.hotReload.enable) {
+        return;
+    }
+
+    if (!m_resources.shaderVertPath.empty() && !m_resources.shaderFragPath.empty()) {
+        m_hotReloader.AddWatch(
+            "sandbox_shader",
+            {std::filesystem::path(m_resources.shaderVertPath), std::filesystem::path(m_resources.shaderFragPath)},
+            [this]() {
+                bool ok = m_resources.ReloadShader();
+                if (ok) {
+                    ApplyResourcesToScene();
+                }
+                return ok;
+            });
+    }
+
+    if (!m_resources.texturePath.empty()) {
+        m_hotReloader.AddWatch(
+            "sandbox_texture",
+            {std::filesystem::path(m_resources.texturePath)},
+            [this]() {
+                bool ok = m_resources.ReloadTexture();
+                if (ok) {
+                    ApplyResourcesToScene();
+                }
+                return ok;
+            });
+    }
+
+    if (!m_resources.meshPath.empty()) {
+        m_hotReloader.AddWatch(
+            "sandbox_mesh",
+            {std::filesystem::path(m_resources.meshPath)},
+            [this]() {
+                bool ok = m_resources.ReloadMesh();
+                if (ok) {
+                    ApplyResourcesToScene();
+                }
+                return ok;
+            });
+    }
+
+    m_hotReloader.ForcePoll();
+}
+
+void Game::ApplyResourcesToScene() {
+    if (!m_gameScene) {
+        return;
+    }
+
+    sandbox::RehydrateMeshSpinnerComponents(*m_gameScene, m_resources, m_camera.get());
+    sandbox::CollectMeshSpinnerObjects(*m_gameScene, m_spinnerObjects);
+
+    for (auto& obj : m_spinnerObjects) {
+        if (!obj) {
+            continue;
+        }
+
+        if (auto materialComp = obj->GetComponent<gm::MaterialComponent>()) {
+            if (auto mat = materialComp->GetMaterial()) {
+                mat->SetDiffuseTexture(m_resources.texture ? m_resources.texture.get() : nullptr);
+            }
+        }
+    }
+
+    if (m_tooling) {
+        m_tooling->SetScene(m_gameScene);
+    }
+}
+
+void Game::PerformQuickSave() {
+    if (!m_saveManager || !m_gameScene || !m_camera || !m_gameplay) {
+        gm::core::Logger::Warning("[Game] QuickSave unavailable (missing dependencies)");
+        if (m_tooling) m_tooling->AddNotification("QuickSave unavailable");
+        return;
+    }
+
+    auto data = sandbox::save::CaptureSnapshot(*m_gameScene, *m_camera, *m_gameplay);
+    auto result = m_saveManager->QuickSave(data);
+    if (!result.success) {
+        gm::core::Logger::Warning("[Game] QuickSave failed: %s", result.message.c_str());
+        if (m_tooling) m_tooling->AddNotification("QuickSave failed");
+    } else {
+        gm::core::Logger::Info("[Game] QuickSave completed");
+        if (m_tooling) m_tooling->AddNotification("QuickSave completed");
+    }
+}
+
+void Game::PerformQuickLoad() {
+    if (!m_saveManager || !m_gameScene || !m_camera || !m_gameplay) {
+        gm::core::Logger::Warning("[Game] QuickLoad unavailable (missing dependencies)");
+        if (m_tooling) m_tooling->AddNotification("QuickLoad unavailable");
+        return;
+    }
+
+    sandbox::save::SaveGameData data;
+    auto result = m_saveManager->QuickLoad(data);
+    if (!result.success) {
+        gm::core::Logger::Warning("[Game] QuickLoad failed: %s", result.message.c_str());
+        if (m_tooling) m_tooling->AddNotification("QuickLoad failed");
+        return;
+    }
+
+    sandbox::save::ApplySnapshot(data, *m_gameScene, *m_camera, *m_gameplay);
+    ApplyResourcesToScene();
+    if (m_tooling) m_tooling->AddNotification("QuickLoad applied");
+}
+
+void Game::ForceResourceReload() {
+    bool ok = m_resources.ReloadAll();
+    ApplyResourcesToScene();
+    m_hotReloader.ForcePoll();
+    if (ok) {
+        gm::core::Logger::Info("[Game] Resources reloaded");
+        if (m_tooling) m_tooling->AddNotification("Resources reloaded");
+    } else {
+        gm::core::Logger::Warning("[Game] Resource reload encountered errors");
+        if (m_tooling) m_tooling->AddNotification("Resource reload failed");
+    }
 }

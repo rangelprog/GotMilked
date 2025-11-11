@@ -1,16 +1,25 @@
+#include <filesystem>
 #include <string>
 
 #include "Game.hpp"
 #include "gm/core/GameApp.hpp"
+#include "gm/utils/Config.hpp"
 
 int main() {
-  const std::string assetsDir = std::string(GM_ASSETS_DIR);
-  Game game(assetsDir);
+  const std::filesystem::path configPath = std::filesystem::path(GM_CONFIG_PATH);
+  auto configResult = gm::utils::ConfigLoader::Load(configPath);
+  gm::utils::AppConfig appConfig = configResult.config;
+
+  Game game(appConfig);
 
   gm::core::GameAppConfig config;
-  config.width = 1280;
-  config.height = 720;
-  config.title = "GotMilkedSandbox";
+  config.width = appConfig.window.width;
+  config.height = appConfig.window.height;
+  config.title = appConfig.window.title;
+  config.enableVsync = appConfig.window.vsync;
+  config.enableDepthTest = appConfig.window.depthTest;
+  config.showFpsInTitle = appConfig.window.showFpsInTitle;
+  config.fpsTitleUpdateIntervalSeconds = appConfig.window.fpsTitleUpdateIntervalSeconds;
 
   gm::core::GameApp app(config);
 

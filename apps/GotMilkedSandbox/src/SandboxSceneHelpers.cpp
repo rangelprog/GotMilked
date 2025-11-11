@@ -100,21 +100,21 @@ void RehydrateMeshSpinnerComponents(
         auto spinner = obj->GetComponent<MeshSpinnerComponent>();
         if (!spinner) continue;
 
-        if (!spinner->GetMesh() && resources.mesh &&
+        if (resources.mesh &&
             ((!spinner->GetMeshGuid().empty() && spinner->GetMeshGuid() == resources.meshGuid) ||
              (!spinner->GetMeshPath().empty() && spinner->GetMeshPath() == resources.meshPath)))
         {
             spinner->SetMesh(resources.mesh.get());
         }
 
-        if (!spinner->GetTexture() && resources.texture &&
+        if (resources.texture &&
             ((!spinner->GetTextureGuid().empty() && spinner->GetTextureGuid() == resources.textureGuid) ||
              (!spinner->GetTexturePath().empty() && spinner->GetTexturePath() == resources.texturePath)))
         {
             spinner->SetTexture(resources.texture.get());
         }
 
-        if (!spinner->GetShader() && resources.shader &&
+        if (resources.shader &&
             ((!spinner->GetShaderGuid().empty() && spinner->GetShaderGuid() == resources.shaderGuid) ||
              (!spinner->GetShaderVertPath().empty() && spinner->GetShaderVertPath() == resources.shaderVertPath)))
         {

@@ -1,0 +1,128 @@
+#include "gm/utils/Config.hpp"
+
+#include <fstream>
+#include <system_error>
+#include <nlohmann/json.hpp>
+
+#include "gm/core/Logger.hpp"
+
+namespace gm::utils {
+
+namespace {
+
+static std::filesystem::path NormalizePath(const std::filesystem::path& path) {
+    std::error_code ec;
+    std::filesystem::path normalized = std::filesystem::weakly_canonical(path, ec);
+    if (ec) {
+        normalized = std::filesystem::absolute(path);
+    }
+    return normalized.lexically_normal();
+}
+
+static std::filesystem::path ResolvePath(const std::filesystem::path& baseDir,
+                                         const std::string& value) {
+    if (value.empty()) {
+        return NormalizePath(baseDir);
+    }
+    std::filesystem::path raw(value);
+    if (raw.is_relative()) {
+        return NormalizePath(baseDir / raw);
+    }
+    return NormalizePath(raw);
+}
+
+template <typename T>
+static T GetOrDefault(const nlohmann::json& obj, const char* key, const T& fallback) {
+    if (!obj.is_object()) {
+        return fallback;
+    }
+    auto it = obj.find(key);
+    if (it == obj.end() || it->is_null()) {
+        return fallback;
+    }
+    try {
+        return it->get<T>();
+    } catch (const nlohmann::json::exception& e) {
+        gm::core::Logger::Warning("[ConfigLoader] Failed to parse key '%s': %s", key, e.what());
+        return fallback;
+    }
+}
+
+} // namespace
+
+AppConfig ConfigLoader::CreateDefault(const std::filesystem::path& baseDir) {
+    AppConfig config{};
+    config.configDirectory = baseDir;
+    config.paths.assets = NormalizePath(baseDir / "assets");
+    config.paths.saves = NormalizePath(baseDir / "saves");
+    return config;
+}
+
+ConfigLoadResult ConfigLoader::Load(const std::filesystem::path& path) {
+    const std::filesystem::path baseDir = path.empty() ? std::filesystem::current_path()
+                                                       : path.parent_path();
+
+    ConfigLoadResult result;
+    result.config = CreateDefault(baseDir);
+
+    std::error_code ec;
+    if (path.empty() || !std::filesystem::exists(path, ec)) {
+        gm::core::Logger::Warning(
+            "[ConfigLoader] Config file '%s' not found, using defaults",
+            path.empty() ? "<none>" : path.string().c_str());
+        return result;
+    }
+
+    std::ifstream file(path);
+    if (!file) {
+        gm::core::Logger::Error("[ConfigLoader] Failed to open config file '%s'", path.string().c_str());
+        return result;
+    }
+
+    nlohmann::json json;
+    try {
+        file >> json;
+    } catch (const nlohmann::json::exception& e) {
+        gm::core::Logger::Error("[ConfigLoader] Failed to parse JSON '%s': %s",
+                                path.string().c_str(), e.what());
+        return result;
+    }
+
+    const auto windowObj = json.contains("window") ? json["window"] : nlohmann::json::object();
+    result.config.window.width = GetOrDefault<int>(windowObj, "width", result.config.window.width);
+    result.config.window.height = GetOrDefault<int>(windowObj, "height", result.config.window.height);
+    result.config.window.title = GetOrDefault<std::string>(windowObj, "title", result.config.window.title);
+    result.config.window.vsync = GetOrDefault<bool>(windowObj, "vsync", result.config.window.vsync);
+    result.config.window.depthTest = GetOrDefault<bool>(windowObj, "depthTest", result.config.window.depthTest);
+    result.config.window.showFpsInTitle = GetOrDefault<bool>(windowObj, "showFpsInTitle", result.config.window.showFpsInTitle);
+    result.config.window.fpsTitleUpdateIntervalSeconds =
+        GetOrDefault<double>(windowObj,
+                             "fpsTitleUpdateIntervalSeconds",
+                             result.config.window.fpsTitleUpdateIntervalSeconds);
+
+    const auto pathsObj = json.contains("paths") ? json["paths"] : nlohmann::json::object();
+    if (pathsObj.contains("assets") && pathsObj["assets"].is_string()) {
+        result.config.paths.assets = ResolvePath(baseDir, pathsObj["assets"].get<std::string>());
+    }
+    if (pathsObj.contains("saves") && pathsObj["saves"].is_string()) {
+        result.config.paths.saves = ResolvePath(baseDir, pathsObj["saves"].get<std::string>());
+    }
+
+    const auto hotReloadObj = json.contains("hotReload") ? json["hotReload"] : nlohmann::json::object();
+    result.config.hotReload.enable = GetOrDefault<bool>(hotReloadObj, "enable", result.config.hotReload.enable);
+    result.config.hotReload.pollIntervalSeconds =
+        GetOrDefault<double>(hotReloadObj, "pollIntervalSeconds", result.config.hotReload.pollIntervalSeconds);
+    if (result.config.hotReload.pollIntervalSeconds <= 0.0) {
+        gm::core::Logger::Warning("[ConfigLoader] hotReload.pollIntervalSeconds (%.3f) must be positive; clamping to 0.1",
+                                  result.config.hotReload.pollIntervalSeconds);
+        result.config.hotReload.pollIntervalSeconds = 0.1;
+    }
+
+    result.config.configDirectory = baseDir;
+    result.loadedFromFile = true;
+    gm::core::Logger::Info("[ConfigLoader] Loaded config from '%s'", path.string().c_str());
+    return result;
+}
+
+} // namespace gm::utils
+

@@ -21,6 +21,10 @@ struct SandboxResources {
     std::string meshPath;
 
     bool Load(const std::string& assetsDir);
+    bool ReloadShader();
+    bool ReloadTexture();
+    bool ReloadMesh();
+    bool ReloadAll();
     void Release();
 };
 

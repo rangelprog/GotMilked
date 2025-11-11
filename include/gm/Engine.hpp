@@ -4,6 +4,8 @@
 #include "gm/core/Event.hpp"
 #include "gm/core/Logger.hpp"
 #include "gm/core/Time.hpp"
+#include "gm/core/Input.hpp"
+#include "gm/core/InputBindings.hpp"
 
 // Rendering
 #include "gm/rendering/Camera.hpp"
