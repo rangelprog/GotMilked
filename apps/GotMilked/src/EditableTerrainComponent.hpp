@@ -1,5 +1,7 @@
 #pragma once
 
+#if GM_DEBUG_TOOLS
+
 #include "gm/scene/Component.hpp"
 #include "GameConstants.hpp"
 
@@ -18,6 +20,8 @@ class Material;
 class Camera;
 class TransformComponent;
 }
+
+namespace gm::debug {
 
 class EditableTerrainComponent : public gm::Component {
 public:
@@ -63,6 +67,7 @@ public:
 
 private:
     void InitializeHeightmap();
+    void ResampleHeightmap(int newResolution);
     bool RebuildMesh();
     void BuildIndexBuffer();
     void ApplyBrush(const glm::vec2& localXZ, float deltaTime, float direction);
@@ -90,3 +95,7 @@ private:
 
     std::function<float()> m_fovProvider;
 };
+
+} // namespace gm::debug
+
+#endif // GM_DEBUG_TOOLS

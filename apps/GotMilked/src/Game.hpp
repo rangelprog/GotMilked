@@ -16,9 +16,12 @@ namespace gm {
     namespace core { class InputManager; }
 }
 
-#ifdef _DEBUG
-namespace gm::tooling {
+#if GM_DEBUG_TOOLS
+namespace gm::debug {
     class DebugConsole;
+    class DebugMenu;
+    class DebugHudController;
+    class EditableTerrainComponent;
 }
 #endif
 
@@ -31,7 +34,7 @@ namespace gm::tooling {
 #include "gm/tooling/Overlay.hpp"
 #include "gm/save/SaveManager.hpp"
 #include "gm/save/SaveSnapshotHelpers.hpp"
-#ifdef _DEBUG
+#if GM_DEBUG_TOOLS
 #include "DebugMenu.hpp"
 #endif
 
@@ -62,10 +65,10 @@ private:
     std::unique_ptr<gm::save::SaveManager> m_saveManager;
     std::unique_ptr<gm::utils::ImGuiManager> m_imgui;
     std::unique_ptr<gm::tooling::Overlay> m_tooling;
-#ifdef _DEBUG
-    std::unique_ptr<DebugMenu> m_debugMenu;
-    bool m_debugMenuVisible = false;
-    std::unique_ptr<gm::tooling::DebugConsole> m_debugConsole;
+#if GM_DEBUG_TOOLS
+    std::unique_ptr<gm::debug::DebugMenu> m_debugMenu;
+    std::unique_ptr<gm::debug::DebugConsole> m_debugConsole;
+    std::unique_ptr<gm::debug::DebugHudController> m_debugHud;
 #endif
     bool m_overlayVisible = false;
     bool m_vsyncEnabled = true;  // Track VSync state
@@ -82,7 +85,7 @@ private:
     void SetupGameplay();
     void SetupSaveSystem();
     bool SetupDebugTools();
-#ifdef _DEBUG
+#if GM_DEBUG_TOOLS
     void SetupDebugMenu();
 #endif
     
@@ -90,7 +93,9 @@ private:
     void SetupScene();
     void SetupResourceHotReload();
     void ApplyResourcesToScene();
+#if GM_DEBUG_TOOLS
     void ApplyResourcesToTerrain();
+#endif
     void ApplyResourcesToStaticMeshComponents();
     void SetupEventSubscriptions();
 };

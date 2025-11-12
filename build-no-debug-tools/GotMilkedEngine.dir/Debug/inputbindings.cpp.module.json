@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "GotMilkedEngine.dir\\Debug\\InputBindings.obj",
+            "outputs": [
+                "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build-no-debug-tools\\Debug\\GotMilkedEngine.pdb",
+                "GotMilkedEngine.dir\\Debug\\"
+            ],
+            "requires": []
+        }
+    ]
+}

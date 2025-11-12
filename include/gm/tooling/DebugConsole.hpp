@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(GM_DEBUG) || defined(_DEBUG)
+#if GM_DEBUG_TOOLS
 
 #include <vector>
 #include <string>
@@ -8,7 +8,7 @@
 
 #include "gm/core/Logger.hpp"
 
-namespace gm::tooling {
+namespace gm::debug {
 
 class DebugConsole {
 public:
@@ -31,7 +31,13 @@ private:
     size_t m_listenerToken = 0;
 };
 
-} // namespace gm::tooling
+} // namespace gm::debug
 
-#endif // GM_DEBUG || _DEBUG
+#else
+
+namespace gm::debug {
+class DebugConsole;
+}
+
+#endif // GM_DEBUG_TOOLS
 

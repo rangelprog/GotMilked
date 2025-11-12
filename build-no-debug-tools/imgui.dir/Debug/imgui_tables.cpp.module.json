@@ -1,0 +1,14 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "imgui.dir\\Debug\\imgui_tables.obj",
+            "outputs": [
+                "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\build-no-debug-tools\\Debug\\imgui.pdb",
+                "imgui.dir\\Debug\\"
+            ],
+            "requires": []
+        }
+    ]
+}

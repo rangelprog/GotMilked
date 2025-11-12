@@ -2,7 +2,9 @@
 
 #include "GameResources.hpp"
 #include "GameConstants.hpp"
+#if GM_DEBUG_TOOLS
 #include "EditableTerrainComponent.hpp"
+#endif
 
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/GameObject.hpp"
@@ -14,6 +16,10 @@
 #include <utility>
 
 namespace gotmilked {
+
+#if GM_DEBUG_TOOLS
+using gm::debug::EditableTerrainComponent;
+#endif
 
 void PopulateInitialScene(
     gm::Scene& scene,
@@ -40,6 +46,7 @@ void PopulateInitialScene(
     terrainTransform->SetPosition(GameConstants::Transform::Origin);
     terrainTransform->SetScale(GameConstants::Transform::UnitScale);
 
+#if GM_DEBUG_TOOLS
     auto terrainComponent = terrainObject->AddComponent<EditableTerrainComponent>();
     terrainComponent->SetCamera(&camera);
     if (resources.GetShader()) {
@@ -53,6 +60,11 @@ void PopulateInitialScene(
         terrainComponent->SetFovProvider(std::move(fovProvider));
     }
     terrainComponent->SetTerrainSize(GameConstants::Terrain::InitialSize);
+#else
+    (void)resources;
+    (void)window;
+    (void)fovProvider;
+#endif
 
     gm::core::Logger::Info("[Game] Scene populated with editable terrain");
 }

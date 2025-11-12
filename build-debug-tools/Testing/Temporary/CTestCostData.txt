@@ -1,0 +1,15 @@
+SceneSerializer round-trips custom components 1 0.0194683
+SceneSerializer streams large scenes without data loss 1 0.413791
+ResourceManager caches and reloads shaders and meshes 1 0.297784
+Scene draws without errors 1 0.240816
+GameResources loads assets via config 1 0.239517
+GameResources legacy load handles missing assets gracefully 1 0.259612
+GameResources can reload shaders 1 0.253015
+GameResources can reload textures 1 0.250899
+GameResources can reload meshes 1 0.248535
+GameResources reloads all resources 1 0.250146
+GameResources releases loaded resources 1 0.235836
+GameResources reload methods fail safely when not loaded 1 0.225768
+GameResources load fails with invalid shader paths 1 0.244577
+GameResources loads without optional mesh 1 0.244284
+---

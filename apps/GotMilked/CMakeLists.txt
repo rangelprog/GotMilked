@@ -1,12 +1,23 @@
-add_executable(GotMilked
+set(GOTMILKED_SOURCES
   src/main.cpp
   src/Game.cpp
   src/SceneSerializerExtensions.cpp
   src/GameResources.cpp
   src/GameSceneHelpers.cpp
-  src/EditableTerrainComponent.cpp
-  src/DebugMenu.cpp
 )
+
+if(GM_ENABLE_DEBUG_TOOLS)
+  list(APPEND GOTMILKED_SOURCES
+    src/DebugHudController.cpp
+    src/EditableTerrainComponent.cpp
+    src/DebugMenu.cpp
+    src/DebugMenu_Menus.cpp
+    src/DebugMenu_Windows.cpp
+    src/DebugMenu_RecentFiles.cpp
+  )
+endif()
+
+add_executable(GotMilked ${GOTMILKED_SOURCES})
 
 set_target_properties(GotMilked PROPERTIES OUTPUT_NAME "GotMilked")
 gm_apply_warnings(GotMilked)

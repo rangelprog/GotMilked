@@ -2,55 +2,19 @@
 #include <glad/glad.h>
 #include "gm/core/Error.hpp"
 #include "gm/core/Logger.hpp"
+#include "gm/rendering/RenderStateCache.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
-#include <array>
 
 #include "stb_image.h"
 
 namespace gm {
 
-namespace {
-constexpr int kTrackedTextureUnits = 32;
-thread_local std::array<GLuint, kTrackedTextureUnits> g_boundTextures{};
-thread_local bool g_bindingCacheInitialized = false;
-
-void InitializeBindingCache() {
-    if (!g_bindingCacheInitialized) {
-        g_boundTextures.fill(0);
-        g_bindingCacheInitialized = true;
-    }
-}
-
-void InvalidateBinding(GLuint textureId) {
-    InitializeBindingCache();
-    for (auto& bound : g_boundTextures) {
-        if (bound == textureId) {
-            bound = 0;
-        }
-    }
-}
-
-bool IsTextureBound(GLuint textureId, int unit) {
-    if (unit < 0 || unit >= kTrackedTextureUnits) {
-        return false;
-    }
-    InitializeBindingCache();
-    return g_boundTextures[unit] == textureId;
-}
-
-void SetBindingCache(GLuint textureId, int unit) {
-    if (unit >= 0 && unit < kTrackedTextureUnits) {
-        g_boundTextures[unit] = textureId;
-    }
-}
-} // namespace
-
 Texture::~Texture() {
     if (m_id) {
-        InvalidateBinding(m_id);
+        RenderStateCache::InvalidateTexture(m_id);
         glDeleteTextures(1, &m_id);
     }
 }
@@ -63,7 +27,7 @@ Texture::Texture(Texture&& o) noexcept {
 Texture& Texture::operator=(Texture&& o) noexcept {
   if (this != &o) {
     if (m_id) {
-      InvalidateBinding(m_id);
+      RenderStateCache::InvalidateTexture(m_id);
       glDeleteTextures(1, &m_id);
     }
     m_id = o.m_id;
@@ -82,7 +46,8 @@ bool Texture::createRGBA8(int width, int height,
   }
   if (!m_id)
     glGenTextures(1, &m_id);
-  glBindTexture(GL_TEXTURE_2D, m_id);
+
+  RenderStateCache::BindTexture(GL_TEXTURE_2D, m_id, 0);
 
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
                   generateMipmaps ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
@@ -103,12 +68,7 @@ bool Texture::createRGBA8(int width, int height,
 void Texture::bind(int unit) const {
     if (!m_id)
         return;
-    if (IsTextureBound(m_id, unit)) {
-        return;
-    }
-    glActiveTexture(GL_TEXTURE0 + unit);
-    glBindTexture(GL_TEXTURE_2D, m_id);
-    SetBindingCache(m_id, unit);
+    RenderStateCache::BindTexture(GL_TEXTURE_2D, m_id, unit);
 }
 
 Texture Texture::makeChecker(int w, int h, int cell) {

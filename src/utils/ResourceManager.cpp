@@ -2,6 +2,7 @@
 #include "gm/rendering/Shader.hpp"
 #include "gm/rendering/Texture.hpp"
 #include "gm/rendering/Mesh.hpp"
+#include "gm/rendering/RenderStateCache.hpp"
 #include "gm/utils/ObjLoader.hpp"
 #include "gm/core/Error.hpp"
 #include "gm/core/Logger.hpp"
@@ -50,6 +51,7 @@ void ResourceManager::Init() {
     textures.clear();
     meshes.clear();
     ClearInternedStrings();
+    RenderStateCache::Reset();
 }
 
 void ResourceManager::Cleanup() {
@@ -57,6 +59,7 @@ void ResourceManager::Cleanup() {
     textures.clear();
     meshes.clear();
     ClearInternedStrings();
+    RenderStateCache::Reset();
 }
 
 std::shared_ptr<Shader> ResourceManager::LoadShader(const std::string& name,
@@ -122,7 +125,13 @@ std::shared_ptr<Shader> ResourceManager::ReloadShader(const std::string& name,
     }
 
     const char* pooledName = InternString(name);
+    if (auto existing = shaders.find(std::string_view{name}); existing != shaders.end()) {
+        if (existing->second) {
+            RenderStateCache::InvalidateShader(existing->second->Id());
+        }
+    }
     shaders[pooledName] = shader;
+    RenderStateCache::InvalidateShader(shader->Id());
     core::Logger::Info("[ResourceManager] Reloaded shader '{}' ({}, {})",
                        name, vertPath, fragPath);
     return shader;
@@ -187,7 +196,13 @@ std::shared_ptr<Texture> ResourceManager::ReloadTexture(const std::string& name,
     try {
         auto texture = std::make_shared<Texture>(Texture::loadOrThrow(path));
         const char* pooledName = InternString(name);
+        if (auto existing = textures.find(std::string_view{name}); existing != textures.end()) {
+            if (existing->second) {
+                RenderStateCache::InvalidateTexture(existing->second->id());
+            }
+        }
         textures[pooledName] = texture;
+        RenderStateCache::InvalidateTexture(texture->id());
         core::Logger::Info("[ResourceManager] Reloaded texture '{}' ({})",
                            name, path);
         return texture;

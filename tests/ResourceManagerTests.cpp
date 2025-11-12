@@ -11,6 +11,8 @@
 #include <filesystem>
 #include <stdexcept>
 #include <system_error>
+#include <string>
+#include <string_view>
 
 namespace {
 
@@ -101,4 +103,25 @@ TEST_CASE("ResourceManager caches and reloads shaders and meshes", "[resources]"
     auto meshReload = gm::ResourceManager::ReloadMesh("test_mesh", bundle.meshPath);
     REQUIRE(meshReload);
     REQUIRE(gm::ResourceManager::GetMesh("test_mesh") == meshReload);
+}
+
+TEST_CASE("ResourceManager supports string_view lookups", "[resources]") {
+    GlfwContext glContext;
+    TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
+    TempDir assets(bundle.root);
+    ResourceManagerGuard guard;
+
+    std::string name = "dynamic_shader";
+    auto shader = gm::ResourceManager::LoadShader(name, bundle.vertPath, bundle.fragPath);
+    REQUIRE(shader);
+
+    std::string lookupName = name;  // copy to ensure independent storage
+    name[0] = 'x';  // mutate original string to prove ResourceManager does not depend on caller storage
+
+    std::string_view viewLookup(lookupName);
+    auto viaView = gm::ResourceManager::GetShader(viewLookup);
+    REQUIRE(viaView == shader);
+
+    auto viaCStr = gm::ResourceManager::GetShader(lookupName.c_str());
+    REQUIRE(viaCStr == shader);
 }

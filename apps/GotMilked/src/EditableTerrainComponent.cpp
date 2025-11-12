@@ -1,3 +1,5 @@
+#if GM_DEBUG_TOOLS
+
 #include "EditableTerrainComponent.hpp"
 #include "GameConstants.hpp"
 
@@ -21,6 +23,8 @@
 #include <algorithm>
 #include <cmath>
 
+namespace gm::debug {
+
 EditableTerrainComponent::EditableTerrainComponent() {
     SetName("EditableTerrainComponent");
 }
@@ -40,8 +44,17 @@ void EditableTerrainComponent::SetTerrainSize(float sizeMeters) {
     if (sizeMeters <= 0.0f) {
         return;
     }
+
+    if (std::abs(sizeMeters - m_size) < 1e-4f) {
+        return;
+    }
+
     m_size = sizeMeters;
-    InitializeHeightmap();
+
+    if (m_heights.empty()) {
+        InitializeHeightmap();
+    }
+
     m_meshDirty = true;
 }
 
@@ -78,8 +91,13 @@ void EditableTerrainComponent::SetResolution(int resolution) {
     if (resolution == m_resolution) {
         return;
     }
-    m_resolution = resolution;
-    InitializeHeightmap();
+
+    if (m_heights.empty() || m_resolution < 2) {
+        m_resolution = resolution;
+        InitializeHeightmap();
+    } else {
+        ResampleHeightmap(resolution);
+    }
     m_meshDirty = true;
 }
 
@@ -167,6 +185,58 @@ void EditableTerrainComponent::InitializeHeightmap() {
     const std::size_t vertCount = static_cast<std::size_t>(m_resolution) * static_cast<std::size_t>(m_resolution);
     m_heights.assign(vertCount, 0.0f);
     m_meshDirty = true;
+}
+
+void EditableTerrainComponent::ResampleHeightmap(int newResolution) {
+    if (newResolution < 2) {
+        newResolution = 2;
+    }
+
+    if (m_heights.empty() || m_resolution < 2) {
+        m_resolution = newResolution;
+        InitializeHeightmap();
+        return;
+    }
+
+    const int oldResolution = m_resolution;
+    const std::vector<float> oldHeights = m_heights;
+
+    auto sampleOld = [&](float u, float v) {
+        const float x = u * static_cast<float>(oldResolution - 1);
+        const float z = v * static_cast<float>(oldResolution - 1);
+        const int x0 = std::clamp(static_cast<int>(std::floor(x)), 0, oldResolution - 1);
+        const int z0 = std::clamp(static_cast<int>(std::floor(z)), 0, oldResolution - 1);
+        const int x1 = std::min(x0 + 1, oldResolution - 1);
+        const int z1 = std::min(z0 + 1, oldResolution - 1);
+        const float tx = x - static_cast<float>(x0);
+        const float tz = z - static_cast<float>(z0);
+        const auto index = [&](int ix, int iz) {
+            return static_cast<std::size_t>(iz) * static_cast<std::size_t>(oldResolution) + static_cast<std::size_t>(ix);
+        };
+        const float h00 = oldHeights[index(x0, z0)];
+        const float h10 = oldHeights[index(x1, z0)];
+        const float h01 = oldHeights[index(x0, z1)];
+        const float h11 = oldHeights[index(x1, z1)];
+        const float hx0 = h00 + (h10 - h00) * tx;
+        const float hx1 = h01 + (h11 - h01) * tx;
+        const float h = hx0 + (hx1 - hx0) * tz;
+        return std::clamp(h, m_minHeight, m_maxHeight);
+    };
+
+    m_resolution = newResolution;
+    const std::size_t newCount = static_cast<std::size_t>(newResolution) * static_cast<std::size_t>(newResolution);
+    m_heights.assign(newCount, 0.0f);
+
+    for (int z = 0; z < newResolution; ++z) {
+        const float v = (newResolution > 1) ? static_cast<float>(z) / static_cast<float>(newResolution - 1) : 0.0f;
+        for (int x = 0; x < newResolution; ++x) {
+            const float u = (newResolution > 1) ? static_cast<float>(x) / static_cast<float>(newResolution - 1) : 0.0f;
+            const std::size_t idx = static_cast<std::size_t>(z) * static_cast<std::size_t>(newResolution) + static_cast<std::size_t>(x);
+            m_heights[idx] = sampleOld(u, v);
+        }
+    }
+
+    BuildIndexBuffer();
 }
 
 void EditableTerrainComponent::BuildIndexBuffer() {
@@ -465,3 +535,7 @@ bool EditableTerrainComponent::ComputeTerrainHit(glm::vec3& outWorldPos, glm::ve
     outLocalXZ = glm::vec2(local.x, local.z);
     return true;
 }
+
+} // namespace gm::debug
+
+#endif // GM_DEBUG_TOOLS

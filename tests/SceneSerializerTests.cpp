@@ -10,6 +10,8 @@
 #include <glm/glm.hpp>
 
 #include <cmath>
+#include <filesystem>
+#include <chrono>
 
 namespace {
 
@@ -107,4 +109,58 @@ TEST_CASE("SceneSerializer round-trips custom components", "[scene][serializatio
     auto restoredTest = rehydrated->GetComponent<TestComponent>();
     REQUIRE(restoredTest);
     REQUIRE(restoredTest->GetValue() == Approx(42.0f));
+}
+
+TEST_CASE("SceneSerializer streams large scenes without data loss", "[scene][serialization][stream]") {
+    SerializerGuard guard;
+
+    gm::Scene scene("LargeScene");
+    constexpr int kObjectCount = 500;
+    for (int i = 0; i < kObjectCount; ++i) {
+        auto obj = scene.CreateGameObject("LargeObject_" + std::to_string(i));
+        auto transform = obj->EnsureTransform();
+        transform->SetPosition(static_cast<float>(i),
+                               static_cast<float>(i * 2),
+                               static_cast<float>(i * -3));
+        transform->SetScale(1.0f + static_cast<float>(i % 5));
+    }
+
+    const auto tempDir = std::filesystem::temp_directory_path();
+    const auto uniqueId = static_cast<long long>(
+        std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    const std::filesystem::path scenePath = tempDir / ("gm_scene_stream_test_" + std::to_string(uniqueId) + ".json");
+
+    REQUIRE(gm::SceneSerializer::SaveToFile(scene, scenePath.string()));
+
+    gm::Scene restored("LargeSceneRestored");
+    REQUIRE(gm::SceneSerializer::LoadFromFile(restored, scenePath.string()));
+
+    const auto& restoredObjects = restored.GetAllGameObjects();
+    REQUIRE(restoredObjects.size() == scene.GetAllGameObjects().size());
+
+    auto validateObject = [&](int index) {
+        auto restoredObj = restored.FindGameObjectByName("LargeObject_" + std::to_string(index));
+        REQUIRE(restoredObj);
+        auto transform = restoredObj->GetTransform();
+        REQUIRE(transform);
+        auto pos = transform->GetPosition();
+        REQUIRE(pos.x == Catch::Approx(static_cast<float>(index)));
+        REQUIRE(pos.y == Catch::Approx(static_cast<float>(index * 2)));
+        REQUIRE(pos.z == Catch::Approx(static_cast<float>(index * -3)));
+        auto scale = transform->GetScale();
+        REQUIRE(scale.x == Catch::Approx(1.0f + static_cast<float>(index % 5)));
+    };
+
+    validateObject(0);
+    validateObject(kObjectCount / 2);
+    validateObject(kObjectCount - 1);
+
+    std::error_code ec;
+    std::filesystem::remove(scenePath, ec);
+}
+
+TEST_CASE("SceneSerializer rejects malformed JSON", "[scene][serialization]") {
+    gm::Scene scene("MalformedTest");
+    const std::string invalidJson = "{ this is not valid json";
+    REQUIRE_FALSE(gm::SceneSerializer::Deserialize(scene, invalidJson));
 }

@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace gm::utils {
 
@@ -58,14 +59,29 @@ struct AppConfig {
 struct ConfigLoadResult {
     AppConfig config;
     bool loadedFromFile = false;
+    std::vector<std::string> errors;      // Critical errors that should prevent startup
+    std::vector<std::string> warnings;    // Non-critical issues that should be logged
+    
+    bool HasErrors() const { return !errors.empty(); }
+    bool HasWarnings() const { return !warnings.empty(); }
 };
 
 class ConfigLoader {
 public:
     static ConfigLoadResult Load(const std::filesystem::path& path);
+    
+    /**
+     * @brief Get the default user documents directory for saves/logs.
+     * @return Path to user documents/GotMilked directory, or empty path if unavailable
+     */
+    static std::filesystem::path GetUserDocumentsPath();
 
 private:
     static AppConfig CreateDefault(const std::filesystem::path& baseDir);
+    static void ValidateConfig(AppConfig& config, ConfigLoadResult& result);
+    static void ValidateWindowConfig(WindowConfig& window, ConfigLoadResult& result);
+    static void ValidateResourcePaths(const AppConfig& config, ConfigLoadResult& result);
+    static void ValidateHotReloadConfig(HotReloadConfig& hotReload, ConfigLoadResult& result);
 };
 
 } // namespace gm::utils

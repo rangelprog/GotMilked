@@ -10,6 +10,9 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_map>
+#include <string_view>
+#include <type_traits>
+#include <type_traits>
 
 // Include JSON library
 #include <nlohmann/json.hpp>
@@ -25,6 +28,42 @@ namespace {
     static std::unordered_map<std::string, CustomSerializerEntry>& CustomSerializerRegistry() {
         static std::unordered_map<std::string, CustomSerializerEntry> registry;
         return registry;
+    }
+
+    void WriteJsonKey(std::ostream& out, std::string_view key) {
+        out.put('"');
+        out.write(key.data(), static_cast<std::streamsize>(key.size()));
+        out << "\":";
+    }
+
+    void WriteJsonField(std::ostream& out, std::string_view key, bool value) {
+        WriteJsonKey(out, key);
+        out << (value ? "true" : "false");
+    }
+
+    template <typename T,
+              typename = std::enable_if_t<std::is_arithmetic_v<T> && !std::is_same_v<T, bool>>>
+    void WriteJsonField(std::ostream& out, std::string_view key, T value) {
+        WriteJsonKey(out, key);
+        out << value;
+    }
+
+    void WriteJsonField(std::ostream& out, std::string_view key, const std::string& value) {
+        WriteJsonKey(out, key);
+        out << json(value).dump();
+    }
+
+    void WriteJsonField(std::ostream& out, std::string_view key, const char* value) {
+        WriteJsonField(out, key, std::string(value ? value : ""));
+    }
+
+    void WriteJsonField(std::ostream& out, std::string_view key, const json& value) {
+        WriteJsonKey(out, key);
+        out << value.dump(-1);
+    }
+
+    void WriteJsonValue(std::ostream& out, const json& value) {
+        out << value.dump(-1);
     }
 } // namespace
 
@@ -64,8 +103,9 @@ bool SceneSerializer::SaveToFile(Scene& scene, const std::string& filepath) {
         }
 
         file << '{';
-        file << "\"name\":" << json(scene.GetName()).dump();
-        file << ",\"isPaused\":" << (scene.IsPaused() ? "true" : "false");
+        WriteJsonField(file, "name", scene.GetName());
+        file << ',';
+        WriteJsonField(file, "isPaused", scene.IsPaused());
         file << ",\"gameObjects\":[";
 
         bool first = true;
@@ -78,7 +118,7 @@ bool SceneSerializer::SaveToFile(Scene& scene, const std::string& filepath) {
                 file << ',';
             }
             first = false;
-            file << SerializeGameObject(obj).dump(-1);
+            WriteJsonValue(file, SerializeGameObject(obj));
         }
 
         file << "]}";

@@ -23,6 +23,8 @@ public:
     virtual void Render() {}
     // Called when component is about to be destroyed; override for cleanup.
     virtual void OnDestroy() {}
+    // Called when component is being reused from a pool; override to reset state.
+    virtual void OnReset() { isActive = true; }
 
     void SetOwner(GameObject* obj) { owner = obj; }
     GameObject* GetOwner() const { return owner; }

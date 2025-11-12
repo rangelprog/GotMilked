@@ -1,0 +1,5 @@
+if(EXISTS "C:/Users/tmein/Documents/GitHub/GotMilked/build-no-debug-tools/tests/GotMilkedTests-b12d07c_tests.cmake")
+  include("C:/Users/tmein/Documents/GitHub/GotMilked/build-no-debug-tools/tests/GotMilkedTests-b12d07c_tests.cmake")
+else()
+  add_test(GotMilkedTests_NOT_BUILT-b12d07c GotMilkedTests_NOT_BUILT-b12d07c)
+endif()

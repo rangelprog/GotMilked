@@ -2,13 +2,35 @@
 
 #include <fstream>
 #include <system_error>
+#include <algorithm>
 #include <nlohmann/json.hpp>
+#include <fmt/format.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <shlobj.h>
+#else
+#include <pwd.h>
+#include <unistd.h>
+#endif
 
 #include "gm/core/Logger.hpp"
 
 namespace gm::utils {
 
 namespace {
+
+// Window size constraints
+constexpr int kMinWindowWidth = 320;
+constexpr int kMaxWindowWidth = 7680;
+constexpr int kMinWindowHeight = 240;
+constexpr int kMaxWindowHeight = 4320;
+constexpr double kMinFpsTitleUpdateInterval = 0.01;
+constexpr double kMaxFpsTitleUpdateInterval = 10.0;
+
+// Hot reload constraints
+constexpr double kMinPollInterval = 0.01;
+constexpr double kMaxPollInterval = 60.0;
 
 static std::filesystem::path NormalizePath(const std::filesystem::path& path) {
     std::error_code ec;
@@ -63,11 +85,41 @@ std::filesystem::path gm::utils::ResourcePathConfig::ResolvePath(
     return NormalizePath(assetsDir / raw);
 }
 
+std::filesystem::path ConfigLoader::GetUserDocumentsPath() {
+#ifdef _WIN32
+    wchar_t* documentsPath = nullptr;
+    if (SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &documentsPath) == S_OK) {
+        std::filesystem::path path(documentsPath);
+        CoTaskMemFree(documentsPath);
+        return path / "GotMilked";
+    }
+#else
+    const char* homeDir = getenv("HOME");
+    if (homeDir) {
+        return std::filesystem::path(homeDir) / "Documents" / "GotMilked";
+    }
+    // Fallback to passwd entry
+    struct passwd* pw = getpwuid(getuid());
+    if (pw && pw->pw_dir) {
+        return std::filesystem::path(pw->pw_dir) / "Documents" / "GotMilked";
+    }
+#endif
+    return std::filesystem::path();
+}
+
 AppConfig ConfigLoader::CreateDefault(const std::filesystem::path& baseDir) {
     AppConfig config{};
     config.configDirectory = baseDir;
     config.paths.assets = NormalizePath(baseDir / "assets");
-    config.paths.saves = NormalizePath(baseDir / "saves");
+    
+    // Use user documents directory for saves by default
+    std::filesystem::path userDocsPath = GetUserDocumentsPath();
+    if (!userDocsPath.empty()) {
+        config.paths.saves = NormalizePath(userDocsPath / "saves");
+    } else {
+        // Fallback to config directory if user docs unavailable
+        config.paths.saves = NormalizePath(baseDir / "saves");
+    }
     return config;
 }
 
@@ -118,7 +170,14 @@ ConfigLoadResult ConfigLoader::Load(const std::filesystem::path& path) {
         result.config.paths.assets = ResolvePath(baseDir, pathsObj["assets"].get<std::string>());
     }
     if (pathsObj.contains("saves") && pathsObj["saves"].is_string()) {
+        // User-specified saves path overrides default
         result.config.paths.saves = ResolvePath(baseDir, pathsObj["saves"].get<std::string>());
+    } else {
+        // Use user documents directory if not specified in config
+        std::filesystem::path userDocsPath = GetUserDocumentsPath();
+        if (!userDocsPath.empty()) {
+            result.config.paths.saves = NormalizePath(userDocsPath / "saves");
+        }
     }
 
     // Load resource path configuration
@@ -133,16 +192,135 @@ ConfigLoadResult ConfigLoader::Load(const std::filesystem::path& path) {
     result.config.hotReload.enable = GetOrDefault<bool>(hotReloadObj, "enable", result.config.hotReload.enable);
     result.config.hotReload.pollIntervalSeconds =
         GetOrDefault<double>(hotReloadObj, "pollIntervalSeconds", result.config.hotReload.pollIntervalSeconds);
-    if (result.config.hotReload.pollIntervalSeconds <= 0.0) {
-        gm::core::Logger::Warning("[ConfigLoader] hotReload.pollIntervalSeconds ({:.3f}) must be positive; clamping to 0.1",
-                                  result.config.hotReload.pollIntervalSeconds);
-        result.config.hotReload.pollIntervalSeconds = 0.1;
-    }
 
     result.config.configDirectory = baseDir;
     result.loadedFromFile = true;
-    gm::core::Logger::Info("[ConfigLoader] Loaded config from '{}'", path.string());
+    
+    // Validate all config values and collect errors/warnings
+    ValidateConfig(result.config, result);
+    
+    // Log warnings
+    for (const auto& warning : result.warnings) {
+        gm::core::Logger::Warning("[ConfigLoader] {}", warning);
+    }
+    
+    // Log errors
+    for (const auto& error : result.errors) {
+        gm::core::Logger::Error("[ConfigLoader] {}", error);
+    }
+    
+    if (result.loadedFromFile) {
+        gm::core::Logger::Info("[ConfigLoader] Loaded config from '{}'", path.string());
+    }
+    
     return result;
+}
+
+void ConfigLoader::ValidateConfig(AppConfig& config, ConfigLoadResult& result) {
+    ValidateWindowConfig(config.window, result);
+    ValidateResourcePaths(config, result);
+    ValidateHotReloadConfig(config.hotReload, result);
+    
+    // Validate paths exist (warnings only, not errors)
+    std::error_code ec;
+    if (!std::filesystem::exists(config.paths.assets, ec)) {
+        result.warnings.push_back(
+            fmt::format("Assets directory does not exist: {}", config.paths.assets.string()));
+    }
+    
+    // Ensure saves directory can be created (try to create it)
+    std::filesystem::create_directories(config.paths.saves, ec);
+    if (ec) {
+        result.errors.push_back(
+            fmt::format("Cannot create saves directory '{}': {}", config.paths.saves.string(), ec.message()));
+    }
+}
+
+void ConfigLoader::ValidateWindowConfig(WindowConfig& window, ConfigLoadResult& result) {
+    if (window.width < kMinWindowWidth || window.width > kMaxWindowWidth) {
+        result.errors.push_back(
+            fmt::format("Window width ({}) must be between {} and {}", 
+                       window.width, kMinWindowWidth, kMaxWindowWidth));
+        // Clamp to valid range
+        window.width = std::clamp(window.width, kMinWindowWidth, kMaxWindowWidth);
+    }
+    
+    if (window.height < kMinWindowHeight || window.height > kMaxWindowHeight) {
+        result.errors.push_back(
+            fmt::format("Window height ({}) must be between {} and {}", 
+                       window.height, kMinWindowHeight, kMaxWindowHeight));
+        // Clamp to valid range
+        window.height = std::clamp(window.height, kMinWindowHeight, kMaxWindowHeight);
+    }
+    
+    if (window.title.empty()) {
+        result.warnings.push_back("Window title is empty, using default");
+    }
+    
+    if (window.fpsTitleUpdateIntervalSeconds < kMinFpsTitleUpdateInterval || 
+        window.fpsTitleUpdateIntervalSeconds > kMaxFpsTitleUpdateInterval) {
+        result.warnings.push_back(
+            fmt::format("fpsTitleUpdateIntervalSeconds ({:.3f}) should be between {:.3f} and {:.3f}, clamping",
+                       window.fpsTitleUpdateIntervalSeconds, kMinFpsTitleUpdateInterval, kMaxFpsTitleUpdateInterval));
+        // Clamp to valid range
+        window.fpsTitleUpdateIntervalSeconds = std::clamp(window.fpsTitleUpdateIntervalSeconds, 
+                                                          kMinFpsTitleUpdateInterval, 
+                                                          kMaxFpsTitleUpdateInterval);
+    }
+}
+
+
+void ConfigLoader::ValidateResourcePaths(const AppConfig& config, ConfigLoadResult& result) {
+    const auto& resources = config.resources;
+    const auto& assetsDir = config.paths.assets;
+    
+    // Check if assets directory exists
+    std::error_code ec;
+    if (!std::filesystem::exists(assetsDir, ec)) {
+        result.warnings.push_back(
+            fmt::format("Assets directory does not exist: {}", assetsDir.string()));
+        return; // Can't validate resource paths if assets dir doesn't exist
+    }
+    
+    // Validate shader paths
+    auto shaderVertPath = resources.ResolvePath(assetsDir, resources.shaderVert);
+    if (!std::filesystem::exists(shaderVertPath, ec)) {
+        result.warnings.push_back(
+            fmt::format("Vertex shader not found: {}", shaderVertPath.string()));
+    }
+    
+    auto shaderFragPath = resources.ResolvePath(assetsDir, resources.shaderFrag);
+    if (!std::filesystem::exists(shaderFragPath, ec)) {
+        result.warnings.push_back(
+            fmt::format("Fragment shader not found: {}", shaderFragPath.string()));
+    }
+    
+    // Validate texture paths (warnings only, textures may be optional)
+    auto textureGroundPath = resources.ResolvePath(assetsDir, resources.textureGround);
+    if (!std::filesystem::exists(textureGroundPath, ec)) {
+        result.warnings.push_back(
+            fmt::format("Ground texture not found: {}", textureGroundPath.string()));
+    }
+    
+    // Validate mesh paths (warnings only, meshes may be optional)
+    auto meshPlaceholderPath = resources.ResolvePath(assetsDir, resources.meshPlaceholder);
+    if (!std::filesystem::exists(meshPlaceholderPath, ec)) {
+        result.warnings.push_back(
+            fmt::format("Placeholder mesh not found: {}", meshPlaceholderPath.string()));
+    }
+}
+
+void ConfigLoader::ValidateHotReloadConfig(HotReloadConfig& hotReload, ConfigLoadResult& result) {
+    if (hotReload.enable && (hotReload.pollIntervalSeconds < kMinPollInterval || 
+                             hotReload.pollIntervalSeconds > kMaxPollInterval)) {
+        result.warnings.push_back(
+            fmt::format("hotReload.pollIntervalSeconds ({:.3f}) should be between {:.3f} and {:.3f}, clamping",
+                       hotReload.pollIntervalSeconds, kMinPollInterval, kMaxPollInterval));
+        // Clamp to valid range
+        hotReload.pollIntervalSeconds = std::clamp(hotReload.pollIntervalSeconds, 
+                                                   kMinPollInterval, 
+                                                   kMaxPollInterval);
+    }
 }
 
 } // namespace gm::utils

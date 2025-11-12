@@ -19,7 +19,7 @@ public:
 
     bool loadFromFiles(const std::string& vertPath, const std::string& fragPath);
 
-    void Use() const { glUseProgram(m_id); }
+    void Use() const;
     GLuint Id() const { return m_id; }
 
     GLint uniformLoc(const char* name) const;

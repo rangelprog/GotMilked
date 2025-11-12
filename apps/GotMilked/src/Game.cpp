@@ -12,7 +12,6 @@
 #include "GameEvents.hpp"
 #include "SceneSerializerExtensions.hpp"
 #include "gm/scene/SceneSerializer.hpp"
-#include "EditableTerrainComponent.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -37,16 +36,24 @@
 #include "gm/utils/HotReloader.hpp"
 #include "gm/tooling/Overlay.hpp"
 #include "gm/gameplay/FlyCameraController.hpp"
-#ifdef _DEBUG
+#if GM_DEBUG_TOOLS
+#include "EditableTerrainComponent.hpp"
 #include "DebugMenu.hpp"
 #include "gm/tooling/DebugConsole.hpp"
+#include "DebugHudController.hpp"
+
+using gm::debug::EditableTerrainComponent;
 #endif
 #include <imgui.h>
 
 
 Game::Game(const gm::utils::AppConfig& config)
     : m_config(config),
-      m_assetsDir(config.paths.assets) {}
+      m_assetsDir(config.paths.assets) {
+#if GM_DEBUG_TOOLS
+    m_debugHud = std::make_unique<gm::debug::DebugHudController>();
+#endif
+}
 
 Game::~Game() = default;
 
@@ -86,9 +93,23 @@ bool Game::Init(GLFWwindow* window) {
 }
 
 bool Game::SetupLogging() {
-    std::filesystem::path logDir = m_config.paths.saves / "logs";
+    // Use user documents directory for logs (same parent as saves)
+    std::filesystem::path logDir;
+    std::filesystem::path userDocsPath = gm::utils::ConfigLoader::GetUserDocumentsPath();
+    if (!userDocsPath.empty()) {
+        logDir = userDocsPath / "logs";
+    } else {
+        // Fallback to saves directory if user docs unavailable
+        logDir = m_config.paths.saves / "logs";
+    }
+    
     std::error_code ec;
     std::filesystem::create_directories(logDir, ec);
+    if (ec) {
+        gm::core::Logger::Error("[Game] Failed to create log directory '{}': {}", logDir.string(), ec.message());
+        return false;
+    }
+    
     const std::filesystem::path logPath = logDir / "game.log";
     gm::core::Logger::SetLogFile(logPath);
     gm::core::Logger::Info("[Game] Logging to {}", logPath.string());
@@ -177,24 +198,45 @@ bool Game::SetupDebugTools() {
         m_tooling->AddNotification("Tooling overlay ready");
     }
 
-#ifdef _DEBUG
+#if GM_DEBUG_TOOLS
+    if (m_debugHud && m_tooling) {
+        m_debugHud->SetOverlay(m_tooling.get());
+        m_debugHud->SetOverlayVisible(m_overlayVisible);
+    }
     // Setup debug menu
-    m_debugMenu = std::make_unique<DebugMenu>();
+    m_debugMenu = std::make_unique<gm::debug::DebugMenu>();
     if (m_debugMenu) {
         SetupDebugMenu();
     }
-    m_debugConsole = std::make_unique<gm::tooling::DebugConsole>();
+    m_debugConsole = std::make_unique<gm::debug::DebugConsole>();
     if (m_debugMenu) {
         m_debugMenu->SetDebugConsole(m_debugConsole.get());
+    }
+    if (m_debugHud) {
+        m_debugHud->SetDebugMenu(m_debugMenu.get());
+        m_debugHud->SetDebugConsole(m_debugConsole.get());
+        m_debugHud->SetConsoleVisible(false);
+        if (m_debugMenu) {
+            m_debugMenu->SetOverlayToggleCallbacks(
+                [this]() -> bool {
+                    return m_debugHud && m_debugHud->GetOverlayVisible();
+                },
+                [this](bool visible) {
+                    if (m_debugHud) {
+                        m_debugHud->SetOverlayVisible(visible);
+                    }
+                });
+        }
+        m_debugHud->SetHudVisible(false);
     }
 #endif
 
     return true;
 }
 
-#ifdef _DEBUG
+#if GM_DEBUG_TOOLS
 void Game::SetupDebugMenu() {
-    DebugMenu::Callbacks callbacks{
+    gm::debug::DebugMenu::Callbacks callbacks{
         [this]() { PerformQuickSave(); },
         [this]() { PerformQuickLoad(); },
         [this]() { ForceResourceReload(); },
@@ -228,6 +270,9 @@ void Game::SetupDebugMenu() {
                 if (terrainObject) {
                     if (auto terrain = terrainObject->GetComponent<EditableTerrainComponent>()) {
                         m_debugMenu->SetTerrainComponent(terrain.get());
+                        if (m_debugHud) {
+                            m_debugHud->RegisterTerrain(terrain.get());
+                        }
                     }
                 }
             }
@@ -304,6 +349,9 @@ void Game::SetupDebugMenu() {
         if (terrainObject) {
             if (auto terrain = terrainObject->GetComponent<EditableTerrainComponent>()) {
                 m_debugMenu->SetTerrainComponent(terrain.get());
+                if (m_debugHud) {
+                    m_debugHud->RegisterTerrain(terrain.get());
+                }
             }
         }
     }
@@ -381,16 +429,26 @@ void Game::Update(float dt) {
     }
 
     if (input.IsActionJustPressed("ToggleOverlay")) {
-#ifdef _DEBUG
-        if (m_imgui && m_imgui->IsInitialized()) {
-            m_debugMenuVisible = !m_debugMenuVisible;
-        } else {
-            gm::core::Logger::Warning("[Game] ImGui not initialized; debug menu not available");
-        }
+#if GM_DEBUG_TOOLS
+        if (m_debugHud) {
+            if (m_imgui && m_imgui->IsInitialized()) {
+                m_debugHud->ToggleHud();
+                m_overlayVisible = m_debugHud->GetOverlayVisible();
+            } else {
+                gm::core::Logger::Warning("[Game] ImGui not initialized; debug menu not available");
+            }
+        } else
 #endif
+        {
+            if (m_imgui && m_imgui->IsInitialized()) {
+                m_overlayVisible = !m_overlayVisible;
+            } else {
+                gm::core::Logger::Warning("[Game] ImGui not initialized; debug menu not available");
+            }
+        }
     }
 
-#ifdef _DEBUG
+#if GM_DEBUG_TOOLS
     // Handle Ctrl+S (Save Scene As) and Ctrl+O (Load Scene From) shortcuts
     if (m_debugMenu && m_imgui && m_imgui->IsInitialized()) {
         auto* debugInputSys = input.GetInputSystem();
@@ -428,7 +486,14 @@ void Game::Update(float dt) {
             imguiWantsInput = io.WantCaptureKeyboard || io.WantCaptureMouse;
         }
         
-        m_gameplay->SetInputSuppressed(imguiWantsInput || m_overlayVisible);
+        bool overlayActive = m_overlayVisible;
+#if GM_DEBUG_TOOLS
+        if (m_debugHud) {
+            overlayActive = m_debugHud->IsHudVisible() && m_debugHud->GetOverlayVisible();
+            m_overlayVisible = m_debugHud->GetOverlayVisible();
+        }
+#endif
+        m_gameplay->SetInputSuppressed(imguiWantsInput || overlayActive);
         m_gameplay->Update(dt);
     }
 
@@ -464,16 +529,34 @@ void Game::Render() {
     }
     
     if (m_imgui && m_imgui->IsInitialized()) {
-#ifdef _DEBUG
-        if (m_debugMenu) {
-            m_debugMenu->Render(m_debugMenuVisible);
+#if GM_DEBUG_TOOLS
+        if (m_debugHud) {
+            m_debugHud->RenderHud();
+        } else if (m_debugMenu) {
+            bool visible = true;
+            m_debugMenu->Render(visible);
+        }
+#endif
+        bool open = m_overlayVisible;
+#if GM_DEBUG_TOOLS
+        if (m_debugHud) {
+            open = m_debugHud->IsHudVisible() && m_debugHud->GetOverlayVisible();
         }
 #endif
         if (m_tooling) {
-            bool open = m_overlayVisible;
             m_tooling->Render(open);
+#if GM_DEBUG_TOOLS
+            if (m_debugHud) {
+                m_debugHud->SetOverlayVisible(open);
+            }
+#endif
             m_overlayVisible = open;
         }
+#if GM_DEBUG_TOOLS
+        if (m_debugHud) {
+            m_debugHud->RenderTerrainEditors();
+        }
+#endif
         m_imgui->Render();
     }
 }
@@ -492,7 +575,8 @@ void Game::Shutdown() {
         m_imgui.reset();
     }
     m_tooling.reset();
-#ifdef _DEBUG
+#if GM_DEBUG_TOOLS
+    m_debugHud.reset();
     m_debugMenu.reset();
     m_debugConsole.reset();
 #endif
@@ -514,6 +598,11 @@ void Game::SetupEventSubscriptions() {
         if (m_tooling) {
             m_tooling->AddNotification("Shader loaded");
         }
+#if GM_DEBUG_TOOLS
+        if (m_debugHud) {
+            m_debugHud->Refresh();
+        }
+#endif
     });
 
         gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceShaderReloaded, [this]() {
@@ -521,10 +610,20 @@ void Game::SetupEventSubscriptions() {
         if (m_tooling) {
             m_tooling->AddNotification("Shader reloaded");
         }
+#if GM_DEBUG_TOOLS
+        if (m_debugHud) {
+            m_debugHud->Refresh();
+        }
+#endif
     });
 
         gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceTextureLoaded, [this]() {
         gm::core::Logger::Debug("[Game] Event: Texture loaded");
+#if GM_DEBUG_TOOLS
+        if (m_debugHud) {
+            m_debugHud->Refresh();
+        }
+#endif
     });
 
         gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceTextureReloaded, [this]() {
@@ -532,10 +631,20 @@ void Game::SetupEventSubscriptions() {
         if (m_tooling) {
             m_tooling->AddNotification("Texture reloaded");
         }
+#if GM_DEBUG_TOOLS
+        if (m_debugHud) {
+            m_debugHud->Refresh();
+        }
+#endif
     });
 
         gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceMeshLoaded, [this]() {
         gm::core::Logger::Debug("[Game] Event: Mesh loaded");
+#if GM_DEBUG_TOOLS
+        if (m_debugHud) {
+            m_debugHud->Refresh();
+        }
+#endif
     });
 
         gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceMeshReloaded, [this]() {
@@ -543,6 +652,11 @@ void Game::SetupEventSubscriptions() {
         if (m_tooling) {
             m_tooling->AddNotification("Mesh reloaded");
         }
+#if GM_DEBUG_TOOLS
+        if (m_debugHud) {
+            m_debugHud->Refresh();
+        }
+#endif
     });
 
         gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceAllReloaded, [this]() {
@@ -550,6 +664,11 @@ void Game::SetupEventSubscriptions() {
         if (m_tooling) {
             m_tooling->AddNotification("All resources reloaded");
         }
+#if GM_DEBUG_TOOLS
+        if (m_debugHud) {
+            m_debugHud->Refresh();
+        }
+#endif
     });
 
         gm::core::Event::Subscribe(gotmilked::GameEvents::ResourceLoadFailed, [this]() {
@@ -638,12 +757,19 @@ void Game::ApplyResourcesToScene() {
         return;
     }
 
+#if GM_DEBUG_TOOLS
     ApplyResourcesToTerrain();
+#endif
     ApplyResourcesToStaticMeshComponents();
 
     if (m_tooling) {
         m_tooling->SetScene(m_gameScene);
     }
+#if GM_DEBUG_TOOLS
+    if (m_debugHud) {
+        m_debugHud->Refresh();
+    }
+#endif
 }
 
 void Game::ApplyResourcesToStaticMeshComponents() {
@@ -694,6 +820,8 @@ void Game::ApplyResourcesToStaticMeshComponents() {
     }
 }
 
+#if GM_DEBUG_TOOLS
+#if GM_DEBUG_TOOLS
 void Game::ApplyResourcesToTerrain() {
     if (!m_gameScene) {
         return;
@@ -726,7 +854,13 @@ void Game::ApplyResourcesToTerrain() {
     terrainObject->Init();
     terrain->Init();
     terrain->MarkMeshDirty();
+
+    if (m_debugHud) {
+        m_debugHud->RegisterTerrain(terrain.get());
+    }
 }
+#endif
+#endif
 
 void Game::PerformQuickSave() {
     if (!m_saveManager || !m_gameScene || !m_camera || !m_gameplay) {

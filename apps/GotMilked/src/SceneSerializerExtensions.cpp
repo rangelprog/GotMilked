@@ -3,7 +3,9 @@
 #include "gm/scene/ComponentFactory.hpp"
 #include "gm/scene/StaticMeshComponent.hpp"
 #include "gm/physics/RigidBodyComponent.hpp"
+#if GM_DEBUG_TOOLS
 #include "EditableTerrainComponent.hpp"
+#endif
 #include "gm/scene/SceneSerializer.hpp"
 #include "gm/scene/GameObject.hpp"
 #include "gm/rendering/Mesh.hpp"
@@ -18,9 +20,12 @@ void RegisterSerializers() {
     // Register components with the factory
     auto& factory = gm::scene::ComponentFactory::Instance();
     
+    #if GM_DEBUG_TOOLS
+    using gm::debug::EditableTerrainComponent;
     if (!factory.Register<EditableTerrainComponent>("EditableTerrainComponent")) {
         gm::core::Logger::Warning("[SceneSerializerExtensions] EditableTerrainComponent already registered in factory");
     }
+    #endif
     if (!factory.Register<gm::scene::StaticMeshComponent>("StaticMeshComponent")) {
         gm::core::Logger::Warning("[SceneSerializerExtensions] StaticMeshComponent already registered in factory");
     }
@@ -28,11 +33,12 @@ void RegisterSerializers() {
         gm::core::Logger::Warning("[SceneSerializerExtensions] RigidBodyComponent already registered in factory");
     }
     
+    #if GM_DEBUG_TOOLS
     // Register EditableTerrainComponent serializer
     gm::SceneSerializer::RegisterComponentSerializer(
         "EditableTerrainComponent",
         [](gm::Component* component) -> nlohmann::json {
-            auto* terrain = dynamic_cast<::EditableTerrainComponent*>(component);
+            auto* terrain = dynamic_cast<EditableTerrainComponent*>(component);
             if (!terrain) {
                 return nlohmann::json();
             }
@@ -105,7 +111,7 @@ void RegisterSerializers() {
             }
             
             // Verify component was added to GameObject
-            auto verify = obj->GetComponent<::EditableTerrainComponent>();
+            auto verify = obj->GetComponent<EditableTerrainComponent>();
             if (!verify) {
                 gm::core::Logger::Error("[SceneSerializer] EditableTerrainComponent was not found on GameObject after creation!");
             } else {
@@ -115,6 +121,7 @@ void RegisterSerializers() {
             return terrain.get();
         }
     );
+    #endif
 
     // Register StaticMeshComponent serializer
     gm::SceneSerializer::RegisterComponentSerializer(
@@ -396,13 +403,17 @@ void RegisterSerializers() {
 }
 
 void UnregisterSerializers() {
+    #if GM_DEBUG_TOOLS
     gm::SceneSerializer::UnregisterComponentSerializer("EditableTerrainComponent");
+    #endif
     gm::SceneSerializer::UnregisterComponentSerializer("StaticMeshComponent");
     gm::SceneSerializer::UnregisterComponentSerializer("RigidBodyComponent");
     
     // Optionally unregister from factory (usually not needed, but available)
     auto& factory = gm::scene::ComponentFactory::Instance();
+    #if GM_DEBUG_TOOLS
     factory.Unregister("EditableTerrainComponent");
+    #endif
     factory.Unregister("StaticMeshComponent");
     factory.Unregister("RigidBodyComponent");
 }

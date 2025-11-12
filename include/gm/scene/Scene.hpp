@@ -31,7 +31,15 @@ private:
     bool m_nameLookupDirty = true;
     std::size_t m_destroyedSinceLastCleanup = 0;
     int m_framesSinceLastCleanup = 0;
-    std::vector<std::shared_ptr<GameObject>> m_availableGameObjects;
+    struct GameObjectPool {
+        std::vector<std::shared_ptr<GameObject>> objects;
+        void Reserve(std::size_t capacity);
+        std::shared_ptr<GameObject> Acquire(Scene& owner, const std::string& name);
+        void Release(Scene& owner, std::shared_ptr<GameObject> gameObject);
+        void Clear();
+        std::size_t Size() const { return objects.size(); }
+    };
+    GameObjectPool m_gameObjectPool;
     
     // Optimized lists for active GameObjects (avoid iterating inactive ones)
     std::vector<std::shared_ptr<GameObject>> m_activeRenderables;
@@ -133,6 +141,7 @@ private:
     std::shared_ptr<GameObject> AcquireGameObject(const std::string& name);
     void ReleaseGameObject(std::shared_ptr<GameObject> gameObject);
     void ClearObjectPool();
+    void RemoveFromActiveLists(const std::shared_ptr<GameObject>& gameObject);
 
     friend class GameObjectUpdateSystem;
     friend class GameObject;

@@ -14,6 +14,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Option to build the game app
 option(GM_BUILD_GAME "Build GotMilked game app" ON)
 option(GM_BUILD_TESTS "Build GotMilked tests" ON)
+option(GM_ENABLE_DEBUG_TOOLS "Enable ImGui-based debug tooling (menus, console, terrain editor)" ON)
+
+if(GM_ENABLE_DEBUG_TOOLS)
+    add_compile_definitions(GM_DEBUG_TOOLS=1)
+else()
+    add_compile_definitions(GM_DEBUG_TOOLS=0)
+endif()
 
 # Warning helper function
 function(gm_apply_warnings target)
@@ -147,6 +154,7 @@ add_library(GotMilkedEngine
     src/rendering/Camera.cpp
     src/rendering/Shader.cpp
     src/rendering/Texture.cpp
+    src/rendering/RenderStateCache.cpp
     src/rendering/Mesh.cpp
     src/rendering/Material.cpp
     src/rendering/LightManager.cpp
@@ -154,6 +162,7 @@ add_library(GotMilkedEngine
 
     # Scene management
     src/scene/Scene.cpp
+    src/scene/Scene_GameObject.cpp
     src/scene/SceneManager.cpp
     src/scene/GameObject.cpp
     src/scene/Component.cpp
@@ -189,8 +198,11 @@ add_library(GotMilkedEngine
     src/save/SaveManager.cpp
     src/save/SaveSnapshotHelpers.cpp
     src/tooling/Overlay.cpp
-    src/tooling/DebugConsole.cpp
 )
+
+if(GM_ENABLE_DEBUG_TOOLS)
+    target_sources(GotMilkedEngine PRIVATE src/tooling/DebugConsole.cpp)
+endif()
 
 target_include_directories(GotMilkedEngine 
     PUBLIC 
@@ -218,6 +230,11 @@ target_include_directories(GotMilkedEngine
 )
 target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm::glm imgui Jolt)
 target_link_libraries(GotMilkedEngine PUBLIC fmt::fmt)
+
+# Windows-specific libraries for user documents path resolution
+if(WIN32)
+    target_link_libraries(GotMilkedEngine PRIVATE ole32)
+endif()
 
 # Include directories for dependencies
 target_include_directories(GotMilkedEngine PUBLIC ${json_SOURCE_DIR}/include)

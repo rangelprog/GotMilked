@@ -85,6 +85,7 @@ void GameObject::SetName(const std::string& newName) {
 void GameObject::ResetForReuse() {
     for (auto& component : components) {
         if (component) {
+            component->OnReset();
             component->OnDestroy();
         }
     }

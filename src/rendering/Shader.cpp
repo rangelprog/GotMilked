@@ -1,4 +1,5 @@
 #include "gm/rendering/Shader.hpp"
+#include "gm/rendering/RenderStateCache.hpp"
 #include "gm/core/Logger.hpp"
 #include <fstream>
 #include <glm/gtc/type_ptr.hpp>
@@ -8,13 +9,19 @@
 
 namespace gm {
 
+void Shader::Use() const {
+    RenderStateCache::BindShader(m_id);
+}
+
 Shader::UniformRecord::UniformRecord() {
     std::memset(&value, 0, sizeof(value));
 }
 
 Shader::~Shader() {
-    if (m_id)
+    if (m_id) {
+        RenderStateCache::InvalidateShader(m_id);
         glDeleteProgram(m_id);
+    }
 }
 
 Shader::Shader(Shader&& other) noexcept {
@@ -26,8 +33,10 @@ Shader::Shader(Shader&& other) noexcept {
 
 Shader& Shader::operator=(Shader&& other) noexcept {
     if (this != &other) {
-        if (m_id)
+        if (m_id) {
+            RenderStateCache::InvalidateShader(m_id);
             glDeleteProgram(m_id);
+        }
         m_id = other.m_id;
         m_uniformCache = std::move(other.m_uniformCache);
         other.m_id = 0;
@@ -105,8 +114,10 @@ bool Shader::loadFromFiles(const std::string& vertPath, const std::string& fragP
     if (!prog)
         return false;
 
-    if (m_id)
+    if (m_id) {
+        RenderStateCache::InvalidateShader(m_id);
         glDeleteProgram(m_id);
+    }
     m_id = prog;
     
     // Clear uniform cache when shader is reloaded

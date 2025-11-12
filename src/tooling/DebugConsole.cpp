@@ -1,11 +1,11 @@
-#if defined(GM_DEBUG) || defined(_DEBUG)
+#if GM_DEBUG_TOOLS
 
 #include "gm/tooling/DebugConsole.hpp"
 
 #include <imgui.h>
 #include <fmt/format.h>
 
-namespace gm::tooling {
+namespace gm::debug {
 
 namespace {
 ImVec4 LevelColor(core::LogLevel level) {
@@ -70,7 +70,7 @@ void DebugConsole::Render(bool* open) {
     ImGui::End();
 }
 
-} // namespace gm::tooling
+} // namespace gm::debug
 
-#endif // GM_DEBUG || _DEBUG
+#endif // GM_DEBUG_TOOLS
 

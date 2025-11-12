@@ -1,16 +1,24 @@
 cmake_minimum_required(VERSION 3.21)
 
-add_executable(GotMilkedTests
+set(GOTMILKED_TEST_SOURCES
     SceneSerializerTests.cpp
     ResourceManagerTests.cpp
     SceneDrawSmokeTest.cpp
     GameResourcesTests.cpp
     TestAssetHelpers.cpp
+    LoggerTests.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameResources.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameSceneHelpers.cpp
-    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/EditableTerrainComponent.cpp
     TestMain.cpp
 )
+
+if(GM_ENABLE_DEBUG_TOOLS)
+    list(APPEND GOTMILKED_TEST_SOURCES
+        ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/EditableTerrainComponent.cpp
+    )
+endif()
+
+add_executable(GotMilkedTests ${GOTMILKED_TEST_SOURCES})
 target_link_libraries(GotMilkedTests PRIVATE
     Catch2::Catch2
     GotMilkedEngine

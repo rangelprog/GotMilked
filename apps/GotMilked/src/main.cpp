@@ -11,6 +11,16 @@ int main() {
   try {
     const std::filesystem::path configPath = std::filesystem::path(GM_CONFIG_PATH);
     auto configResult = gm::utils::ConfigLoader::Load(configPath);
+    
+    // Check for critical config errors
+    if (configResult.HasErrors()) {
+      gm::core::Logger::Error("[main] Configuration errors detected. Please fix the following:");
+      for (const auto& error : configResult.errors) {
+        gm::core::Logger::Error("[main]   - {}", error);
+      }
+      return 1;
+    }
+    
     gm::utils::AppConfig appConfig = configResult.config;
 
     Game game(appConfig);

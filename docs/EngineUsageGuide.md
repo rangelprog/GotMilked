@@ -37,8 +37,8 @@ The GotMilked game demonstrates engine features (scene management, rendering, se
 ### Configuration
 
 - Edit `apps/GotMilked/config.json` to change window defaults, toggle VSync, enable/disable resource hot reload, or relocate asset/save directories. Relative paths resolve against the config file’s directory, so source and build trees stay in sync. Hot reload polls watched files every `pollIntervalSeconds` (default 0.5s) and rebinds assets in the running scene whenever they change.
-- Saves are written to the configured `paths.saves` directory. Press `F5` for a quick save and `F9` to load the most recent quick save (stubbed to capture camera and scene state). Slot-based saving lives in `gm::save::SaveManager` for future expansion.
-- Press `F1` to toggle the tooling overlay (ImGui) at runtime. The panel exposes quick save/load buttons, resource reload controls, hot-reload settings, and live world/camera stats. Disable hot reload or trigger a manual reload directly from the overlay when debugging assets.
+- Saves are written to the configured `paths.saves` directory. Press `F5` for a quick save and `F9` to load the most recent quick save (stubbed to capture camera and scene state). Slot-based saving lives in `gm::save::SaveManager` for future expansion. If no saves path is specified, the engine now defaults to the user documents folder (`~/Documents/GotMilked/saves` or `%USERPROFILE%\Documents\GotMilked\saves`).
+- Press `F1` to toggle the debug HUD (ImGui). Build the HUD by configuring CMake with `-DGM_ENABLE_DEBUG_TOOLS=ON`. Once the HUD is visible, open the Debug menu to toggle the tooling overlay, console, or terrain editor. Terrain resolution changes now resample the existing heightmap instead of wiping it, so you can refine sculpted terrain without losing detail. Disable hot reload or trigger a manual reload directly from the overlay when debugging assets.
 
 ---
 
@@ -66,7 +66,7 @@ The scene system revolves around `gm::Scene` and `gm::GameObject`. The detailed 
 3. Use tags and names for lookup (`Scene::FindGameObjectsByTag`, `FindGameObjectByName`).
 4. Serialize with `Scene::SaveToFile` / `LoadFromFile`. Core components are handled by `gm::SceneSerializer`.
 5. Extend serialization by registering custom component serializers with `gm::SceneSerializer::RegisterComponentSerializer` (the GotMilked game wraps this in `SceneSerializerExtensions::RegisterSerializers`). Store asset paths rather than raw pointers.
-6. On load, rehydrate custom components by resolving assets through `gm::ResourceManager` or your own resource system.
+6. On load, rehydrate custom components by resolving assets through `gm::ResourceManager` or your own resource system. The scene serializer now clears tag/name caches before recycling objects, preventing orphaned references during repeated load/unload cycles when pooling is active.
 
 > Component lifecycle: `gm::Component` exposes `Init`, `Update`, `Render`, and `OnDestroy`. Override only what you need; these hooks are invoked automatically by `GameObject`/`Scene`.
 
@@ -77,7 +77,7 @@ The scene system revolves around `gm::Scene` and `gm::GameObject`. The detailed 
 The engine supplies basic rendering wrappers but leaves resource ownership to the application:
 
 - Use `gm::Texture::loadOrThrow`, `gm::Shader::loadFromFiles`, and `gm::Mesh` (via `ObjLoader`) to load data.
-- Use `gm::ResourceManager` for centralized resource loading and caching. Resources are loaded by name and automatically cached, preventing duplicate loads. `Has*` helpers let you check cache state, while `Reload*` APIs force a refresh from disk and log any failures.
+- Use `gm::ResourceManager` for centralized resource loading and caching. Recent changes added string-view aware lookups and reload tests; use `Has*` helpers to check cache state, while `Reload*` APIs force a refresh and invalidate relevant render-state caches.
 - When serializing, store asset identifiers (paths or GUIDs) in the component JSON so resources can be rehydrated on load.
 - Register asset GUIDs with `gm::ResourceRegistry` so scenes can resolve resources even if files move between releases.
 
@@ -90,6 +90,7 @@ The GotMilked game illustrates several patterns:
 - **Resource management:** Uses `GameResources` to load and cache shared shader/mesh/texture resources by name.
 - **Scene population:** `PopulateInitialScene` demonstrates how to spawn objects, attach components, and tag them.
 - **Custom components:** Games can create their own components (e.g., crop components, animal components) and register serializers for them.
+- **Terrain editing:** The built-in `EditableTerrainComponent` supports brush sculpting and on-the-fly resolution changes. The inspector exposes sliders for size, min/max heights, brush radius/strength, and resolution; changing resolution resamples the current height data.
 
 Use it as a template for building your farming game content.
 
@@ -104,26 +105,8 @@ Ideas for future expansion:
 - Implement a resource registry with GUIDs to avoid path-dependent references.
 - Add cross-platform build targets (Linux/macOS) by providing the appropriate CMake toolchains.
 - Expose runtime configuration via environment variables; e.g., set `GM_LOG_DEBUG=0` to silence debug logging in debug builds or `=1` to re-enable it without recompiling.
+- Add unit tests for new utilities (resource manager, logger, serialization). Catch2 suites already cover these areas; add new cases in `tests/` so CI runs them alongside existing checks.
 
 ### 6.1 Parallel Updates
 
-- Call `scene->SetParallelGameObjectUpdates(true);` to fan out `GameObject::Update` across worker tasks.
-- Only opt in once your component code is thread-safe; spawning/destroying objects during update still defers to the main thread at the end of the frame.
-- Combine with custom async `SceneSystem` implementations to keep heavy work off the main thread.
-
-For more detailed scene usage, consult `docs/SceneManagementManual.md`. The game code (`apps/GotMilked/`) showcases how the pieces fit together in practice.
-
-## Terrain Editing
-
-The default game scene now includes an editable terrain component attached to the `GroundPlane` object. Open the tooling overlay (F1) to reveal the **Terrain Editor** panel. From there you can:
-
-- Toggle the `Enable Editing` checkbox to allow in-viewport sculpting.
-- Left-click and drag to raise the terrain, right-click and drag to lower it.
-- Adjust brush radius and strength to control the area of effect and sculpting speed.
-- Tune minimum and maximum height constraints to keep the landscape within bounds.
-- Resize the terrain or change the resolution (note: changing resolution resets the heightmap).
-
-The editor uses the active camera for ray casting, so you can freely reposition the camera while sculpting to work on different parts of the field. When hot reloading materials or shaders, the terrain component automatically rebinds to the updated resources.
-
-- Terrain edits are stored in the quick save file, so you can sculpt, quick-save, and quick-load to restore the landscape.
-
+- Call `

@@ -810,22 +810,22 @@ namespace gm::save {
 
 **Usage:**
 ```cpp
-gm::save::SaveManager saveManager("saves/");
-
-gm::save::SaveGameData data;
-data.sceneName = "MyScene";
-data.cameraPosition = glm::vec3(0, 5, 10);
-// ... set other data
-
-auto result = saveManager.QuickSave(data);
-if (result.success) {
-    // Save successful
-}
-
-// Load
-gm::save::SaveGameData loaded;
-auto loadResult = saveManager.QuickLoad(loaded);
+gm::save::SaveManager saves("saves/");
+saves.QuickSave(gameState);
 ```
+
+### Debug HUD (`gm::debug::*`)
+
+Debug tooling lives under the `gm::debug` namespace and is only compiled when `GM_ENABLE_DEBUG_TOOLS` is enabled (the macro `GM_DEBUG_TOOLS`). Major components include:
+
+| Component | Responsibility |
+|-----------|----------------|
+| `DebugMenu` | ImGui menu bar and console/overlay toggles. |
+| `DebugHudController` | Coordinates menu, console, overlay, and terrain editor visibility. |
+| `DebugConsole` | Logger-backed console window. |
+| `EditableTerrainComponent` | Terrain sculpting UI and in-scene editing behaviour. |
+
+See `docs/DebugToolsGuide.md` for details on enabling the flag and extending the HUD.
 
 ---
 
