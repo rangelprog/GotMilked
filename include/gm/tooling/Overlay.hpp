@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <deque>
 
 #include <glm/vec3.hpp>
 
@@ -78,7 +79,7 @@ private:
     Callbacks m_callbacks;
     WorldInfoProvider m_worldInfoProvider;
 
-    std::vector<std::pair<std::chrono::system_clock::time_point, std::string>> m_notifications;
+    std::deque<std::pair<std::chrono::system_clock::time_point, std::string>> m_notifications;
     std::vector<gm::save::SaveMetadata> m_cachedSaves;
     std::chrono::system_clock::time_point m_lastSaveRefresh{};
 };

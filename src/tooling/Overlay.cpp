@@ -44,9 +44,8 @@ void Overlay::SetScene(const std::shared_ptr<gm::Scene>& scene) {
 void Overlay::AddNotification(const std::string& message) {
     m_notifications.emplace_back(std::chrono::system_clock::now(), message);
     const std::size_t kMaxNotifications = 10;
-    if (m_notifications.size() > kMaxNotifications) {
-        m_notifications.erase(m_notifications.begin(),
-                              m_notifications.begin() + (m_notifications.size() - kMaxNotifications));
+    while (m_notifications.size() > kMaxNotifications) {
+        m_notifications.pop_front();
     }
 }
 

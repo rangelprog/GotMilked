@@ -8,7 +8,7 @@ This page captures the high-level impact of the scene-management overhaul. For a
 - **Fast Lookups** – Hash maps back `FindGameObjectByName` and tag queries; tags stay in sync through `Scene::TagGameObject`.
 - **Deferred Destruction** – Objects mark themselves with `Destroy()` and are removed safely at frame end.
 - **SceneManager** – Central singleton for creating, loading, and switching scenes without leaking state.
-- **JSON Serialization** – `SceneSerializer` supports save/load for transforms, materials, and lights (extendable for new components).
+- **JSON Serialization** – `SceneSerializer` supports save/load for transforms, materials, and lights (extendable for new components). Prefabs piggyback on the same layer via `gm::scene::PrefabLibrary`, so designers can drop pre-configured GameObjects into the scene editor.
 
 ## Key APIs (cheat sheet)
 

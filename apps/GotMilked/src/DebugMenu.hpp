@@ -6,12 +6,17 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cstdint>
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
 
 namespace gm {
 class Scene;
 class GameObject;
+}
+
+namespace gm::scene {
+class PrefabLibrary;
 }
 
 namespace gm::save {
@@ -52,9 +57,17 @@ public:
     void SetTerrainComponent(EditableTerrainComponent* terrain) { m_terrainComponent = terrain; }
     void SetWindowHandle(void* hwnd) { m_windowHandle = hwnd; }
     void SetDebugConsole(DebugConsole* console) { m_debugConsole = console; }
+    void SetPrefabLibrary(gm::scene::PrefabLibrary* library) { m_prefabLibrary = library; }
     void SetConsoleVisible(bool visible);
     bool IsConsoleVisible() const;
     void SetOverlayToggleCallbacks(std::function<bool()> getter, std::function<void(bool)> setter);
+    void ProcessGlobalShortcuts();
+    bool ShouldBlockCameraInput() const;
+    bool HasSelection() const;
+    void ClearSelection();
+    void BeginSceneReload();
+    void EndSceneReload();
+    bool ShouldDelaySceneUI();
 
     void Render(bool& menuVisible);
     
@@ -72,16 +85,21 @@ private:
     void RenderOptionsMenu();
     void RenderSaveAsDialog();
     void RenderLoadDialog();
-    void RenderGameObjectLabels();
-    void RenderEditorWindow();
     void RenderSceneHierarchy();
     void RenderInspector();
+    void RenderSceneExplorerWindow();
     void RenderSceneInfo();
+    void RenderPrefabBrowser();
+    void RenderTransformGizmo();
+    void RenderGameObjectOverlay();
+    void RenderDockspace();
     void HandleSaveAs();
     void HandleLoad();
     void AddRecentFile(const std::string& filePath);
     void LoadRecentFile(const std::string& filePath);
     void SaveRecentFilesToDisk();
+    void EnsureSelectionWindowsVisible();
+    void FocusCameraOnGameObject(const std::shared_ptr<gm::GameObject>& gameObject);
 
     Callbacks m_callbacks;
     gm::save::SaveManager* m_saveManager = nullptr;
@@ -92,15 +110,24 @@ private:
     bool m_fileMenuOpen = false;
     bool m_editMenuOpen = false;
     bool m_optionsMenuOpen = false;
-    bool m_showGameObjects = false;
-
-    // Editor windows
-    bool m_showInspector = false;
+    bool m_showSceneExplorer = false;
     bool m_showSceneInfo = false;
     bool m_showDebugConsole = false;
+    bool m_showPrefabBrowser = false;
+
+    // Layout control
+    bool m_resetDockLayout = false;
 
     // Selection
     std::weak_ptr<gm::GameObject> m_selectedGameObject;
+
+    // Prefabs
+    gm::scene::PrefabLibrary* m_prefabLibrary = nullptr;
+    std::string m_pendingPrefabToSpawn;
+
+    // Gizmo state
+    int m_gizmoOperation = 0; // 0=translate,1=rotate,2=scale
+    int m_gizmoMode = 0; // 0=world,1=local
 
     // File dialogs
     bool m_showSaveAsDialog = false;
@@ -109,6 +136,8 @@ private:
     bool m_pendingLoad = false;
     char m_filePathBuffer[512] = {0};
     std::string m_defaultScenePath = "assets/scenes/";
+    char m_quickLoadBuffer[512] = {0};
+    std::string m_lastQuickLoadPath;
 
     // Recent files (max 10)
     static constexpr size_t kMaxRecentFiles = 10;
@@ -117,6 +146,11 @@ private:
     DebugConsole* m_debugConsole = nullptr;
     std::function<bool()> m_overlayGetter;
     std::function<void(bool)> m_overlaySetter;
+    bool m_suppressCameraInput = false;
+    bool m_sceneReloadInProgress = false;
+    bool m_sceneReloadPendingResume = false;
+    int m_sceneReloadFramesToSkip = 0;
+    std::uint64_t m_lastSeenSceneVersion = 0;
 };
 
 } // namespace gm::debug

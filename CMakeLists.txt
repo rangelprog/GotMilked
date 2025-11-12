@@ -87,6 +87,17 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(imgui)
 
+# ImGuizmo (ImGui gizmo helper)
+FetchContent_Declare(
+  ImGuizmo
+  GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git
+  GIT_TAG        master
+)
+FetchContent_MakeAvailable(ImGuizmo)
+if(NOT ImGuizmo_SOURCE_DIR AND imguizmo_SOURCE_DIR)
+  set(ImGuizmo_SOURCE_DIR ${imguizmo_SOURCE_DIR})
+endif()
+
 # nlohmann/json (header-only JSON library)
 FetchContent_Declare(
   json
@@ -163,6 +174,7 @@ add_library(GotMilkedEngine
     # Scene management
     src/scene/Scene.cpp
     src/scene/Scene_GameObject.cpp
+    src/scene/PrefabLibrary.cpp
     src/scene/SceneManager.cpp
     src/scene/GameObject.cpp
     src/scene/Component.cpp

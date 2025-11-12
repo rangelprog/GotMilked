@@ -84,29 +84,38 @@ void Scene::RemoveFromActiveLists(const std::shared_ptr<GameObject>& gameObject)
 }
 
 std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string& name) {
-    if (name.empty()) {
-        core::Logger::Warning("[Scene] Creating GameObject with empty name");
+    std::string finalName = name;
+    if (finalName.empty()) {
+        finalName = GenerateUniqueName();
+        core::Logger::Warning("[Scene] Creating GameObject with empty name. Assigned '{}'", finalName);
     }
 
     EnsureNameLookup();
 
-    if (!name.empty()) {
-        auto existingIt = objectsByName.find(name);
+    if (!finalName.empty()) {
+        auto existingIt = objectsByName.find(finalName);
         if (existingIt != objectsByName.end() && existingIt->second) {
             core::Logger::Warning("[Scene] GameObject with name '{}' already exists, returning existing object",
-                                  name);
+                                  finalName);
             return existingIt->second;
         }
     }
-    auto gameObject = AcquireGameObject(name);
+    auto gameObject = AcquireGameObject(finalName);
     gameObjects.push_back(gameObject);
     MarkNameLookupDirty();
     m_activeListsDirty = true;
+    core::Logger::Debug("[Scene] Created GameObject '{}'", gameObject ? gameObject->GetName().c_str() : "<null>");
     return gameObject;
 }
 
 std::shared_ptr<GameObject> Scene::AcquireGameObject(const std::string& name) {
-    return m_gameObjectPool.Acquire(*this, name);
+    auto acquired = m_gameObjectPool.Acquire(*this, name);
+    if (!acquired) {
+        core::Logger::Error("[Scene] AcquireGameObject returned null for '{}'", name);
+    } else if (acquired->GetName().empty()) {
+        core::Logger::Error("[Scene] AcquireGameObject yielded object with empty name (desired '{}')", name);
+    }
+    return acquired;
 }
 
 std::shared_ptr<GameObject> Scene::SpawnGameObject(const std::string& name) {
@@ -244,11 +253,15 @@ void Scene::HandleGameObjectRename(GameObject& object, const std::string& oldNam
         return;
     }
 
-    MarkNameLookupDirty();
-
     if (newName.empty()) {
+        std::string generated = GenerateUniqueName();
+        core::Logger::Warning("[Scene] Empty GameObject name detected after rename; assigning '{}'", generated);
+        object.name = generated;
+        MarkNameLookupDirty();
         return;
     }
+
+    MarkNameLookupDirty();
 
     EnsureNameLookup();
 
@@ -326,6 +339,10 @@ void Scene::ReleaseGameObject(std::shared_ptr<GameObject> gameObject) {
 
 void Scene::ClearObjectPool() {
     m_gameObjectPool.Clear();
+}
+
+std::string Scene::GenerateUniqueName() {
+    return "GameObject_" + std::to_string(++m_unnamedObjectCounter);
 }
 
 } // namespace gm

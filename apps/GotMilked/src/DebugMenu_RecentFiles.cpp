@@ -59,21 +59,26 @@ void DebugMenu::LoadRecentFile(const std::string& filePath) {
     std::string jsonStr = buffer.str();
     file.close();
 
+    BeginSceneReload();
+    bool ok = false;
     try {
         nlohmann::json sceneJson = nlohmann::json::parse(jsonStr);
         std::string sceneJsonStr = sceneJson.dump();
-        if (gm::SceneSerializer::Deserialize(*scene, sceneJsonStr)) {
-            gm::core::Logger::Info("[DebugMenu] Scene loaded from: {}", filePath);
-            scene->Init();
-            if (m_callbacks.onSceneLoaded) {
-                m_callbacks.onSceneLoaded();
-            }
-            AddRecentFile(filePath);
-        } else {
-            gm::core::Logger::Error("[DebugMenu] Failed to load scene from: {}", filePath);
-        }
+        ok = gm::SceneSerializer::Deserialize(*scene, sceneJsonStr);
     } catch (const nlohmann::json::exception& e) {
         gm::core::Logger::Error("[DebugMenu] JSON parse error: {}", e.what());
+    }
+    EndSceneReload();
+
+    if (ok) {
+        gm::core::Logger::Info("[DebugMenu] Scene loaded from: {}", filePath);
+        scene->Init();
+        if (m_callbacks.onSceneLoaded) {
+            m_callbacks.onSceneLoaded();
+        }
+        AddRecentFile(filePath);
+    } else {
+        gm::core::Logger::Error("[DebugMenu] Failed to load scene from: {}", filePath);
     }
 }
 

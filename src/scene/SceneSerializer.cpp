@@ -118,7 +118,7 @@ bool SceneSerializer::SaveToFile(Scene& scene, const std::string& filepath) {
                 file << ',';
             }
             first = false;
-            WriteJsonValue(file, SerializeGameObject(obj));
+            WriteJsonValue(file, SceneSerializer::SerializeGameObject(obj));
         }
 
         file << "]}";
@@ -178,7 +178,7 @@ std::string SceneSerializer::Serialize(Scene& scene) {
     // Note: nlohmann::json doesn't support reserve(), but handles memory efficiently internally
     for (const auto& obj : allObjects) {
         if (obj && !obj->IsDestroyed()) {
-            gameObjectsJson.push_back(SerializeGameObject(obj));
+            gameObjectsJson.push_back(SceneSerializer::SerializeGameObject(obj));
         }
     }
     sceneJson["gameObjects"] = gameObjectsJson;
@@ -201,7 +201,7 @@ bool SceneSerializer::Deserialize(Scene& scene, const std::string& jsonString) {
         // Deserialize GameObjects
         if (sceneJson.contains("gameObjects") && sceneJson["gameObjects"].is_array()) {
             for (const auto& objJson : sceneJson["gameObjects"]) {
-                DeserializeGameObject(scene, objJson);
+                SceneSerializer::DeserializeGameObject(scene, objJson);
             }
         }
         
@@ -242,7 +242,7 @@ void SceneSerializer::ClearComponentSerializers() {
     CustomSerializerRegistry().clear();
 }
 
-json SceneSerializer::SerializeGameObject(std::shared_ptr<GameObject> obj) {
+json SceneSerializer::SerializeGameObject(const std::shared_ptr<GameObject>& obj) {
     json objJson;
     
     objJson["name"] = obj->GetName();
@@ -263,7 +263,7 @@ json SceneSerializer::SerializeGameObject(std::shared_ptr<GameObject> obj) {
     // Note: nlohmann::json doesn't support reserve(), but handles memory efficiently internally
     for (const auto& component : components) {
         if (component) {
-            json compJson = SerializeComponent(component.get());
+            json compJson = SceneSerializer::SerializeComponent(component.get());
             if (!compJson.is_null()) {
                 componentsJson.push_back(compJson);
             }
@@ -281,7 +281,16 @@ std::shared_ptr<GameObject> SceneSerializer::DeserializeGameObject(Scene& scene,
     }
     
     std::string name = objectJson["name"].get<std::string>();
+    core::Logger::Info("[SceneSerializer] DeserializeGameObject requested name='{}'", name);
     auto obj = scene.CreateGameObject(name);
+    if (!obj) {
+        core::Logger::Error("[SceneSerializer] CreateGameObject returned null for '{}'", name);
+        return nullptr;
+    }
+    core::Logger::Info(
+        "[SceneSerializer] DeserializeGameObject created GameObject '{}' (ptr={})",
+        obj->GetName(),
+        static_cast<const void*>(obj.get()));
     
     if (!obj) {
         core::Logger::Warning("[SceneSerializer] Failed to create GameObject: {}",
@@ -309,8 +318,13 @@ std::shared_ptr<GameObject> SceneSerializer::DeserializeGameObject(Scene& scene,
     // Deserialize components
     if (objectJson.contains("components") && objectJson["components"].is_array()) {
         for (const auto& compJson : objectJson["components"]) {
-            DeserializeComponent(obj.get(), compJson);
+            SceneSerializer::DeserializeComponent(obj.get(), compJson);
         }
+    }
+
+    const std::string& resolvedName = obj->GetName();
+    if (resolvedName.empty()) {
+        core::Logger::Error("[SceneSerializer] GameObject resolved with empty name after deserialization. Original '{}'", name);
     }
     
     return obj;
@@ -329,13 +343,13 @@ json SceneSerializer::SerializeComponent(Component* component) {
     
     // Component-specific serialization
     if (type == "TransformComponent" || type == "Transform") {
-        json data = SerializeTransformComponent(component);
+        json data = SceneSerializer::SerializeTransformComponent(component);
         compJson["data"] = data;
     } else if (type == "MaterialComponent") {
-        json data = SerializeMaterialComponent(component);
+        json data = SceneSerializer::SerializeMaterialComponent(component);
         compJson["data"] = data;
     } else if (type == "LightComponent") {
-        json data = SerializeLightComponent(component);
+        json data = SceneSerializer::SerializeLightComponent(component);
         compJson["data"] = data;
     } else {
         // Try registered custom component serializers
@@ -387,11 +401,11 @@ void SceneSerializer::DeserializeComponent(GameObject* obj, const json& componen
     // Component-specific deserialization
     Component* component = nullptr;
     if (type == "TransformComponent" || type == "Transform") {
-        component = DeserializeTransformComponent(obj, data);
+        component = SceneSerializer::DeserializeTransformComponent(obj, data);
     } else if (type == "MaterialComponent") {
-        component = DeserializeMaterialComponent(obj, data);
+        component = SceneSerializer::DeserializeMaterialComponent(obj, data);
     } else if (type == "LightComponent") {
-        component = DeserializeLightComponent(obj, data);
+        component = SceneSerializer::DeserializeLightComponent(obj, data);
     } else {
         // Try registered custom component deserializers
         auto& registry = CustomSerializerRegistry();

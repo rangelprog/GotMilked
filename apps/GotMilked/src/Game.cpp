@@ -12,11 +12,13 @@
 #include "GameEvents.hpp"
 #include "SceneSerializerExtensions.hpp"
 #include "gm/scene/SceneSerializer.hpp"
+#include "gm/scene/PrefabLibrary.hpp"
 
 #include <filesystem>
 #include <optional>
 #include <glm/gtc/matrix_transform.hpp>
 #include <nlohmann/json.hpp>
+#include <typeinfo>
 
 #include "gm/rendering/Camera.hpp"
 #include "gm/scene/TransformComponent.hpp"
@@ -79,6 +81,9 @@ bool Game::Init(GLFWwindow* window) {
     ApplyResourcesToScene();
     SetupGameplay();
     SetupSaveSystem();
+    if (!SetupPrefabs()) {
+        gm::core::Logger::Warning("[Game] Prefab library failed to initialize");
+    }
 
     if (!SetupDebugTools()) {
         gm::core::Logger::Warning("[Game] Some debug tools failed to initialize, continuing anyway");
@@ -334,6 +339,7 @@ void Game::SetupDebugMenu() {
     m_debugMenu->SetCallbacks(std::move(callbacks));
     m_debugMenu->SetSaveManager(m_saveManager.get());
     m_debugMenu->SetScene(m_gameScene);
+    m_debugMenu->SetPrefabLibrary(m_prefabLibrary.get());
     
     // Set window handle for file dialogs
 #ifdef _WIN32
@@ -417,7 +423,15 @@ void Game::Update(float dt) {
     }
 
     if (input.IsActionJustPressed("Exit")) {
-        glfwSetWindowShouldClose(m_window, 1);
+        bool shouldExit = true;
+#if GM_DEBUG_TOOLS
+        if (m_debugMenu && m_debugMenu->HasSelection()) {
+            shouldExit = false;
+        }
+#endif
+        if (shouldExit) {
+            glfwSetWindowShouldClose(m_window, 1);
+        }
     }
 
     if (input.IsActionJustPressed("QuickSave")) {
@@ -487,13 +501,17 @@ void Game::Update(float dt) {
         }
         
         bool overlayActive = m_overlayVisible;
+        bool debugSelectionBlocksInput = false;
 #if GM_DEBUG_TOOLS
         if (m_debugHud) {
             overlayActive = m_debugHud->IsHudVisible() && m_debugHud->GetOverlayVisible();
             m_overlayVisible = m_debugHud->GetOverlayVisible();
         }
+        if (m_debugMenu) {
+            debugSelectionBlocksInput = m_debugMenu->ShouldBlockCameraInput();
+        }
 #endif
-        m_gameplay->SetInputSuppressed(imguiWantsInput || overlayActive);
+        m_gameplay->SetInputSuppressed(imguiWantsInput || overlayActive || debugSelectionBlocksInput);
         m_gameplay->Update(dt);
     }
 
@@ -948,11 +966,59 @@ void Game::PerformQuickLoad() {
     if (jsonResult.success && saveJson.contains("gameObjects") && saveJson["gameObjects"].is_array()) {
         // New format with GameObjects - deserialize the scene
         std::string jsonString = saveJson.dump();
-        if (!gm::SceneSerializer::Deserialize(*m_gameScene, jsonString)) {
+#if GM_DEBUG_TOOLS
+        if (m_debugMenu) {
+            m_debugMenu->BeginSceneReload();
+        }
+#endif
+        bool ok = gm::SceneSerializer::Deserialize(*m_gameScene, jsonString);
+        gm::core::Logger::Info("[Game] QuickLoad JSON deserialize result: {}", ok ? "success" : "failure");
+#if GM_DEBUG_TOOLS
+        if (m_debugMenu) {
+            m_debugMenu->EndSceneReload();
+        }
+#endif
+        if (!ok) {
             gm::core::Logger::Warning("[Game] QuickLoad failed to deserialize scene");
             if (m_tooling) m_tooling->AddNotification("QuickLoad failed");
             gm::core::Event::Trigger(gotmilked::GameEvents::SceneLoadFailed);
             return;
+        }
+
+        if (m_gameScene) {
+            m_gameScene->BumpReloadVersion();
+        }
+
+        auto quickObjects = m_gameScene->GetAllGameObjects();
+        gm::core::Logger::Info("[Game] QuickLoad scene object count: {}", quickObjects.size());
+        for (const auto& obj : quickObjects) {
+            if (!obj) {
+                gm::core::Logger::Error("[Game] QuickLoad: encountered null GameObject");
+                continue;
+            }
+            gm::core::Logger::Info("[Game] QuickLoad: raw name '{}'", obj->GetName());
+            const std::string& objName = obj->GetName();
+            if (objName.empty()) {
+                gm::core::Logger::Error("[Game] QuickLoad: GameObject with empty name (ptr {})", static_cast<const void*>(obj.get()));
+            } else {
+                gm::core::Logger::Info("[Game] QuickLoad: GameObject '{}'", objName);
+            }
+
+            auto comps = obj->GetComponents();
+            gm::core::Logger::Info("[Game] QuickLoad: '{}' has {} components", objName.c_str(), comps.size());
+            for (const auto& comp : comps) {
+                if (!comp) {
+                    gm::core::Logger::Error("[Game] QuickLoad: '{}' has null component", objName.c_str());
+                    continue;
+                }
+                const std::string& compName = comp->GetName();
+                if (compName.empty()) {
+                    gm::core::Logger::Error("[Game] QuickLoad: component with empty name on '{}' (typeid {})",
+                        objName.c_str(), typeid(*comp).name());
+                } else {
+                    gm::core::Logger::Info("[Game] QuickLoad:     Component '{}'", compName);
+                }
+            }
         }
         
         // Apply camera if present
@@ -1000,6 +1066,12 @@ void Game::PerformQuickLoad() {
         return;
     }
 
+#if GM_DEBUG_TOOLS
+    if (m_debugMenu) {
+        m_debugMenu->BeginSceneReload();
+    }
+#endif
+
     bool applied = gm::save::SaveSnapshotHelpers::ApplySnapshot(
         data,
         m_camera.get(),
@@ -1009,7 +1081,13 @@ void Game::PerformQuickLoad() {
                 m_gameplay->SetWorldTimeSeconds(worldTime);
             }
         });
-    
+
+#if GM_DEBUG_TOOLS
+    if (m_debugMenu) {
+        m_debugMenu->EndSceneReload();
+    }
+#endif
+
     if (applied && m_gameScene) {
         if (data.terrainResolution > 0 && !data.terrainHeights.empty()) {
             auto terrainObject = m_gameScene->FindGameObjectByName("Terrain");
@@ -1041,6 +1119,10 @@ void Game::PerformQuickLoad() {
     if (m_tooling) {
         m_tooling->AddNotification(applied ? "QuickLoad applied" : "QuickLoad partially applied");
     }
+
+    if (m_gameScene) {
+        m_gameScene->BumpReloadVersion();
+    }
     
     // Trigger event for successful load
     if (applied) {
@@ -1059,5 +1141,14 @@ void Game::ForceResourceReload() {
         gm::core::Logger::Warning("[Game] Resource reload encountered errors");
         if (m_tooling) m_tooling->AddNotification("Resource reload failed");
     }
+}
+
+bool Game::SetupPrefabs() {
+    m_prefabLibrary = std::make_shared<gm::scene::PrefabLibrary>();
+    std::filesystem::path prefabRoot = m_assetsDir / "prefabs";
+    if (!m_prefabLibrary->LoadDirectory(prefabRoot)) {
+        gm::core::Logger::Info("[Game] No prefabs loaded from {}", prefabRoot.string());
+    }
+    return true;
 }
 

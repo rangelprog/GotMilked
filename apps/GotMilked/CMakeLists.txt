@@ -14,10 +14,15 @@ if(GM_ENABLE_DEBUG_TOOLS)
     src/DebugMenu_Menus.cpp
     src/DebugMenu_Windows.cpp
     src/DebugMenu_RecentFiles.cpp
+    ${ImGuizmo_SOURCE_DIR}/ImGuizmo.cpp
   )
 endif()
 
 add_executable(GotMilked ${GOTMILKED_SOURCES})
+
+if(GM_ENABLE_DEBUG_TOOLS)
+  target_include_directories(GotMilked PRIVATE ${ImGuizmo_SOURCE_DIR})
+endif()
 
 set_target_properties(GotMilked PROPERTIES OUTPUT_NAME "GotMilked")
 gm_apply_warnings(GotMilked)

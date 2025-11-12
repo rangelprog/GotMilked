@@ -23,15 +23,18 @@ private:
     std::unordered_set<std::string> tags;
     int layer = 0;  // For layer-based queries/rendering
     Scene* m_scene = nullptr;
+    mutable std::string m_lastKnownName;
+    mutable bool m_hasNameSnapshot = false;
 
     void UpdateComponentMap();  // Update map when components change
     void SetScene(Scene* scene) { m_scene = scene; }
     void ResetForReuse();
+    void ValidateNameIntegrity() const;
     friend class Scene;
 
 public:
     GameObject() = default;
-    explicit GameObject(const std::string& objectName) : name(objectName) {}
+    explicit GameObject(const std::string& objectName) : name(objectName), m_lastKnownName(objectName), m_hasNameSnapshot(true) {}
     virtual ~GameObject() = default;
 
     // Lifecycle
@@ -141,7 +144,10 @@ public:
     virtual void Destroy(); // Calls OnDestroy on all components, then marks as destroyed
 
     // Naming
-    const std::string& GetName() const { return name; }
+    const std::string& GetName() const {
+        ValidateNameIntegrity();
+        return name;
+    }
     void SetName(const std::string& newName);
 
     // Tags

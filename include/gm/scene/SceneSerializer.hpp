@@ -36,11 +36,12 @@ public:
     static void UnregisterComponentSerializer(const std::string& typeName);
     static void ClearComponentSerializers();
 
+    // GameObject serialization (public for prefab support)
+    static nlohmann::json SerializeGameObject(const std::shared_ptr<GameObject>& obj);
+    static std::shared_ptr<GameObject> DeserializeGameObject(Scene& scene, const nlohmann::json& objectJson);
+
 private:
     // Helper functions for JSON conversion
-    static nlohmann::json SerializeGameObject(std::shared_ptr<GameObject> obj);
-    static std::shared_ptr<GameObject> DeserializeGameObject(Scene& scene, const nlohmann::json& objectJson);
-    
     static nlohmann::json SerializeComponent(Component* component);
     static void DeserializeComponent(GameObject* obj, const nlohmann::json& componentJson);
     

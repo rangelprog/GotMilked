@@ -34,6 +34,7 @@ namespace gm::debug {
 #include "gm/tooling/Overlay.hpp"
 #include "gm/save/SaveManager.hpp"
 #include "gm/save/SaveSnapshotHelpers.hpp"
+#include "gm/scene/PrefabLibrary.hpp"
 #if GM_DEBUG_TOOLS
 #include "DebugMenu.hpp"
 #endif
@@ -70,6 +71,7 @@ private:
     std::unique_ptr<gm::debug::DebugConsole> m_debugConsole;
     std::unique_ptr<gm::debug::DebugHudController> m_debugHud;
 #endif
+    std::shared_ptr<gm::scene::PrefabLibrary> m_prefabLibrary;
     bool m_overlayVisible = false;
     bool m_vsyncEnabled = true;  // Track VSync state
     
@@ -88,6 +90,7 @@ private:
 #if GM_DEBUG_TOOLS
     void SetupDebugMenu();
 #endif
+    bool SetupPrefabs();
     
     // Helper methods
     void SetupScene();

@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <string>
 #include <string_view>
+#include <cstdint>
 #include <glm/glm.hpp>
 #include "SceneSystem.hpp"
 #include "gm/rendering/LightManager.hpp"
@@ -118,6 +119,8 @@ public:
     
     // Optimization: Mark active lists as dirty (call when GameObject active state changes)
     void MarkActiveListsDirty() { m_activeListsDirty = true; }
+    void BumpReloadVersion() { ++m_reloadVersion; m_activeListsDirty = true; }
+    std::uint64_t CurrentReloadVersion() const { return m_reloadVersion; }
     
     // Frustum culling
     void SetFrustumCullingEnabled(bool enabled) { m_frustumCullingEnabled = enabled; }
@@ -142,9 +145,13 @@ private:
     void ReleaseGameObject(std::shared_ptr<GameObject> gameObject);
     void ClearObjectPool();
     void RemoveFromActiveLists(const std::shared_ptr<GameObject>& gameObject);
+    std::string GenerateUniqueName();
 
     friend class GameObjectUpdateSystem;
     friend class GameObject;
+
+    std::uint64_t m_unnamedObjectCounter = 0;
+    std::uint64_t m_reloadVersion = 0;
 };
 
 }

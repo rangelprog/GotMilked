@@ -1,6 +1,9 @@
 #include "gm/scene/GameObject.hpp"
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/scene/Scene.hpp"
+#include "gm/core/Logger.hpp"
+
+#include <cctype>
 
 namespace gm {
 
@@ -74,8 +77,28 @@ void GameObject::SetName(const std::string& newName) {
         return;
     }
 
+    if (!newName.empty()) {
+        bool leadingWhitespace = false;
+        bool secondCharWhitespace = false;
+        if (!newName.empty()) {
+            leadingWhitespace = std::isspace(static_cast<unsigned char>(newName.front())) != 0;
+        }
+        if (newName.size() > 1) {
+            secondCharWhitespace = std::isspace(static_cast<unsigned char>(newName[1])) != 0;
+        }
+        if (leadingWhitespace || secondCharWhitespace) {
+            gm::core::Logger::Warning(
+                "[GameObject] SetName detected leading whitespace: ptr={}, old='{}', new='{}'",
+                static_cast<const void*>(this),
+                name,
+                newName);
+        }
+    }
+
     const std::string oldName = name;
     name = newName;
+    m_lastKnownName = name;
+    m_hasNameSnapshot = true;
 
     if (m_scene) {
         m_scene->HandleGameObjectRename(*this, oldName, newName);
@@ -96,6 +119,24 @@ void GameObject::ResetForReuse() {
     isActive = true;
     isDestroyed = false;
     name.clear();
+    m_lastKnownName.clear();
+    m_hasNameSnapshot = false;
+}
+
+void GameObject::ValidateNameIntegrity() const {
+    if (!m_hasNameSnapshot) {
+        m_lastKnownName = name;
+        m_hasNameSnapshot = true;
+        return;
+    }
+
+    if (name != m_lastKnownName) {
+        gm::core::Logger::Error("[GameObject] Detected unexpected name mutation: ptr={}, previous='{}', current='{}'",
+            static_cast<const void*>(this),
+            m_lastKnownName,
+            name);
+        m_lastKnownName = name;
+    }
 }
 
 } // namespace gm
