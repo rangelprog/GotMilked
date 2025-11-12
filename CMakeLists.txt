@@ -88,6 +88,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(json)
 
+# Catch2 (unit testing framework)
+FetchContent_Declare(
+  Catch2
+  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+  GIT_TAG        v3.5.2
+)
+FetchContent_MakeAvailable(Catch2)
+
 # Create imgui library manually since it doesn't have a CMakeLists.txt
 if(NOT TARGET imgui)
   add_library(imgui STATIC

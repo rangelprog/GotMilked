@@ -3,15 +3,14 @@
 
 #include "TestAssetHelpers.hpp"
 
+#include <catch2/catch_test_macros.hpp>
 #include <glad/glad.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-#include <cassert>
 #include <filesystem>
-#include <iostream>
-#include <system_error>
 #include <stdexcept>
+#include <system_error>
 
 namespace {
 
@@ -61,49 +60,45 @@ public:
     std::filesystem::path path;
 };
 
-void ResourceManagerCacheAndReload() {
+struct ResourceManagerGuard {
+    ResourceManagerGuard() { gm::ResourceManager::Init(); }
+    ~ResourceManagerGuard() { gm::ResourceManager::Cleanup(); }
+};
+
+} // namespace
+
+TEST_CASE("ResourceManager caches and reloads shaders and meshes", "[resources]") {
     GlfwContext glContext;
     TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
     TempDir assets(bundle.root);
-
-    gm::ResourceManager::Init();
+    ResourceManagerGuard guard;
 
     auto shader = gm::ResourceManager::LoadShader("test_shader",
                                                   bundle.vertPath,
                                                   bundle.fragPath);
-    assert(shader);
-    assert(gm::ResourceManager::HasShader("test_shader"));
+    REQUIRE(shader);
+    REQUIRE(gm::ResourceManager::HasShader("test_shader"));
 
     auto shaderAgain = gm::ResourceManager::LoadShader("test_shader",
                                                        bundle.vertPath,
                                                        bundle.fragPath);
-    assert(shaderAgain);
-    assert(shaderAgain == shader);
+    REQUIRE(shaderAgain);
+    REQUIRE(shaderAgain == shader);
 
     auto shaderReload = gm::ResourceManager::ReloadShader("test_shader",
                                                           bundle.vertPath,
                                                           bundle.fragPath);
-    assert(shaderReload);
-    assert(gm::ResourceManager::GetShader("test_shader") == shaderReload);
+    REQUIRE(shaderReload);
+    REQUIRE(gm::ResourceManager::GetShader("test_shader") == shaderReload);
 
     auto mesh = gm::ResourceManager::LoadMesh("test_mesh", bundle.meshPath);
-    assert(mesh);
-    assert(gm::ResourceManager::HasMesh("test_mesh"));
+    REQUIRE(mesh);
+    REQUIRE(gm::ResourceManager::HasMesh("test_mesh"));
 
     auto meshAgain = gm::ResourceManager::LoadMesh("test_mesh", bundle.meshPath);
-    assert(meshAgain == mesh);
+    REQUIRE(meshAgain == mesh);
 
     auto meshReload = gm::ResourceManager::ReloadMesh("test_mesh", bundle.meshPath);
-    assert(meshReload);
-    assert(gm::ResourceManager::GetMesh("test_mesh") == meshReload);
-
-    gm::ResourceManager::Cleanup();
+    REQUIRE(meshReload);
+    REQUIRE(gm::ResourceManager::GetMesh("test_mesh") == meshReload);
 }
-
-} // namespace
-
-void RunResourceManagerCacheAndReloadTest() {
-    ResourceManagerCacheAndReload();
-    std::cout << "ResourceManager cache/reload test passed.\n";
-}
-

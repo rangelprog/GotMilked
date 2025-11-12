@@ -4,12 +4,12 @@
 #include "gm/scene/Component.hpp"
 #include "gm/scene/TransformComponent.hpp"
 
+#include <catch2/catch_approx.hpp>
+#include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 #include <glm/glm.hpp>
 
-#include <cassert>
 #include <cmath>
-#include <iostream>
 
 namespace {
 
@@ -52,8 +52,17 @@ void RegisterTestSerializer() {
         });
 }
 
-void SceneSerializerRoundTrip() {
-    gm::SceneSerializer::ClearComponentSerializers();
+struct SerializerGuard {
+    SerializerGuard() { gm::SceneSerializer::ClearComponentSerializers(); }
+    ~SerializerGuard() { gm::SceneSerializer::ClearComponentSerializers(); }
+};
+
+} // namespace
+
+TEST_CASE("SceneSerializer round-trips custom components", "[scene][serialization]") {
+    using Catch::Approx;
+
+    SerializerGuard guard;
     RegisterTestSerializer();
 
     gm::Scene scene("TestScene");
@@ -64,40 +73,38 @@ void SceneSerializerRoundTrip() {
     transform->SetScale(2.0f);
 
     auto testComponent = original->AddComponent<TestComponent>();
+    REQUIRE(testComponent);
     testComponent->SetValue(42.0f);
 
-    std::string serialized = gm::SceneSerializer::Serialize(scene);
+    const std::string serialized = gm::SceneSerializer::Serialize(scene);
 
     gm::Scene restored("RestoredScene");
-    bool deserialized = gm::SceneSerializer::Deserialize(restored, serialized);
-    assert(deserialized);
+    const bool deserialized = gm::SceneSerializer::Deserialize(restored, serialized);
+    REQUIRE(deserialized);
 
     auto rehydrated = restored.FindGameObjectByName("TestObject");
-    assert(rehydrated);
-    assert(rehydrated->IsActive());
+    REQUIRE(rehydrated);
+    REQUIRE(rehydrated->IsActive());
 
     auto restoredTransform = rehydrated->GetTransform();
-    assert(restoredTransform);
+    REQUIRE(restoredTransform);
 
-    glm::vec3 restoredPos = restoredTransform->GetPosition();
-    assert(restoredPos.x == 1.0f && restoredPos.y == 2.0f && restoredPos.z == 3.0f);
+    const glm::vec3 restoredPos = restoredTransform->GetPosition();
+    REQUIRE(restoredPos.x == Approx(1.0f));
+    REQUIRE(restoredPos.y == Approx(2.0f));
+    REQUIRE(restoredPos.z == Approx(3.0f));
 
-    glm::vec3 restoredRot = restoredTransform->GetRotation();
-    assert(restoredRot.x == 10.0f && restoredRot.y == 20.0f && restoredRot.z == 30.0f);
+    const glm::vec3 restoredRot = restoredTransform->GetRotation();
+    REQUIRE(restoredRot.x == Approx(10.0f));
+    REQUIRE(restoredRot.y == Approx(20.0f));
+    REQUIRE(restoredRot.z == Approx(30.0f));
 
-    glm::vec3 restoredScale = restoredTransform->GetScale();
-    assert(restoredScale.x == 2.0f && restoredScale.y == 2.0f && restoredScale.z == 2.0f);
+    const glm::vec3 restoredScale = restoredTransform->GetScale();
+    REQUIRE(restoredScale.x == Approx(2.0f));
+    REQUIRE(restoredScale.y == Approx(2.0f));
+    REQUIRE(restoredScale.z == Approx(2.0f));
 
     auto restoredTest = rehydrated->GetComponent<TestComponent>();
-    assert(restoredTest);
-    assert(std::fabs(restoredTest->GetValue() - 42.0f) < 1e-5f);
-
-    gm::SceneSerializer::ClearComponentSerializers();
-}
-
-} // namespace
-
-void RunSceneSerializerRoundTripTest() {
-    SceneSerializerRoundTrip();
-    std::cout << "SceneSerializer round-trip test passed.\n";
+    REQUIRE(restoredTest);
+    REQUIRE(restoredTest->GetValue() == Approx(42.0f));
 }

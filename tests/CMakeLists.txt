@@ -12,6 +12,7 @@ add_executable(GotMilkedTests
     TestMain.cpp
 )
 target_link_libraries(GotMilkedTests PRIVATE
+    Catch2::Catch2
     GotMilkedEngine
     glfw
     glad
@@ -30,6 +31,6 @@ target_compile_definitions(GotMilkedTests PRIVATE "GM_GAME_SHADER_DIR=\"${GM_GAM
 
 gm_apply_warnings(GotMilkedTests)
 
-add_test(NAME SceneSerializer.RoundTrip COMMAND GotMilkedTests)
-add_test(NAME Scene.Draw COMMAND GotMilkedTests --scene-draw)
-
+list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
+include(Catch)
+catch_discover_tests(GotMilkedTests)

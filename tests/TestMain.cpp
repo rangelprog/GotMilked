@@ -1,31 +1,10 @@
-#include <exception>
-#include <iostream>
-#include <string>
+#include <catch2/catch_session.hpp>
 
-void RunSceneSerializerRoundTripTest();
-void RunResourceManagerCacheAndReloadTest();
-void RunSceneDrawSmokeTest();
-void RunGameResourcesTests();
-
-int main(int argc, char** argv) {
-    try {
-        if (argc > 1) {
-            std::string arg = argv[1];
-            if (arg == "--scene-draw") {
-                RunSceneDrawSmokeTest();
-                std::cout << "Scene draw smoke test passed.\n";
-                return 0;
-            }
-        }
-
-        RunSceneSerializerRoundTripTest();
-        RunResourceManagerCacheAndReloadTest();
-        RunGameResourcesTests();
-        std::cout << "All GotMilked tests passed.\n";
-        return 0;
-    } catch (const std::exception& ex) {
-        std::cerr << "Test failed with exception: " << ex.what() << '\n';
-        return 1;
+int main(int argc, char* argv[]) {
+    Catch::Session session;
+    int returnCode = session.applyCommandLine(argc, argv);
+    if (returnCode != 0) {
+        return returnCode;
     }
+    return session.run();
 }
-

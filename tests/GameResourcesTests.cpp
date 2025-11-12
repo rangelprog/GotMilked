@@ -1,16 +1,16 @@
 #include "apps/GotMilked/src/GameResources.hpp"
 #include "gm/utils/Config.hpp"
+#include "gm/utils/ResourceManager.hpp"
 #include "gm/core/Logger.hpp"
 #include "TestAssetHelpers.hpp"
 
+#include <catch2/catch_test_macros.hpp>
 #include <glad/glad.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-#include <cassert>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <system_error>
 #include <stdexcept>
 #include <vector>
@@ -90,10 +90,19 @@ public:
     std::filesystem::path path;
 };
 
-void TestGameResourcesLoad() {
+struct ScopedResourceManagerReset {
+    ScopedResourceManagerReset() {
+        gm::ResourceManager::Cleanup();
+        gm::ResourceManager::Init();
+    }
+    ~ScopedResourceManagerReset() { gm::ResourceManager::Cleanup(); }
+};
+
+TEST_CASE("GameResources loads assets via config", "[game_resources]") {
     GlfwContext glContext;
     TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
     TempDir assets(bundle.root);
+    ScopedResourceManagerReset resourceReset;
 
     // Create a minimal valid PNG file for texture loading
     std::filesystem::path textureFile = CreateMinimalPngFile(bundle.root, "ground.png");
@@ -106,35 +115,36 @@ void TestGameResourcesLoad() {
     config.meshPlaceholder = std::filesystem::relative(bundle.meshPath, bundle.root).string();
 
     bool loaded = resources.Load(bundle.root, config);
-    assert(loaded);
+    REQUIRE(loaded);
 
     // Verify resources are loaded
-    assert(resources.GetShader() != nullptr);
-    assert(resources.GetTexture() != nullptr);
-    assert(resources.GetMesh() != nullptr);
-    assert(resources.GetTerrainMaterial() != nullptr);
+    REQUIRE(resources.GetShader() != nullptr);
+    REQUIRE(resources.GetTexture() != nullptr);
+    REQUIRE(resources.GetMesh() != nullptr);
+    REQUIRE(resources.GetTerrainMaterial() != nullptr);
 
     // Verify GUIDs are set
-    assert(!resources.GetShaderGuid().empty());
-    assert(!resources.GetTextureGuid().empty());
-    assert(!resources.GetMeshGuid().empty());
+    REQUIRE_FALSE(resources.GetShaderGuid().empty());
+    REQUIRE_FALSE(resources.GetTextureGuid().empty());
+    REQUIRE_FALSE(resources.GetMeshGuid().empty());
 
     // Verify paths are set
-    assert(!resources.GetShaderVertPath().empty());
-    assert(!resources.GetShaderFragPath().empty());
-    assert(!resources.GetTexturePath().empty());
-    assert(!resources.GetMeshPath().empty());
+    REQUIRE_FALSE(resources.GetShaderVertPath().empty());
+    REQUIRE_FALSE(resources.GetShaderFragPath().empty());
+    REQUIRE_FALSE(resources.GetTexturePath().empty());
+    REQUIRE_FALSE(resources.GetMeshPath().empty());
 
     // Verify terrain material has texture
-    assert(resources.GetTerrainMaterial()->GetDiffuseTexture() != nullptr);
+    REQUIRE(resources.GetTerrainMaterial()->GetDiffuseTexture() != nullptr);
 
     resources.Release();
 }
 
-void TestGameResourcesLoadBackwardCompatibility() {
+TEST_CASE("GameResources legacy load handles missing assets gracefully", "[game_resources]") {
     GlfwContext glContext;
     TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
     TempDir assets(bundle.root);
+    ScopedResourceManagerReset resourceReset;
 
     GameResources resources;
     
@@ -148,27 +158,37 @@ void TestGameResourcesLoadBackwardCompatibility() {
     std::filesystem::copy_file(bundle.vertPath, shaderDir / "simple.vert.glsl");
     std::filesystem::copy_file(bundle.fragPath, shaderDir / "simple.frag.glsl");
     
-    // Use the test texture tag (which is a procedural texture identifier)
-    // The backward compatibility Load method will try to load from file paths
-    // but since we're using test assets, we'll use the config-based Load instead
-    // This test verifies the backward compatibility method exists and is callable
-    
-    // For a proper test, we'd need valid image data, but this verifies the method signature
-    // The actual file loading is tested in TestGameResourcesLoad
-    
-    // Test that the backward compatibility method exists and doesn't crash on empty/invalid paths
-    // It should fail gracefully
+    // Create texture directory with minimal PNG so legacy load succeeds
+    std::filesystem::path texturesDir = assetsDir / "textures";
+    std::filesystem::create_directories(texturesDir);
+    auto groundTexturePath = CreateMinimalPngFile(texturesDir, "ground.png");
+    REQUIRE(std::filesystem::exists(groundTexturePath));
+    {
+        std::ifstream textureCheck(groundTexturePath, std::ios::binary);
+        REQUIRE(textureCheck.good());
+    }
+    // Provide placeholder mesh at legacy location
+    std::filesystem::path modelsDir = assetsDir / "models";
+    std::filesystem::create_directories(modelsDir);
+    std::filesystem::path placeholderMeshPath = modelsDir / "placeholder.obj";
+    std::filesystem::copy_file(bundle.meshPath, placeholderMeshPath);
+    REQUIRE(std::filesystem::exists(placeholderMeshPath));
+
     bool loaded = resources.Load(assetsDir.string());
-    // This will likely fail due to missing texture file, but that's expected
-    // We're just verifying the method is callable and handles errors gracefully
-    
+    REQUIRE(loaded);
+    REQUIRE(resources.GetShader() != nullptr);
+    REQUIRE(resources.GetTexture() != nullptr);
+    REQUIRE(resources.GetTerrainMaterial() != nullptr);
+    REQUIRE(resources.GetMesh() != nullptr);
+
     resources.Release();
 }
 
-void TestGameResourcesReloadShader() {
+TEST_CASE("GameResources can reload shaders", "[game_resources][reload]") {
     GlfwContext glContext;
     TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
     TempDir assets(bundle.root);
+    ScopedResourceManagerReset resourceReset;
 
     GameResources resources;
     gm::utils::ResourcePathConfig config;
@@ -179,27 +199,28 @@ void TestGameResourcesReloadShader() {
     config.meshPlaceholder = std::filesystem::relative(bundle.meshPath, bundle.root).string();
 
     bool loaded = resources.Load(bundle.root, config);
-    assert(loaded);
+    REQUIRE(loaded);
 
     gm::Shader* originalShader = resources.GetShader();
-    assert(originalShader != nullptr);
+    REQUIRE(originalShader != nullptr);
 
     // Reload shader
     bool reloaded = resources.ReloadShader();
-    assert(reloaded);
+    REQUIRE(reloaded);
 
     gm::Shader* reloadedShader = resources.GetShader();
-    assert(reloadedShader != nullptr);
+    REQUIRE(reloadedShader != nullptr);
     // Shader should be a new instance after reload
-    assert(reloadedShader != originalShader);
+    REQUIRE(reloadedShader != originalShader);
 
     resources.Release();
 }
 
-void TestGameResourcesReloadTexture() {
+TEST_CASE("GameResources can reload textures", "[game_resources][reload]") {
     GlfwContext glContext;
     TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
     TempDir assets(bundle.root);
+    ScopedResourceManagerReset resourceReset;
 
     GameResources resources;
     gm::utils::ResourcePathConfig config;
@@ -210,30 +231,31 @@ void TestGameResourcesReloadTexture() {
     config.meshPlaceholder = std::filesystem::relative(bundle.meshPath, bundle.root).string();
 
     bool loaded = resources.Load(bundle.root, config);
-    assert(loaded);
+    REQUIRE(loaded);
 
     gm::Texture* originalTexture = resources.GetTexture();
-    assert(originalTexture != nullptr);
+    REQUIRE(originalTexture != nullptr);
 
     // Reload texture
     bool reloaded = resources.ReloadTexture();
-    assert(reloaded);
+    REQUIRE(reloaded);
 
     gm::Texture* reloadedTexture = resources.GetTexture();
-    assert(reloadedTexture != nullptr);
+    REQUIRE(reloadedTexture != nullptr);
     // Texture should be a new instance after reload
-    assert(reloadedTexture != originalTexture);
+    REQUIRE(reloadedTexture != originalTexture);
 
     // Verify terrain material texture is updated
-    assert(resources.GetTerrainMaterial()->GetDiffuseTexture() == reloadedTexture);
+    REQUIRE(resources.GetTerrainMaterial()->GetDiffuseTexture() == reloadedTexture);
 
     resources.Release();
 }
 
-void TestGameResourcesReloadMesh() {
+TEST_CASE("GameResources can reload meshes", "[game_resources][reload]") {
     GlfwContext glContext;
     TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
     TempDir assets(bundle.root);
+    ScopedResourceManagerReset resourceReset;
 
     GameResources resources;
     gm::utils::ResourcePathConfig config;
@@ -244,27 +266,28 @@ void TestGameResourcesReloadMesh() {
     config.meshPlaceholder = std::filesystem::relative(bundle.meshPath, bundle.root).string();
 
     bool loaded = resources.Load(bundle.root, config);
-    assert(loaded);
+    REQUIRE(loaded);
 
     gm::Mesh* originalMesh = resources.GetMesh();
-    assert(originalMesh != nullptr);
+    REQUIRE(originalMesh != nullptr);
 
     // Reload mesh
     bool reloaded = resources.ReloadMesh();
-    assert(reloaded);
+    REQUIRE(reloaded);
 
     gm::Mesh* reloadedMesh = resources.GetMesh();
-    assert(reloadedMesh != nullptr);
+    REQUIRE(reloadedMesh != nullptr);
     // Mesh should be a new instance after reload
-    assert(reloadedMesh != originalMesh);
+    REQUIRE(reloadedMesh != originalMesh);
 
     resources.Release();
 }
 
-void TestGameResourcesReloadAll() {
+TEST_CASE("GameResources reloads all resources", "[game_resources][reload]") {
     GlfwContext glContext;
     TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
     TempDir assets(bundle.root);
+    ScopedResourceManagerReset resourceReset;
 
     GameResources resources;
     gm::utils::ResourcePathConfig config;
@@ -275,25 +298,26 @@ void TestGameResourcesReloadAll() {
     config.meshPlaceholder = std::filesystem::relative(bundle.meshPath, bundle.root).string();
 
     bool loaded = resources.Load(bundle.root, config);
-    assert(loaded);
+    REQUIRE(loaded);
 
     // Reload all resources
     bool reloaded = resources.ReloadAll();
-    assert(reloaded);
+    REQUIRE(reloaded);
 
     // Verify all resources are still present
-    assert(resources.GetShader() != nullptr);
-    assert(resources.GetTexture() != nullptr);
-    assert(resources.GetMesh() != nullptr);
-    assert(resources.GetTerrainMaterial() != nullptr);
+    REQUIRE(resources.GetShader() != nullptr);
+    REQUIRE(resources.GetTexture() != nullptr);
+    REQUIRE(resources.GetMesh() != nullptr);
+    REQUIRE(resources.GetTerrainMaterial() != nullptr);
 
     resources.Release();
 }
 
-void TestGameResourcesRelease() {
+TEST_CASE("GameResources releases loaded resources", "[game_resources]") {
     GlfwContext glContext;
     TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
     TempDir assets(bundle.root);
+    ScopedResourceManagerReset resourceReset;
 
     GameResources resources;
     gm::utils::ResourcePathConfig config;
@@ -304,56 +328,58 @@ void TestGameResourcesRelease() {
     config.meshPlaceholder = std::filesystem::relative(bundle.meshPath, bundle.root).string();
 
     bool loaded = resources.Load(bundle.root, config);
-    assert(loaded);
+    REQUIRE(loaded);
 
     // Verify resources are loaded
-    assert(resources.GetShader() != nullptr);
-    assert(resources.GetTexture() != nullptr);
-    assert(resources.GetMesh() != nullptr);
-    assert(resources.GetTerrainMaterial() != nullptr);
+    REQUIRE(resources.GetShader() != nullptr);
+    REQUIRE(resources.GetTexture() != nullptr);
+    REQUIRE(resources.GetMesh() != nullptr);
+    REQUIRE(resources.GetTerrainMaterial() != nullptr);
 
     // Release resources
     resources.Release();
 
     // Verify resources are released
-    assert(resources.GetShader() == nullptr);
-    assert(resources.GetTexture() == nullptr);
-    assert(resources.GetMesh() == nullptr);
-    assert(resources.GetTerrainMaterial() == nullptr);
+    REQUIRE(resources.GetShader() == nullptr);
+    REQUIRE(resources.GetTexture() == nullptr);
+    REQUIRE(resources.GetMesh() == nullptr);
+    REQUIRE(resources.GetTerrainMaterial() == nullptr);
 
     // Verify GUIDs and paths are cleared
-    assert(resources.GetShaderGuid().empty());
-    assert(resources.GetTextureGuid().empty());
-    assert(resources.GetMeshGuid().empty());
-    assert(resources.GetShaderVertPath().empty());
-    assert(resources.GetShaderFragPath().empty());
-    assert(resources.GetTexturePath().empty());
-    assert(resources.GetMeshPath().empty());
+    REQUIRE(resources.GetShaderGuid().empty());
+    REQUIRE(resources.GetTextureGuid().empty());
+    REQUIRE(resources.GetMeshGuid().empty());
+    REQUIRE(resources.GetShaderVertPath().empty());
+    REQUIRE(resources.GetShaderFragPath().empty());
+    REQUIRE(resources.GetTexturePath().empty());
+    REQUIRE(resources.GetMeshPath().empty());
 }
 
-void TestGameResourcesReloadWithoutLoad() {
+TEST_CASE("GameResources reload methods fail safely when not loaded", "[game_resources][reload]") {
     GlfwContext glContext;
+    ScopedResourceManagerReset resourceReset;
 
     GameResources resources;
 
     // Try to reload without loading first - should fail gracefully
     bool shaderReloaded = resources.ReloadShader();
-    assert(!shaderReloaded);
+    REQUIRE_FALSE(shaderReloaded);
 
     bool textureReloaded = resources.ReloadTexture();
-    assert(!textureReloaded);
+    REQUIRE_FALSE(textureReloaded);
 
     bool meshReloaded = resources.ReloadMesh();
-    assert(!meshReloaded);
+    REQUIRE_FALSE(meshReloaded);
 
     bool allReloaded = resources.ReloadAll();
-    assert(!allReloaded);
+    REQUIRE_FALSE(allReloaded);
 }
 
-void TestGameResourcesLoadInvalidShader() {
+TEST_CASE("GameResources load fails with invalid shader paths", "[game_resources][error]") {
     GlfwContext glContext;
     TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
     TempDir assets(bundle.root);
+    ScopedResourceManagerReset resourceReset;
 
     GameResources resources;
     gm::utils::ResourcePathConfig config;
@@ -365,16 +391,17 @@ void TestGameResourcesLoadInvalidShader() {
     config.meshPlaceholder = std::filesystem::relative(bundle.meshPath, bundle.root).string();
 
     bool loaded = resources.Load(bundle.root, config);
-    assert(!loaded); // Should fail to load
+    REQUIRE_FALSE(loaded); // Should fail to load
 
     // Resources should not be loaded
-    assert(resources.GetShader() == nullptr);
+    REQUIRE(resources.GetShader() == nullptr);
 }
 
-void TestGameResourcesOptionalMesh() {
+TEST_CASE("GameResources loads without optional mesh", "[game_resources]") {
     GlfwContext glContext;
     TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
     TempDir assets(bundle.root);
+    ScopedResourceManagerReset resourceReset;
 
     GameResources resources;
     gm::utils::ResourcePathConfig config;
@@ -387,53 +414,17 @@ void TestGameResourcesOptionalMesh() {
 
     bool loaded = resources.Load(bundle.root, config);
     // Should still load successfully even without mesh
-    assert(loaded);
+    REQUIRE(loaded);
 
     // Shader and texture should be loaded
-    assert(resources.GetShader() != nullptr);
-    assert(resources.GetTexture() != nullptr);
-    assert(resources.GetTerrainMaterial() != nullptr);
+    REQUIRE(resources.GetShader() != nullptr);
+    REQUIRE(resources.GetTexture() != nullptr);
+    REQUIRE(resources.GetTerrainMaterial() != nullptr);
 
     // Mesh should be null
-    assert(resources.GetMesh() == nullptr);
-    assert(resources.GetMeshPath().empty());
+    REQUIRE(resources.GetMesh() == nullptr);
+    REQUIRE(resources.GetMeshPath().empty());
 
     resources.Release();
 }
-
 } // namespace
-
-void RunGameResourcesTests() {
-    TestGameResourcesLoad();
-    std::cout << "GameResources load test passed.\n";
-
-    TestGameResourcesLoadBackwardCompatibility();
-    std::cout << "GameResources backward compatibility load test passed.\n";
-
-    TestGameResourcesReloadShader();
-    std::cout << "GameResources reload shader test passed.\n";
-
-    TestGameResourcesReloadTexture();
-    std::cout << "GameResources reload texture test passed.\n";
-
-    TestGameResourcesReloadMesh();
-    std::cout << "GameResources reload mesh test passed.\n";
-
-    TestGameResourcesReloadAll();
-    std::cout << "GameResources reload all test passed.\n";
-
-    TestGameResourcesRelease();
-    std::cout << "GameResources release test passed.\n";
-
-    TestGameResourcesReloadWithoutLoad();
-    std::cout << "GameResources reload without load test passed.\n";
-
-    TestGameResourcesLoadInvalidShader();
-    std::cout << "GameResources load invalid shader test passed.\n";
-
-    TestGameResourcesOptionalMesh();
-    std::cout << "GameResources optional mesh test passed.\n";
-
-    std::cout << "All GameResources tests passed.\n";
-}
-

@@ -5,15 +5,14 @@
 #include "GameSceneHelpers.hpp"
 #include "TestAssetHelpers.hpp"
 
+#include <catch2/catch_test_macros.hpp>
 #include <glad/glad.h>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-#include <cassert>
 #include <filesystem>
-#include <iostream>
-#include <system_error>
 #include <stdexcept>
+#include <system_error>
 
 namespace {
 
@@ -63,34 +62,30 @@ public:
     std::filesystem::path path;
 };
 
-void SceneDrawSmoke() {
+} // namespace
+
+TEST_CASE("Scene draws without errors", "[scene][rendering][smoke]") {
     GlfwContext context;
     TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
     TempDir assets(bundle.root);
 
     GameResources resources;
     PopulateGameResourcesFromTestAssets(bundle, resources);
-    assert(resources.GetShader());
-    assert(resources.GetMesh());
+    REQUIRE(resources.GetShader());
+    REQUIRE(resources.GetMesh());
 
     gm::Scene scene("DrawScene");
-
     gm::Camera camera({0.0f, 0.0f, 0.0f});
 
     gotmilked::PopulateInitialScene(scene, camera, resources);
     scene.Init();
 
-    if (resources.GetShader()) {
-        resources.GetShader()->Use();
-    }
-    scene.Draw(*resources.GetShader(), camera, 128, 128, 60.0f);
+    auto* shader = resources.GetShader();
+    REQUIRE(shader);
+    shader->Use();
+
+    REQUIRE_NOTHROW(scene.Draw(*shader, camera, 128, 128, 60.0f));
 
     resources.Release();
-}
-
-} // namespace
-
-void RunSceneDrawSmokeTest() {
-    SceneDrawSmoke();
 }
 
