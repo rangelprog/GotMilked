@@ -1,5 +1,6 @@
 #include "gm/scene/GameObject.hpp"
 #include "gm/scene/TransformComponent.hpp"
+#include "gm/scene/Scene.hpp"
 
 namespace gm {
 
@@ -68,4 +69,32 @@ void GameObject::UpdateComponentMap() {
     }
 }
 
+void GameObject::SetName(const std::string& newName) {
+    if (name == newName) {
+        return;
+    }
+
+    const std::string oldName = name;
+    name = newName;
+
+    if (m_scene) {
+        m_scene->HandleGameObjectRename(*this, oldName, newName);
+    }
 }
+
+void GameObject::ResetForReuse() {
+    for (auto& component : components) {
+        if (component) {
+            component->OnDestroy();
+        }
+    }
+    components.clear();
+    m_componentMap.clear();
+    tags.clear();
+    layer = 0;
+    isActive = true;
+    isDestroyed = false;
+    name.clear();
+}
+
+} // namespace gm

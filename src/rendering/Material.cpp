@@ -9,21 +9,27 @@ Material::Material() {
 }
 
 void Material::Apply(Shader& shader) const {
-    // Diffuse
+    if (m_cacheDirty) {
+        m_cachedDiffuse = m_diffuseColor;
+        m_cachedSpecular = m_specularColor;
+        m_cachedEmission = m_emissionColor;
+        m_cachedShininess = m_shininess;
+        m_cacheDirty = false;
+    }
+
     if (m_diffuseTexture) {
         shader.SetInt("uUseTex", 1);
         m_diffuseTexture->bind(0);
         shader.SetInt("uTex", 0);
     } else {
         shader.SetInt("uUseTex", 0);
-        shader.SetVec3("uSolidColor", m_diffuseColor);
+        shader.SetVec3("uSolidColor", m_cachedDiffuse);
     }
 
-    // Material properties (if shader supports them)
-    shader.SetVec3("uMaterial.diffuse", m_diffuseColor);
-    shader.SetVec3("uMaterial.specular", m_specularColor);
-    shader.SetFloat("uMaterial.shininess", m_shininess);
-    shader.SetVec3("uMaterial.emission", m_emissionColor);
+    shader.SetVec3("uMaterial.diffuse", m_cachedDiffuse);
+    shader.SetVec3("uMaterial.specular", m_cachedSpecular);
+    shader.SetFloat("uMaterial.shininess", m_cachedShininess);
+    shader.SetVec3("uMaterial.emission", m_cachedEmission);
 
     // Texture slots
     int textureSlot = 1;

@@ -38,12 +38,38 @@ private:
     
     // Clear uniform cache (called when shader is reloaded)
     void ClearUniformCache() const;
+    struct UniformRecord;
+    UniformRecord* GetUniformRecord(std::string_view name) const;
 
 private:
+    struct UniformRecord {
+        enum class Type : unsigned char {
+            Unknown = 0,
+            Int,
+            Float,
+            Vec3,
+            Mat3,
+            Mat4
+        };
+
+        UniformRecord();
+
+        GLint location = -1;
+        Type type = Type::Unknown;
+        bool hasValue = false;
+        union {
+            int intValue;
+            float floatValue;
+            float vec3Value[3];
+            float mat3Value[9];
+            float mat4Value[16];
+        } value;
+    };
+
     GLuint m_id{0};
     // Uniform location cache: uniform name -> location
     // Using mutable because cache lookup doesn't change logical state
-    mutable std::unordered_map<std::string, GLint> m_uniformCache;
+    mutable std::unordered_map<std::string, UniformRecord> m_uniformCache;
 };
 
 }

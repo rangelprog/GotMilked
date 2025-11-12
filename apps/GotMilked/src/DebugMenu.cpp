@@ -1,3 +1,6 @@
+#ifdef _DEBUG
+#include "gm/tooling/DebugConsole.hpp"
+#endif
 #include "DebugMenu.hpp"
 #include "GameConstants.hpp"
 
@@ -67,6 +70,15 @@ void DebugMenu::Render(bool& menuVisible) {
     if (m_showGameObjects) {
         RenderGameObjectLabels();
     }
+
+#ifdef _DEBUG
+    if (m_showDebugConsole && m_debugConsole) {
+        bool open = m_showDebugConsole;
+        m_debugConsole->Render(&open);
+        m_showDebugConsole = open;
+    }
+#endif
+
 }
 
 void DebugMenu::RenderMenuBar() {
@@ -164,6 +176,13 @@ void DebugMenu::RenderMenuBar() {
     } else {
         m_optionsMenuOpen = false;
     }
+
+#ifdef _DEBUG
+    if (ImGui::BeginMenu("Debug")) {
+        ImGui::MenuItem("Console", nullptr, &m_showDebugConsole);
+        ImGui::EndMenu();
+    }
+#endif
 }
 
 void DebugMenu::RenderFileMenu() {
@@ -298,17 +317,17 @@ void DebugMenu::RenderSaveAsDialog() {
                 std::error_code ec;
                 std::filesystem::create_directories(dir, ec);
                 if (ec) {
-                    gm::core::Logger::Error("[DebugMenu] Failed to create directory %s: %s", 
-                                dir.string().c_str(), ec.message().c_str());
+                    gm::core::Logger::Error("[DebugMenu] Failed to create directory {}: {}", 
+                                dir.string(), ec.message());
                 }
             }
 
             if (gm::SceneSerializer::SaveToFile(*scene, filePath)) {
-                gm::core::Logger::Info("[DebugMenu] Scene saved to: %s", filePath.c_str());
+                gm::core::Logger::Info("[DebugMenu] Scene saved to: {}", filePath);
                 m_showSaveAsDialog = false;
                 AddRecentFile(filePath);
             } else {
-                gm::core::Logger::Error("[DebugMenu] Failed to save scene to: %s", filePath.c_str());
+                gm::core::Logger::Error("[DebugMenu] Failed to save scene to: {}", filePath);
             }
         }
     }
@@ -347,7 +366,7 @@ void DebugMenu::RenderLoadDialog() {
         if (!filePath.empty()) {
             if (std::filesystem::exists(filePath)) {
                 if (gm::SceneSerializer::LoadFromFile(*scene, filePath)) {
-                    gm::core::Logger::Info("[DebugMenu] Scene loaded from: %s", filePath.c_str());
+                    gm::core::Logger::Info("[DebugMenu] Scene loaded from: {}", filePath);
                     scene->Init();
                     if (m_callbacks.onSceneLoaded) {
                         m_callbacks.onSceneLoaded();
@@ -355,10 +374,10 @@ void DebugMenu::RenderLoadDialog() {
                     m_showLoadDialog = false;
                     AddRecentFile(filePath);
                 } else {
-                    gm::core::Logger::Error("[DebugMenu] Failed to load scene from: %s", filePath.c_str());
+                    gm::core::Logger::Error("[DebugMenu] Failed to load scene from: {}", filePath);
                 }
             } else {
-                gm::core::Logger::Error("[DebugMenu] File not found: %s", filePath.c_str());
+                gm::core::Logger::Error("[DebugMenu] File not found: {}", filePath);
             }
         }
     }
@@ -399,7 +418,7 @@ void DebugMenu::HandleSaveAs() {
                 
                 if (counter < 1000) {
                     filePath = newPath.string();
-                    gm::core::Logger::Info("[DebugMenu] File exists, saving as: %s", filePath.c_str());
+                    gm::core::Logger::Info("[DebugMenu] File exists, saving as: {}", filePath);
                 } else {
                     gm::core::Logger::Error("[DebugMenu] Too many duplicate files, cannot generate unique name");
                     return;
@@ -413,7 +432,7 @@ void DebugMenu::HandleSaveAs() {
                 std::filesystem::create_directories(dir, ec);
                 // Only report error if directory doesn't exist AND creation failed
                 if (ec && !std::filesystem::exists(dir, ec)) {
-                    gm::core::Logger::Error("[DebugMenu] Failed to create directory: %s", ec.message().c_str());
+                    gm::core::Logger::Error("[DebugMenu] Failed to create directory: {}", ec.message());
                     return;
                 }
             }
@@ -460,19 +479,19 @@ void DebugMenu::HandleSaveAs() {
             // Write to file with indentation 2 (same as Quick Save format)
             std::ofstream file(filePath, std::ios::binary | std::ios::trunc);
             if (!file.is_open()) {
-                gm::core::Logger::Error("[DebugMenu] Failed to open file for writing: %s", filePath.c_str());
+                gm::core::Logger::Error("[DebugMenu] Failed to open file for writing: {}", filePath);
                 return;
             }
             
             file << sceneJson.dump(2);
             if (!file.good()) {
-                gm::core::Logger::Error("[DebugMenu] Failed to write to file: %s", filePath.c_str());
+                gm::core::Logger::Error("[DebugMenu] Failed to write to file: {}", filePath);
                 file.close();
                 return;
             }
             
             file.close();
-            gm::core::Logger::Info("[DebugMenu] Scene saved to: %s (includes all GameObjects and properties)", filePath.c_str());
+            gm::core::Logger::Info("[DebugMenu] Scene saved to: {} (includes all GameObjects and properties)", filePath);
             AddRecentFile(filePath);
         }
     } else {
@@ -501,7 +520,7 @@ void DebugMenu::HandleLoad() {
             // Read the JSON file
             std::ifstream file(filePath);
             if (!file.is_open()) {
-                gm::core::Logger::Error("[DebugMenu] Failed to open file for reading: %s", filePath.c_str());
+                gm::core::Logger::Error("[DebugMenu] Failed to open file for reading: {}", filePath);
                 return;
             }
             
@@ -513,7 +532,7 @@ void DebugMenu::HandleLoad() {
             try {
                 sceneJson = nlohmann::json::parse(buffer.str());
             } catch (const std::exception& ex) {
-                gm::core::Logger::Error("[DebugMenu] Failed to parse JSON file %s: %s", filePath.c_str(), ex.what());
+                gm::core::Logger::Error("[DebugMenu] Failed to parse JSON file {}: {}", filePath, ex.what());
                 return;
             }
             
@@ -521,7 +540,7 @@ void DebugMenu::HandleLoad() {
             if (sceneJson.contains("gameObjects") && sceneJson["gameObjects"].is_array()) {
                 // This is a scene file - deserialize using SceneSerializer
                 if (!gm::SceneSerializer::Deserialize(*scene, buffer.str())) {
-                    gm::core::Logger::Error("[DebugMenu] Failed to deserialize scene from: %s", filePath.c_str());
+                    gm::core::Logger::Error("[DebugMenu] Failed to deserialize scene from: {}", filePath);
                     return;
                 }
                 
@@ -545,7 +564,7 @@ void DebugMenu::HandleLoad() {
                 // Note: worldTime is saved but not restored (no setWorldTime callback)
                 // World time is managed by the game itself
                 
-                gm::core::Logger::Info("[DebugMenu] Scene loaded from: %s (with GameObjects)", filePath.c_str());
+                gm::core::Logger::Info("[DebugMenu] Scene loaded from: {} (with GameObjects)", filePath);
                 AddRecentFile(filePath);
                 if (m_callbacks.onSceneLoaded) {
                     m_callbacks.onSceneLoaded();
@@ -629,12 +648,12 @@ void DebugMenu::HandleLoad() {
                         }
                     }
                     
-                    gm::core::Logger::Info("[DebugMenu] Quick Save format file loaded from: %s", filePath.c_str());
+                    gm::core::Logger::Info("[DebugMenu] Quick Save format file loaded from: {}", filePath);
                     if (m_callbacks.onSceneLoaded) {
                         m_callbacks.onSceneLoaded();
                     }
                 } catch (const std::exception& ex) {
-                    gm::core::Logger::Error("[DebugMenu] Failed to parse Quick Save format: %s", ex.what());
+                    gm::core::Logger::Error("[DebugMenu] Failed to parse Quick Save format: {}", ex.what());
                 }
             } else {
                 // This is a scene file - use SceneSerializer
@@ -652,7 +671,7 @@ void DebugMenu::HandleLoad() {
                             glm::vec3 forwardVec(forward[0].get<float>(), forward[1].get<float>(), forward[2].get<float>());
                             
                             m_callbacks.setCamera(position, forwardVec, fov);
-                            gm::core::Logger::Info("[DebugMenu] Restored camera: pos=(%.2f, %.2f, %.2f), fov=%.2f", 
+                            gm::core::Logger::Info("[DebugMenu] Restored camera: pos=({:.2f}, {:.2f}, {:.2f}), fov={:.2f}", 
                                 position.x, position.y, position.z, fov);
                         }
                     }
@@ -661,14 +680,14 @@ void DebugMenu::HandleLoad() {
                 // Deserialize scene
                 std::string sceneJsonStr = sceneJson.dump();
                 if (gm::SceneSerializer::Deserialize(*scene, sceneJsonStr)) {
-                    gm::core::Logger::Info("[DebugMenu] Scene loaded from: %s", filePath.c_str());
+                    gm::core::Logger::Info("[DebugMenu] Scene loaded from: {}", filePath);
                     scene->Init();
                     if (m_callbacks.onSceneLoaded) {
                         m_callbacks.onSceneLoaded();
                     }
                     AddRecentFile(filePath);
                 } else {
-                    gm::core::Logger::Error("[DebugMenu] Failed to load scene from: %s", filePath.c_str());
+                    gm::core::Logger::Error("[DebugMenu] Failed to load scene from: {}", filePath);
                 }
             }
         }
@@ -1086,7 +1105,7 @@ void DebugMenu::AddRecentFile(const std::string& filePath) {
 
 void DebugMenu::LoadRecentFile(const std::string& filePath) {
     if (!std::filesystem::exists(filePath)) {
-        gm::core::Logger::Warning("[DebugMenu] Recent file does not exist: %s", filePath.c_str());
+        gm::core::Logger::Warning("[DebugMenu] Recent file does not exist: {}", filePath);
         // Remove from recent files
         m_recentFiles.erase(
             std::remove(m_recentFiles.begin(), m_recentFiles.end(), filePath),
@@ -1104,7 +1123,7 @@ void DebugMenu::LoadRecentFile(const std::string& filePath) {
     // Load scene using the same logic as HandleLoad
     std::ifstream file(filePath, std::ios::binary);
     if (!file.is_open()) {
-        gm::core::Logger::Error("[DebugMenu] Failed to open file: %s", filePath.c_str());
+        gm::core::Logger::Error("[DebugMenu] Failed to open file: {}", filePath);
         return;
     }
 
@@ -1119,7 +1138,7 @@ void DebugMenu::LoadRecentFile(const std::string& filePath) {
         // Deserialize scene
         std::string sceneJsonStr = sceneJson.dump();
         if (gm::SceneSerializer::Deserialize(*scene, sceneJsonStr)) {
-            gm::core::Logger::Info("[DebugMenu] Scene loaded from: %s", filePath.c_str());
+            gm::core::Logger::Info("[DebugMenu] Scene loaded from: {}", filePath);
             scene->Init();
             if (m_callbacks.onSceneLoaded) {
                 m_callbacks.onSceneLoaded();
@@ -1127,10 +1146,10 @@ void DebugMenu::LoadRecentFile(const std::string& filePath) {
             // Add to recent files (will move to top)
             AddRecentFile(filePath);
         } else {
-            gm::core::Logger::Error("[DebugMenu] Failed to load scene from: %s", filePath.c_str());
+            gm::core::Logger::Error("[DebugMenu] Failed to load scene from: {}", filePath);
         }
     } catch (const nlohmann::json::exception& e) {
-        gm::core::Logger::Error("[DebugMenu] JSON parse error: %s", e.what());
+        gm::core::Logger::Error("[DebugMenu] JSON parse error: {}", e.what());
     }
 }
 
@@ -1162,16 +1181,16 @@ void DebugMenu::SaveRecentFilesToDisk() {
         std::error_code ec;
         std::filesystem::create_directories(dir, ec);
         if (ec) {
-            gm::core::Logger::Error("[DebugMenu] Failed to create directory for recent files: %s", 
-                        dir.string().c_str());
+            gm::core::Logger::Error("[DebugMenu] Failed to create directory for recent files: {}", 
+                        dir.string());
             return;
         }
     }
 
     std::ofstream file(m_recentFilesPath);
     if (!file.is_open()) {
-        gm::core::Logger::Error("[DebugMenu] Failed to save recent files to: %s", 
-                    m_recentFilesPath.c_str());
+        gm::core::Logger::Error("[DebugMenu] Failed to save recent files to: {}", 
+                    m_recentFilesPath);
         return;
     }
 

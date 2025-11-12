@@ -28,6 +28,10 @@ private:
     bool parallelGameObjectUpdatesEnabled = false;
     std::vector<SceneSystemPtr> systems;
     LightManager m_lightManager;  // Cached LightManager to avoid per-frame allocation
+    bool m_nameLookupDirty = true;
+    std::size_t m_destroyedSinceLastCleanup = 0;
+    int m_framesSinceLastCleanup = 0;
+    std::vector<std::shared_ptr<GameObject>> m_availableGameObjects;
     
     // Optimized lists for active GameObjects (avoid iterating inactive ones)
     std::vector<std::shared_ptr<GameObject>> m_activeRenderables;
@@ -122,8 +126,16 @@ private:
     void ShutdownSystems();
     void RunSystems(float deltaTime);
     void UpdateActiveLists();  // Rebuild active renderable/updatable lists
+    void EnsureNameLookup();
+    void HandleGameObjectRename(GameObject& object, const std::string& oldName, const std::string& newName);
+    void MarkNameLookupDirty() { m_nameLookupDirty = true; }
+    void ResetCleanupCounters();
+    std::shared_ptr<GameObject> AcquireGameObject(const std::string& name);
+    void ReleaseGameObject(std::shared_ptr<GameObject> gameObject);
+    void ClearObjectPool();
 
     friend class GameObjectUpdateSystem;
+    friend class GameObject;
 };
 
 }

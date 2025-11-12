@@ -10,6 +10,7 @@
 namespace gm {
 
 class TransformComponent;
+class Scene;
 
 class GameObject {
 private:
@@ -21,8 +22,12 @@ private:
     std::string name;
     std::unordered_set<std::string> tags;
     int layer = 0;  // For layer-based queries/rendering
+    Scene* m_scene = nullptr;
 
     void UpdateComponentMap();  // Update map when components change
+    void SetScene(Scene* scene) { m_scene = scene; }
+    void ResetForReuse();
+    friend class Scene;
 
 public:
     GameObject() = default;
@@ -39,6 +44,9 @@ public:
     std::shared_ptr<T> AddComponent() {
         auto component = std::make_shared<T>();
         component->SetOwner(this);
+        if (component->GetName().empty()) {
+            component->SetName(Component::TypeName<T>());
+        }
         components.push_back(component);
         UpdateComponentMap(); // Update map when components are added
         return component;
@@ -134,7 +142,7 @@ public:
 
     // Naming
     const std::string& GetName() const { return name; }
-    void SetName(const std::string& newName) { name = newName; }
+    void SetName(const std::string& newName);
 
     // Tags
     void AddTag(const std::string& tag) { tags.insert(tag); }

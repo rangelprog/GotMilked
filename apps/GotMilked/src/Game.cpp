@@ -39,6 +39,7 @@
 #include "gm/gameplay/FlyCameraController.hpp"
 #ifdef _DEBUG
 #include "DebugMenu.hpp"
+#include "gm/tooling/DebugConsole.hpp"
 #endif
 #include <imgui.h>
 
@@ -52,6 +53,7 @@ Game::~Game() = default;
 bool Game::Init(GLFWwindow* window) {
     m_window = window;
     m_vsyncEnabled = m_config.window.vsync;  // Initialize VSync state from config
+    SetupLogging();
     if (!m_window) {
         gm::core::Logger::Error("[Game] Invalid window handle");
         return false;
@@ -83,13 +85,23 @@ bool Game::Init(GLFWwindow* window) {
     return true;
 }
 
+bool Game::SetupLogging() {
+    std::filesystem::path logDir = m_config.paths.saves / "logs";
+    std::error_code ec;
+    std::filesystem::create_directories(logDir, ec);
+    const std::filesystem::path logPath = logDir / "game.log";
+    gm::core::Logger::SetLogFile(logPath);
+    gm::core::Logger::Info("[Game] Logging to {}", logPath.string());
+    return true;
+}
+
 bool Game::SetupPhysics() {
     auto& physics = gm::physics::PhysicsWorld::Instance();
     if (!physics.IsInitialized()) {
         try {
             physics.Init();
         } catch (const std::exception& ex) {
-            gm::core::Logger::Error("[Game] Failed to initialize physics: %s", ex.what());
+            gm::core::Logger::Error("[Game] Failed to initialize physics: {}", ex.what());
             return false;
         } catch (...) {
             gm::core::Logger::Error("[Game] Failed to initialize physics: unknown error");
@@ -107,7 +119,7 @@ bool Game::SetupPhysics() {
 
 bool Game::SetupRendering() {
     if (!m_resources.Load(m_assetsDir, m_config.resources)) {
-        gm::core::Logger::Error("[Game] Failed to load resources from %s", m_assetsDir.string().c_str());
+        gm::core::Logger::Error("[Game] Failed to load resources from {}", m_assetsDir.string());
         return false;
     }
 
@@ -171,6 +183,10 @@ bool Game::SetupDebugTools() {
     if (m_debugMenu) {
         SetupDebugMenu();
     }
+    m_debugConsole = std::make_unique<gm::tooling::DebugConsole>();
+    if (m_debugMenu) {
+        m_debugMenu->SetDebugConsole(m_debugConsole.get());
+    }
 #endif
 
     return true;
@@ -188,17 +204,17 @@ void Game::SetupDebugMenu() {
             // Log all GameObjects in scene before applying resources
             if (m_gameScene) {
                 auto allObjects = m_gameScene->GetAllGameObjects();
-                gm::core::Logger::Info("[Game] Scene has %zu GameObjects after load", allObjects.size());
+                gm::core::Logger::Info("[Game] Scene has {} GameObjects after load", allObjects.size());
                 for (const auto& obj : allObjects) {
                     if (obj) {
-                        gm::core::Logger::Info("[Game]   - GameObject: '%s' (active=%s)", 
-                            obj->GetName().c_str(), obj->IsActive() ? "yes" : "no");
+                        gm::core::Logger::Info("[Game]   - GameObject: '{}' (active={})", 
+                            obj->GetName(), obj->IsActive());
                         auto components = obj->GetComponents();
-                        gm::core::Logger::Info("[Game]     Components: %zu", components.size());
+                        gm::core::Logger::Info("[Game]     Components: {}", components.size());
                         for (const auto& comp : components) {
                             if (comp) {
-                                gm::core::Logger::Info("[Game]       - %s (active=%s)", 
-                                    comp->GetName().c_str(), comp->IsActive() ? "yes" : "no");
+                                gm::core::Logger::Info("[Game]       - {} (active={})", 
+                                    comp->GetName(), comp->IsActive());
                             }
                         }
                     }
@@ -348,7 +364,7 @@ void Game::Update(float dt) {
         if (!imguiWantsInput) {
             m_vsyncEnabled = !m_vsyncEnabled;
             glfwSwapInterval(m_vsyncEnabled ? 1 : 0);
-            gm::core::Logger::Info("[Game] VSync %s", m_vsyncEnabled ? "enabled" : "disabled");
+            gm::core::Logger::Info("[Game] VSync {}", m_vsyncEnabled ? "enabled" : "disabled");
         }
     }
 
@@ -377,12 +393,12 @@ void Game::Update(float dt) {
 #ifdef _DEBUG
     // Handle Ctrl+S (Save Scene As) and Ctrl+O (Load Scene From) shortcuts
     if (m_debugMenu && m_imgui && m_imgui->IsInitialized()) {
-        auto* inputSys = input.GetInputSystem();
-        if (inputSys) {
+        auto* debugInputSys = input.GetInputSystem();
+        if (debugInputSys) {
             // Check for Ctrl+S (Save Scene As)
-            bool ctrlPressed = inputSys->IsKeyPressed(GLFW_KEY_LEFT_CONTROL) || 
-                              inputSys->IsKeyPressed(GLFW_KEY_RIGHT_CONTROL);
-            if (ctrlPressed && inputSys->IsKeyJustPressed(GLFW_KEY_S)) {
+            bool ctrlPressed = debugInputSys->IsKeyPressed(GLFW_KEY_LEFT_CONTROL) || 
+                              debugInputSys->IsKeyPressed(GLFW_KEY_RIGHT_CONTROL);
+            if (ctrlPressed && debugInputSys->IsKeyJustPressed(GLFW_KEY_S)) {
                 // Check if ImGui wants keyboard input (don't trigger if typing in a field)
                 ImGuiIO& io = ImGui::GetIO();
                 if (!io.WantCaptureKeyboard) {
@@ -391,7 +407,7 @@ void Game::Update(float dt) {
             }
             
             // Check for Ctrl+O (Load Scene From)
-            if (ctrlPressed && inputSys->IsKeyJustPressed(GLFW_KEY_O)) {
+            if (ctrlPressed && debugInputSys->IsKeyJustPressed(GLFW_KEY_O)) {
                 ImGuiIO& io = ImGui::GetIO();
                 if (!io.WantCaptureKeyboard) {
                     m_debugMenu->TriggerLoad();
@@ -478,6 +494,7 @@ void Game::Shutdown() {
     m_tooling.reset();
 #ifdef _DEBUG
     m_debugMenu.reset();
+    m_debugConsole.reset();
 #endif
     m_camera.reset();
     
@@ -670,8 +687,8 @@ void Game::ApplyResourcesToStaticMeshComponents() {
             if ((!meshComp->GetMeshGuid().empty() && !meshComp->GetMesh()) ||
                 (!meshComp->GetShaderGuid().empty() && !meshComp->GetShader())) {
                 meshComp->RestoreResources(meshResolver, shaderResolver, materialResolver);
-                gm::core::Logger::Info("[Game] Restored resources for StaticMeshComponent on GameObject '%s'",
-                    gameObject->GetName().c_str());
+                gm::core::Logger::Info("[Game] Restored resources for StaticMeshComponent on GameObject '{}'",
+                    gameObject->GetName());
             }
         }
     }
@@ -773,7 +790,7 @@ void Game::PerformQuickSave() {
     // Save using SaveManager but with the merged JSON
     auto result = m_saveManager->QuickSaveWithJson(saveJson);
     if (!result.success) {
-        gm::core::Logger::Warning("[Game] QuickSave failed: %s", result.message.c_str());
+        gm::core::Logger::Warning("[Game] QuickSave failed: {}", result.message);
         if (m_tooling) m_tooling->AddNotification("QuickSave failed");
         gm::core::Event::Trigger(gotmilked::GameEvents::SceneSaveFailed);
     } else {
@@ -843,7 +860,7 @@ void Game::PerformQuickLoad() {
     gm::save::SaveGameData data;
     auto result = m_saveManager->QuickLoad(data);
     if (!result.success) {
-        gm::core::Logger::Warning("[Game] QuickLoad failed: %s", result.message.c_str());
+        gm::core::Logger::Warning("[Game] QuickLoad failed: {}", result.message);
         if (m_tooling) m_tooling->AddNotification("QuickLoad failed");
         gm::core::Event::Trigger(gotmilked::GameEvents::SceneLoadFailed);
         return;

@@ -96,6 +96,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2)
 
+# fmt (formatting library)
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+  GIT_TAG        10.2.1
+)
+FetchContent_MakeAvailable(fmt)
+
 # Create imgui library manually since it doesn't have a CMakeLists.txt
 if(NOT TARGET imgui)
   add_library(imgui STATIC
@@ -148,6 +156,7 @@ add_library(GotMilkedEngine
     src/scene/Scene.cpp
     src/scene/SceneManager.cpp
     src/scene/GameObject.cpp
+    src/scene/Component.cpp
     src/scene/TransformComponent.cpp
     src/scene/MaterialComponent.cpp
     src/scene/LightComponent.cpp
@@ -180,6 +189,7 @@ add_library(GotMilkedEngine
     src/save/SaveManager.cpp
     src/save/SaveSnapshotHelpers.cpp
     src/tooling/Overlay.cpp
+    src/tooling/DebugConsole.cpp
 )
 
 target_include_directories(GotMilkedEngine 
@@ -207,6 +217,7 @@ target_include_directories(GotMilkedEngine
         ${CMAKE_CURRENT_SOURCE_DIR}/src/tooling
 )
 target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm::glm imgui Jolt)
+target_link_libraries(GotMilkedEngine PUBLIC fmt::fmt)
 
 # Include directories for dependencies
 target_include_directories(GotMilkedEngine PUBLIC ${json_SOURCE_DIR}/include)

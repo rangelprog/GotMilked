@@ -123,7 +123,7 @@ void EditableTerrainComponent::Render() {
             m_meshDirty = false;
             gm::core::Logger::Debug("[EditableTerrain] Mesh rebuilt successfully");
         } else {
-            gm::core::Logger::Warning("[EditableTerrain] Failed to rebuild mesh: heights=%zu, resolution=%d, shader=%s",
+            gm::core::Logger::Warning("[EditableTerrain] Failed to rebuild mesh: heights={}, resolution={}, shader={}",
                 m_heights.size(), m_resolution, m_shader ? "set" : "null");
         }
     }
@@ -200,12 +200,12 @@ bool EditableTerrainComponent::SetHeightData(int resolution,
                                               float maxHeight,
                                               const std::vector<float>& heights) {
     if (resolution < 2) {
-        gm::core::Logger::Error("[EditableTerrainComponent] SetHeightData failed: resolution (%d) must be at least 2", resolution);
+        gm::core::Logger::Error("[EditableTerrainComponent] SetHeightData failed: resolution ({}) must be at least 2", resolution);
         return false;
     }
     const std::size_t expected = static_cast<std::size_t>(resolution) * static_cast<std::size_t>(resolution);
     if (heights.size() != expected) {
-        gm::core::Logger::Error("[EditableTerrainComponent] SetHeightData failed: expected %zu height values, got %zu", 
+        gm::core::Logger::Error("[EditableTerrainComponent] SetHeightData failed: expected {} height values, got {}", 
                     expected, heights.size());
         return false;
     }

@@ -16,6 +16,12 @@ namespace gm::save {
 class SaveManager;
 }
 
+#ifdef _DEBUG
+namespace gm::tooling {
+class DebugConsole;
+}
+#endif
+
 class EditableTerrainComponent;
 
 class DebugMenu {
@@ -46,6 +52,9 @@ public:
     void SetScene(const std::shared_ptr<gm::Scene>& scene) { m_scene = scene; }
     void SetTerrainComponent(EditableTerrainComponent* terrain) { m_terrainComponent = terrain; }
     void SetWindowHandle(void* hwnd) { m_windowHandle = hwnd; }
+#ifdef _DEBUG
+    void SetDebugConsole(gm::tooling::DebugConsole* console) { m_debugConsole = console; }
+#endif
 
     void Render(bool& menuVisible);
     
@@ -88,6 +97,9 @@ private:
     // Editor windows
     bool m_showInspector = false;
     bool m_showSceneInfo = false;
+#ifdef _DEBUG
+    bool m_showDebugConsole = false;
+#endif
 
     // Selection
     std::weak_ptr<gm::GameObject> m_selectedGameObject;
@@ -104,4 +116,7 @@ private:
     static constexpr size_t kMaxRecentFiles = 10;
     std::vector<std::string> m_recentFiles;
     std::string m_recentFilesPath = "assets/scenes/.recent_files.txt";
+#ifdef _DEBUG
+    gm::tooling::DebugConsole* m_debugConsole = nullptr;
+#endif
 };

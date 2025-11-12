@@ -31,7 +31,7 @@ int main() {
       try {
         return game.Init(ctx.window);
       } catch (const std::exception& ex) {
-        gm::core::Logger::Error("[main] Exception in onInit: %s", ex.what());
+        gm::core::Logger::Error("[main] Exception in onInit: {}", ex.what());
         return false;
       } catch (...) {
         gm::core::Logger::Error("[main] Unknown exception in onInit");
@@ -42,7 +42,7 @@ int main() {
       try {
         game.Update(dt);
       } catch (const std::exception& ex) {
-        gm::core::Logger::Error("[main] Exception in onUpdate: %s", ex.what());
+        gm::core::Logger::Error("[main] Exception in onUpdate: {}", ex.what());
       } catch (...) {
         gm::core::Logger::Error("[main] Unknown exception in onUpdate");
       }
@@ -51,7 +51,7 @@ int main() {
       try {
         game.Render();
       } catch (const std::exception& ex) {
-        gm::core::Logger::Error("[main] Exception in onRender: %s", ex.what());
+        gm::core::Logger::Error("[main] Exception in onRender: {}", ex.what());
       } catch (...) {
         gm::core::Logger::Error("[main] Unknown exception in onRender");
       }
@@ -60,7 +60,7 @@ int main() {
       try {
         game.Shutdown();
       } catch (const std::exception& ex) {
-        gm::core::Logger::Error("[main] Exception in onShutdown: %s", ex.what());
+        gm::core::Logger::Error("[main] Exception in onShutdown: {}", ex.what());
       } catch (...) {
         gm::core::Logger::Error("[main] Unknown exception in onShutdown");
       }
@@ -68,7 +68,7 @@ int main() {
 
     return app.Run(callbacks);
   } catch (const std::exception& ex) {
-    gm::core::Logger::Error("[main] Fatal exception: %s", ex.what());
+    gm::core::Logger::Error("[main] Fatal exception: {}", ex.what());
     return 1;
   } catch (...) {
     gm::core::Logger::Error("[main] Fatal unknown exception");

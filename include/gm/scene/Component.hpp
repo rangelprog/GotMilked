@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <typeindex>
 
 namespace gm {
 
@@ -31,6 +32,17 @@ public:
 
     const std::string& GetName() const { return name; }
     void SetName(const std::string& newName) { name = newName; }
+
+    static const std::string& TypeName(const std::type_index& typeId);
+
+    template<typename T>
+    static const std::string& TypeName() {
+        return TypeName(std::type_index(typeid(T)));
+    }
+
+    static const std::string& TypeName(const Component& component) {
+        return TypeName(std::type_index(typeid(component)));
+    }
 };
 
 }

@@ -9,30 +9,60 @@
 #include <exception>
 #include <sstream>
 #include <string_view>
+#include <cstring>
 
 namespace gm {
 
-std::unordered_map<std::string, std::shared_ptr<Shader>> ResourceManager::shaders;
-std::unordered_map<std::string, std::shared_ptr<Texture>> ResourceManager::textures;
-std::unordered_map<std::string, std::shared_ptr<Mesh>> ResourceManager::meshes;
+ResourceManager::ShaderMap ResourceManager::shaders;
+ResourceManager::TextureMap ResourceManager::textures;
+ResourceManager::MeshMap ResourceManager::meshes;
+ResourceManager::StringSet ResourceManager::internedStrings;
+std::vector<std::unique_ptr<char[]>> ResourceManager::stringStorage;
+std::mutex ResourceManager::stringPoolMutex;
+
+const char* ResourceManager::InternString(std::string_view value) {
+    std::lock_guard<std::mutex> lock(stringPoolMutex);
+
+    auto it = internedStrings.find(value);
+    if (it != internedStrings.end()) {
+        return *it;
+    }
+
+    auto buffer = std::make_unique<char[]>(value.size() + 1);
+    std::memcpy(buffer.get(), value.data(), value.size());
+    buffer[value.size()] = '\0';
+
+    const char* stored = buffer.get();
+    stringStorage.emplace_back(std::move(buffer));
+    internedStrings.insert(stored);
+    return stored;
+}
+
+void ResourceManager::ClearInternedStrings() {
+    std::lock_guard<std::mutex> lock(stringPoolMutex);
+    internedStrings.clear();
+    stringStorage.clear();
+}
 
 void ResourceManager::Init() {
     // Initialize resource maps
     shaders.clear();
     textures.clear();
     meshes.clear();
+    ClearInternedStrings();
 }
 
 void ResourceManager::Cleanup() {
     shaders.clear();
     textures.clear();
     meshes.clear();
+    ClearInternedStrings();
 }
 
 std::shared_ptr<Shader> ResourceManager::LoadShader(const std::string& name,
     const std::string& vertPath, const std::string& fragPath) {
-    if (shaders.find(name) != shaders.end()) {
-        return shaders[name];
+    if (auto it = shaders.find(std::string_view{name}); it != shaders.end()) {
+        return it->second;
     }
     
     auto shader = std::make_shared<Shader>();
@@ -42,14 +72,15 @@ std::shared_ptr<Shader> ResourceManager::LoadShader(const std::string& name,
         throw core::ResourceError("shader", name, oss.str());
     }
 
-    shaders[name] = shader;
-    core::Logger::Info("[ResourceManager] Loaded shader '%s' (%s, %s)",
-                       name.c_str(), vertPath.c_str(), fragPath.c_str());
+    const char* pooledName = InternString(name);
+    shaders[pooledName] = shader;
+    core::Logger::Info("[ResourceManager] Loaded shader '{}' ({}, {})",
+                       name, vertPath, fragPath);
     return shader;
 }
 
 std::shared_ptr<Shader> ResourceManager::GetShader(const std::string& name) {
-    auto it = shaders.find(name);
+    auto it = shaders.find(std::string_view{name});
     if (it != shaders.end()) {
         return it->second;
     }
@@ -62,9 +93,7 @@ std::shared_ptr<Shader> ResourceManager::GetShader(const char* name) {
 }
 
 std::shared_ptr<Shader> ResourceManager::GetShader(std::string_view name) {
-    // Create temporary string only for lookup (std::unordered_map requires string key)
-    // This is still more efficient than passing std::string by value
-    auto it = shaders.find(std::string(name));
+    auto it = shaders.find(name);
     if (it != shaders.end()) {
         return it->second;
     }
@@ -80,7 +109,7 @@ bool ResourceManager::HasShader(const char* name) {
 }
 
 bool ResourceManager::HasShader(std::string_view name) {
-    return shaders.find(std::string(name)) != shaders.end();
+    return shaders.find(name) != shaders.end();
 }
 
 std::shared_ptr<Shader> ResourceManager::ReloadShader(const std::string& name,
@@ -92,24 +121,26 @@ std::shared_ptr<Shader> ResourceManager::ReloadShader(const std::string& name,
         throw core::ResourceError("shader", name, oss.str());
     }
 
-    shaders[name] = shader;
-    core::Logger::Info("[ResourceManager] Reloaded shader '%s' (%s, %s)",
-                       name.c_str(), vertPath.c_str(), fragPath.c_str());
+    const char* pooledName = InternString(name);
+    shaders[pooledName] = shader;
+    core::Logger::Info("[ResourceManager] Reloaded shader '{}' ({}, {})",
+                       name, vertPath, fragPath);
     return shader;
 }
 
 std::shared_ptr<Texture> ResourceManager::LoadTexture(const std::string& name,
     const std::string& path) {
-    auto it = textures.find(name);
+    auto it = textures.find(std::string_view{name});
     if (it != textures.end()) {
         return it->second;
     }
     
     try {
         auto texture = std::make_shared<Texture>(Texture::loadOrThrow(path));
-        textures[name] = texture;
-        core::Logger::Info("[ResourceManager] Loaded texture '%s' (%s)",
-                           name.c_str(), path.c_str());
+        const char* pooledName = InternString(name);
+        textures[pooledName] = texture;
+        core::Logger::Info("[ResourceManager] Loaded texture '{}' ({})",
+                           name, path);
         return texture;
     } catch (const core::GraphicsError& err) {
         throw core::ResourceError("texture", name, std::string(err.what()));
@@ -119,7 +150,7 @@ std::shared_ptr<Texture> ResourceManager::LoadTexture(const std::string& name,
 }
 
 std::shared_ptr<Texture> ResourceManager::GetTexture(const std::string& name) {
-    auto it = textures.find(name);
+    auto it = textures.find(std::string_view{name});
     if (it != textures.end()) {
         return it->second;
     }
@@ -132,9 +163,7 @@ std::shared_ptr<Texture> ResourceManager::GetTexture(const char* name) {
 }
 
 std::shared_ptr<Texture> ResourceManager::GetTexture(std::string_view name) {
-    // Create temporary string only for lookup (std::unordered_map requires string key)
-    // This is still more efficient than passing std::string by value
-    auto it = textures.find(std::string(name));
+    auto it = textures.find(name);
     if (it != textures.end()) {
         return it->second;
     }
@@ -150,16 +179,17 @@ bool ResourceManager::HasTexture(const char* name) {
 }
 
 bool ResourceManager::HasTexture(std::string_view name) {
-    return textures.find(std::string(name)) != textures.end();
+    return textures.find(name) != textures.end();
 }
 
 std::shared_ptr<Texture> ResourceManager::ReloadTexture(const std::string& name,
     const std::string& path) {
     try {
         auto texture = std::make_shared<Texture>(Texture::loadOrThrow(path));
-        textures[name] = texture;
-        core::Logger::Info("[ResourceManager] Reloaded texture '%s' (%s)",
-                           name.c_str(), path.c_str());
+        const char* pooledName = InternString(name);
+        textures[pooledName] = texture;
+        core::Logger::Info("[ResourceManager] Reloaded texture '{}' ({})",
+                           name, path);
         return texture;
     } catch (const core::GraphicsError& err) {
         throw core::ResourceError("texture", name, std::string(err.what()));
@@ -170,16 +200,17 @@ std::shared_ptr<Texture> ResourceManager::ReloadTexture(const std::string& name,
 
 std::shared_ptr<Mesh> ResourceManager::LoadMesh(const std::string& name,
     const std::string& path) {
-    auto it = meshes.find(name);
+    auto it = meshes.find(std::string_view{name});
     if (it != meshes.end()) {
         return it->second;
     }
     
     try {
         auto mesh = std::make_shared<Mesh>(ObjLoader::LoadObjPNUV(path));
-        meshes[name] = mesh;
-        core::Logger::Info("[ResourceManager] Loaded mesh '%s' (%s)",
-                           name.c_str(), path.c_str());
+        const char* pooledName = InternString(name);
+        meshes[pooledName] = mesh;
+        core::Logger::Info("[ResourceManager] Loaded mesh '{}' ({})",
+                           name, path);
         return mesh;
     } catch (const core::ResourceError&) {
         throw;
@@ -189,7 +220,7 @@ std::shared_ptr<Mesh> ResourceManager::LoadMesh(const std::string& name,
 }
 
 std::shared_ptr<Mesh> ResourceManager::GetMesh(const std::string& name) {
-    auto it = meshes.find(name);
+    auto it = meshes.find(std::string_view{name});
     if (it != meshes.end()) {
         return it->second;
     }
@@ -202,9 +233,7 @@ std::shared_ptr<Mesh> ResourceManager::GetMesh(const char* name) {
 }
 
 std::shared_ptr<Mesh> ResourceManager::GetMesh(std::string_view name) {
-    // Create temporary string only for lookup (std::unordered_map requires string key)
-    // This is still more efficient than passing std::string by value
-    auto it = meshes.find(std::string(name));
+    auto it = meshes.find(name);
     if (it != meshes.end()) {
         return it->second;
     }
@@ -220,16 +249,17 @@ bool ResourceManager::HasMesh(const char* name) {
 }
 
 bool ResourceManager::HasMesh(std::string_view name) {
-    return meshes.find(std::string(name)) != meshes.end();
+    return meshes.find(name) != meshes.end();
 }
 
 std::shared_ptr<Mesh> ResourceManager::ReloadMesh(const std::string& name,
     const std::string& path) {
     try {
         auto mesh = std::make_shared<Mesh>(ObjLoader::LoadObjPNUV(path));
-        meshes[name] = mesh;
-        core::Logger::Info("[ResourceManager] Reloaded mesh '%s' (%s)",
-                           name.c_str(), path.c_str());
+        const char* pooledName = InternString(name);
+        meshes[pooledName] = mesh;
+        core::Logger::Info("[ResourceManager] Reloaded mesh '{}' ({})",
+                           name, path);
         return mesh;
     } catch (const core::ResourceError&) {
         throw;

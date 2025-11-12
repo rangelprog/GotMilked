@@ -64,7 +64,7 @@ public:
         // Validate directory exists
         std::error_code ec;
         if (!std::filesystem::exists(watchDir, ec) || !std::filesystem::is_directory(watchDir, ec)) {
-            gm::core::Logger::Warning("[HotReloader] Watch directory does not exist: %s", watchDir.string().c_str());
+            gm::core::Logger::Warning("[HotReloader] Watch directory does not exist: {}", watchDir.string());
             return false;
         }
 
@@ -90,8 +90,8 @@ public:
 
             if (m_directoryHandle == INVALID_HANDLE_VALUE) {
                 DWORD error = GetLastError();
-                gm::core::Logger::Warning("[HotReloader] Failed to open directory for watching: %s (error: %lu)", 
-                                        watchDir.string().c_str(), error);
+                gm::core::Logger::Warning("[HotReloader] Failed to open directory for watching: {} (error: {})", 
+                                        watchDir.string(), error);
                 return false;
             }
 
@@ -103,11 +103,11 @@ public:
             } catch (const std::exception& e) {
                 CloseHandle(m_directoryHandle);
                 m_directoryHandle = INVALID_HANDLE_VALUE;
-                gm::core::Logger::Error("[HotReloader] Failed to create watch thread: %s", e.what());
+                gm::core::Logger::Error("[HotReloader] Failed to create watch thread: {}", e.what());
                 return false;
             }
         } catch (const std::exception& e) {
-            gm::core::Logger::Error("[HotReloader] Exception in StartWatching: %s", e.what());
+            gm::core::Logger::Error("[HotReloader] Exception in StartWatching: {}", e.what());
             return false;
         }
 
@@ -172,7 +172,7 @@ private:
                 DWORD error = GetLastError();
                 if (error != ERROR_IO_PENDING) {
                     if (error != ERROR_INVALID_HANDLE) {
-                        gm::core::Logger::Warning("[HotReloader] ReadDirectoryChangesW failed: %lu", error);
+                        gm::core::Logger::Warning("[HotReloader] ReadDirectoryChangesW failed: {}", error);
                     }
                     break;
                 }
@@ -187,12 +187,12 @@ private:
                 } else {
                     DWORD error = GetLastError();
                     if (error != ERROR_IO_INCOMPLETE && error != ERROR_INVALID_HANDLE) {
-                        gm::core::Logger::Warning("[HotReloader] GetOverlappedResult failed: %lu", error);
+                        gm::core::Logger::Warning("[HotReloader] GetOverlappedResult failed: {}", error);
                     }
                 }
             } else if (waitResult == WAIT_FAILED) {
                 DWORD error = GetLastError();
-                gm::core::Logger::Warning("[HotReloader] WaitForSingleObject failed: %lu", error);
+                gm::core::Logger::Warning("[HotReloader] WaitForSingleObject failed: {}", error);
                 break;
             }
         }
@@ -246,7 +246,7 @@ private:
                                     m_onChange(watchedPath);
                                 } catch (const std::exception& e) {
                                     // Log but don't crash if callback throws
-                                    gm::core::Logger::Error("[HotReloader] Callback exception: %s", e.what());
+                                    gm::core::Logger::Error("[HotReloader] Callback exception: {}", e.what());
                                 } catch (...) {
                                     gm::core::Logger::Error("[HotReloader] Callback threw unknown exception");
                                 }
@@ -258,7 +258,7 @@ private:
                     }
                 }
             } catch (const std::exception& e) {
-                gm::core::Logger::Warning("[HotReloader] Exception processing file change: %s", e.what());
+                gm::core::Logger::Warning("[HotReloader] Exception processing file change: {}", e.what());
             }
 
             if (info->NextEntryOffset == 0) {
@@ -406,7 +406,7 @@ HotReloader::HotReloader() {
         m_watcherImpl = std::make_unique<FallbackFileWatcher>();
 #endif
     } catch (const std::exception& e) {
-        gm::core::Logger::Error("[HotReloader] Failed to create file watcher: %s", e.what());
+        gm::core::Logger::Error("[HotReloader] Failed to create file watcher: {}", e.what());
 #ifdef _WIN32
         // On Windows, try to create a WindowsFileWatcher again, or leave as nullptr
         // The polling fallback will work even without a watcher
@@ -445,8 +445,8 @@ void HotReloader::AddWatch(const std::string& id,
                            const std::vector<std::filesystem::path>& paths,
                            ReloadCallback callback) {
     if (paths.empty() || !callback) {
-        gm::core::Logger::Warning("[HotReloader] Ignoring watch '%s' with no paths or callback",
-                                  id.c_str());
+        gm::core::Logger::Warning("[HotReloader] Ignoring watch '{}' with no paths or callback",
+                                  id);
         return;
     }
 
@@ -464,8 +464,8 @@ void HotReloader::AddWatch(const std::string& id,
         watched.timestamp = GetTimestamp(path, ok);
         watched.missingLogged = !ok;
         if (!ok) {
-            gm::core::Logger::Warning("[HotReloader] File '%s' for watch '%s' missing or inaccessible",
-                                      path.string().c_str(), id.c_str());
+            gm::core::Logger::Warning("[HotReloader] File '{}' for watch '{}' missing or inaccessible",
+                                      path.string(), id);
         }
         entry.paths.emplace_back(std::move(watched));
     }
@@ -494,7 +494,7 @@ void HotReloader::AddWatch(const std::string& id,
                 m_pendingCallbacks.push_back({id, changedPath});
                 // Don't log here as it might be called frequently
             } catch (const std::exception& e) {
-                gm::core::Logger::Error("[HotReloader] Exception queuing callback: %s", e.what());
+                gm::core::Logger::Error("[HotReloader] Exception queuing callback: {}", e.what());
             } catch (...) {
                 gm::core::Logger::Error("[HotReloader] Unknown exception queuing callback");
             }
@@ -502,13 +502,13 @@ void HotReloader::AddWatch(const std::string& id,
 
         try {
             if (m_watcherImpl && m_watcherImpl->StartWatching(paths, onChange)) {
-                gm::core::Logger::Info("[HotReloader] Using native file watcher for '%s'", id.c_str());
+                gm::core::Logger::Info("[HotReloader] Using native file watcher for '{}'", id);
                 return;  // Native watching is active, no need for polling
             }
         } catch (const std::exception& e) {
-            gm::core::Logger::Error("[HotReloader] Exception starting native watcher for '%s': %s", id.c_str(), e.what());
+            gm::core::Logger::Error("[HotReloader] Exception starting native watcher for '{}': {}", id, e.what());
         } catch (...) {
-            gm::core::Logger::Error("[HotReloader] Unknown exception starting native watcher for '%s'", id.c_str());
+            gm::core::Logger::Error("[HotReloader] Unknown exception starting native watcher for '{}'", id);
         }
     }
 
@@ -564,7 +564,7 @@ void HotReloader::ProcessPendingCallbacks() {
             callbacksToProcess = std::move(m_pendingCallbacks);
             m_pendingCallbacks.clear();
         } catch (const std::exception& e) {
-            gm::core::Logger::Error("[HotReloader] Exception accessing pending callbacks: %s", e.what());
+            gm::core::Logger::Error("[HotReloader] Exception accessing pending callbacks: {}", e.what());
             return;
         }
     }
@@ -585,11 +585,11 @@ void HotReloader::ProcessPendingCallbacks() {
                                 try {
                                     success = watch.callback();
                                 } catch (const std::exception& e) {
-                                    gm::core::Logger::Error("[HotReloader] Callback exception for '%s': %s", 
-                                                           pending.watchId.c_str(), e.what());
+                                    gm::core::Logger::Error("[HotReloader] Callback exception for '{}': {}", 
+                                                           pending.watchId, e.what());
                                 } catch (...) {
-                                    gm::core::Logger::Error("[HotReloader] Callback threw unknown exception for '%s'", 
-                                                           pending.watchId.c_str());
+                                    gm::core::Logger::Error("[HotReloader] Callback threw unknown exception for '{}'", 
+                                                           pending.watchId);
                                 }
                             }
                             
@@ -597,9 +597,9 @@ void HotReloader::ProcessPendingCallbacks() {
                                 // Update timestamp
                                 bool ok = false;
                                 watchedPath.timestamp = GetTimestamp(watchedPath.path, ok);
-                                gm::core::Logger::Info("[HotReloader] Reloaded '%s' successfully", pending.watchId.c_str());
+                                gm::core::Logger::Info("[HotReloader] Reloaded '{}' successfully", pending.watchId);
                             } else {
-                                gm::core::Logger::Warning("[HotReloader] Reload failed for '%s'", pending.watchId.c_str());
+                                gm::core::Logger::Warning("[HotReloader] Reload failed for '{}'", pending.watchId);
                             }
                             break;  // Found matching path, move to next callback
                         }
@@ -626,8 +626,8 @@ void HotReloader::Poll() {
 
             if (!ok) {
                 if (!pathEntry.missingLogged) {
-                    gm::core::Logger::Warning("[HotReloader] File '%s' for watch '%s' missing or unreadable",
-                                              pathEntry.path.string().c_str(), watch.id.c_str());
+                    gm::core::Logger::Warning("[HotReloader] File '{}' for watch '{}' missing or unreadable",
+                                              pathEntry.path.string(), watch.id);
                     pathEntry.missingLogged = true;
                 }
                 newTimestamps.emplace_back(pathEntry.timestamp);
@@ -635,8 +635,8 @@ void HotReloader::Poll() {
             }
 
             if (pathEntry.missingLogged) {
-                gm::core::Logger::Info("[HotReloader] File '%s' for watch '%s' is now available",
-                                       pathEntry.path.string().c_str(), watch.id.c_str());
+                gm::core::Logger::Info("[HotReloader] File '{}' for watch '{}' is now available",
+                                       pathEntry.path.string(), watch.id);
                 pathEntry.missingLogged = false;
             }
 
@@ -647,15 +647,15 @@ void HotReloader::Poll() {
         }
 
         if (shouldReload) {
-            gm::core::Logger::Info("[HotReloader] Detected change for '%s', reloading...", watch.id.c_str());
+            gm::core::Logger::Info("[HotReloader] Detected change for '{}', reloading...", watch.id);
             bool success = watch.callback ? watch.callback() : false;
             if (success) {
                 for (std::size_t i = 0; i < watch.paths.size(); ++i) {
                     watch.paths[i].timestamp = newTimestamps[i];
                 }
-                gm::core::Logger::Info("[HotReloader] Reloaded '%s' successfully", watch.id.c_str());
+                gm::core::Logger::Info("[HotReloader] Reloaded '{}' successfully", watch.id);
             } else {
-                gm::core::Logger::Warning("[HotReloader] Reload failed for '%s'", watch.id.c_str());
+                gm::core::Logger::Warning("[HotReloader] Reload failed for '{}'", watch.id);
             }
         }
     }

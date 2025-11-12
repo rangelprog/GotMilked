@@ -114,7 +114,7 @@ int GameApp::Run(const GameAppCallbacks& callbacks) {
 }
 
 void GameApp::ErrorCallback(int code, const char* desc) {
-    core::Logger::Error("[GameApp] GLFW error %d: %s", code, desc ? desc : "unknown");
+    core::Logger::Error("[GameApp] GLFW error {}: {}", code, desc ? desc : "unknown");
 }
 
 bool GameApp::InitializeWindow() {

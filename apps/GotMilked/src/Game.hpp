@@ -16,6 +16,12 @@ namespace gm {
     namespace core { class InputManager; }
 }
 
+#ifdef _DEBUG
+namespace gm::tooling {
+    class DebugConsole;
+}
+#endif
+
 #include "gm/scene/GameObject.hpp"
 #include "gm/utils/Config.hpp"
 #include "GameResources.hpp"
@@ -59,6 +65,7 @@ private:
 #ifdef _DEBUG
     std::unique_ptr<DebugMenu> m_debugMenu;
     bool m_debugMenuVisible = false;
+    std::unique_ptr<gm::tooling::DebugConsole> m_debugConsole;
 #endif
     bool m_overlayVisible = false;
     bool m_vsyncEnabled = true;  // Track VSync state
@@ -68,6 +75,7 @@ private:
     void ForceResourceReload();
 
     // Initialization helpers
+    bool SetupLogging();
     bool SetupPhysics();
     bool SetupRendering();
     void SetupInput();

@@ -4,8 +4,13 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <sstream>
 #include <vector>
+#include <cstring>
 
 namespace gm {
+
+Shader::UniformRecord::UniformRecord() {
+    std::memset(&value, 0, sizeof(value));
+}
 
 Shader::~Shader() {
     if (m_id)
@@ -34,7 +39,7 @@ Shader& Shader::operator=(Shader&& other) noexcept {
 /*static*/ bool Shader::readFile(const std::string& path, std::string& out) {
     std::ifstream in(path, std::ios::binary);
     if (!in) {
-        core::Logger::Error("Shader: failed to open file: %s", path.c_str());
+        core::Logger::Error("Shader: failed to open file: {}", path);
         return false;
     }
     std::ostringstream ss;
@@ -54,7 +59,7 @@ GLuint Shader::compile(GLenum type, const char* src) {
         glGetShaderiv(id, GL_INFO_LOG_LENGTH, &len);
         std::vector<char> log(static_cast<size_t>(len) + 1);
         glGetShaderInfoLog(id, len, nullptr, log.data());
-        core::Logger::Error("Shader: compile failed: %s", log.data());
+        core::Logger::Error("Shader: compile failed: {}", log.data());
         glDeleteShader(id);
         return 0;
     }
@@ -73,7 +78,7 @@ GLuint Shader::link(GLuint vs, GLuint fs) {
         glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &len);
         std::vector<char> log(static_cast<size_t>(len) + 1);
         glGetProgramInfoLog(prog, len, nullptr, log.data());
-        core::Logger::Error("Shader: link failed: %s", log.data());
+        core::Logger::Error("Shader: link failed: {}", log.data());
         glDeleteProgram(prog);
         return 0;
     }
@@ -114,62 +119,118 @@ void Shader::ClearUniformCache() const {
     m_uniformCache.clear();
 }
 
+Shader::UniformRecord* Shader::GetUniformRecord(std::string_view name) const {
+    if (!m_id || name.empty()) {
+        return nullptr;
+    }
+
+    std::string key(name);
+    auto it = m_uniformCache.find(key);
+    if (it == m_uniformCache.end()) {
+        UniformRecord record;
+        record.location = glGetUniformLocation(m_id, key.c_str());
+        it = m_uniformCache.emplace(std::move(key), record).first;
+    }
+    return &it->second;
+}
+
 GLint Shader::uniformLoc(const char* name) const {
     return uniformLoc(std::string_view(name));
 }
 
 GLint Shader::uniformLoc(std::string_view name) const {
-    if (!m_id || name.empty()) {
-        return -1;
+    if (auto* record = GetUniformRecord(name)) {
+        return record->location;
     }
-    
-    // Convert string_view to string for map lookup
-    // We need to store as string in the cache anyway
-    std::string nameStr(name);
-    
-    // Check cache first
-    auto it = m_uniformCache.find(nameStr);
-    if (it != m_uniformCache.end()) {
-        return it->second;
-    }
-    
-    // Not in cache, query OpenGL
-    GLint location = glGetUniformLocation(m_id, nameStr.c_str());
-    
-    // Cache the result (even if -1, to avoid repeated lookups for missing uniforms)
-    m_uniformCache[nameStr] = location;
-    
-    return location;
+    return -1;
 }
 
 void Shader::SetMat4(const char* name, const glm::mat4& m) const {
-    const GLint loc = uniformLoc(name);
-    if (loc >= 0)
-        glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(m));
+    auto* record = GetUniformRecord(name);
+    if (!record || record->location < 0) {
+        return;
+    }
+
+    const auto* data = glm::value_ptr(m);
+    if (record->hasValue && record->type == UniformRecord::Type::Mat4 &&
+        std::memcmp(record->value.mat4Value, data, sizeof(float) * 16) == 0) {
+        return;
+    }
+
+    record->type = UniformRecord::Type::Mat4;
+    std::memcpy(record->value.mat4Value, data, sizeof(float) * 16);
+    record->hasValue = true;
+    glUniformMatrix4fv(record->location, 1, GL_FALSE, data);
 }
 
 void Shader::SetFloat(const char* name, float v) const {
-    const GLint loc = uniformLoc(name);
-    if (loc >= 0)
-        glUniform1f(loc, v);
+    auto* record = GetUniformRecord(name);
+    if (!record || record->location < 0) {
+        return;
+    }
+
+    if (record->hasValue && record->type == UniformRecord::Type::Float &&
+        record->value.floatValue == v) {
+        return;
+    }
+
+    record->type = UniformRecord::Type::Float;
+    record->value.floatValue = v;
+    record->hasValue = true;
+    glUniform1f(record->location, v);
 }
 
 void Shader::SetInt(const char* name, int v) const {
-    const GLint loc = uniformLoc(name);
-    if (loc >= 0)
-        glUniform1i(loc, v);
+    auto* record = GetUniformRecord(name);
+    if (!record || record->location < 0) {
+        return;
+    }
+
+    if (record->hasValue && record->type == UniformRecord::Type::Int &&
+        record->value.intValue == v) {
+        return;
+    }
+
+    record->type = UniformRecord::Type::Int;
+    record->value.intValue = v;
+    record->hasValue = true;
+    glUniform1i(record->location, v);
 }
 
 void Shader::SetVec3(const char* name, const glm::vec3& v) const {
-    const GLint loc = uniformLoc(name);
-    if (loc >= 0)
-        glUniform3fv(loc, 1, glm::value_ptr(v));
+    auto* record = GetUniformRecord(name);
+    if (!record || record->location < 0) {
+        return;
+    }
+
+    const auto* data = glm::value_ptr(v);
+    if (record->hasValue && record->type == UniformRecord::Type::Vec3 &&
+        std::memcmp(record->value.vec3Value, data, sizeof(float) * 3) == 0) {
+        return;
+    }
+
+    record->type = UniformRecord::Type::Vec3;
+    std::memcpy(record->value.vec3Value, data, sizeof(float) * 3);
+    record->hasValue = true;
+    glUniform3fv(record->location, 1, data);
 }
 
 void Shader::SetMat3(const char* name, const glm::mat3& m) const {
-    const GLint loc = uniformLoc(name);
-    if (loc >= 0)
-        glUniformMatrix3fv(loc, 1, GL_FALSE, glm::value_ptr(m));
+    auto* record = GetUniformRecord(name);
+    if (!record || record->location < 0) {
+        return;
+    }
+
+    const auto* data = glm::value_ptr(m);
+    if (record->hasValue && record->type == UniformRecord::Type::Mat3 &&
+        std::memcmp(record->value.mat3Value, data, sizeof(float) * 9) == 0) {
+        return;
+    }
+
+    record->type = UniformRecord::Type::Mat3;
+    std::memcpy(record->value.mat3Value, data, sizeof(float) * 9);
+    record->hasValue = true;
+    glUniformMatrix3fv(record->location, 1, GL_FALSE, data);
 }
 
 } // namespace gm

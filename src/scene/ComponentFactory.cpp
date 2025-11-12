@@ -21,33 +21,33 @@ bool ComponentFactory::Unregister(const std::string& typeName) {
 
 std::shared_ptr<Component> ComponentFactory::Create(const std::string& typeName, GameObject* obj) const {
     if (!obj) {
-        core::Logger::Error("[ComponentFactory] Cannot create component '%s': invalid GameObject", 
-                    typeName.c_str());
+        core::Logger::Error("[ComponentFactory] Cannot create component '{}': invalid GameObject", 
+                    typeName);
         return nullptr;
     }
 
     auto it = m_creators.find(typeName);
     if (it == m_creators.end()) {
-        core::Logger::Error("[ComponentFactory] Component type '%s' is not registered", 
-                    typeName.c_str());
+        core::Logger::Error("[ComponentFactory] Component type '{}' is not registered", 
+                    typeName);
         return nullptr;
     }
 
     try {
         auto component = it->second(obj);
         if (!component) {
-            core::Logger::Error("[ComponentFactory] Creator function returned null for type '%s'", 
-                        typeName.c_str());
+            core::Logger::Error("[ComponentFactory] Creator function returned null for type '{}'", 
+                        typeName);
             return nullptr;
         }
         return component;
     } catch (const std::exception& ex) {
-        core::Logger::Error("[ComponentFactory] Exception while creating component '%s': %s", 
-                    typeName.c_str(), ex.what());
+        core::Logger::Error("[ComponentFactory] Exception while creating component '{}': {}", 
+                    typeName, ex.what());
         return nullptr;
     } catch (...) {
-        core::Logger::Error("[ComponentFactory] Unknown exception while creating component '%s'", 
-                    typeName.c_str());
+        core::Logger::Error("[ComponentFactory] Unknown exception while creating component '{}'", 
+                    typeName);
         return nullptr;
     }
 }

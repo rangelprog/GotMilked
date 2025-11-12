@@ -80,14 +80,14 @@ bool GameResources::Load(const std::filesystem::path& assetsDir,
         gm::core::Event::Trigger(gotmilked::GameEvents::ResourceTextureLoaded);
     } catch (const gm::core::Error& err) {
         StoreError(err);
-        gm::core::Logger::Error("[GameResources] %s", err.what());
+        gm::core::Logger::Error("[GameResources] {}", err.what());
         gm::core::Event::Trigger(gotmilked::GameEvents::ResourceLoadFailed);
         gm::core::Event::TriggerWithData(gotmilked::GameEvents::ResourceLoadFailed, m_lastError.get());
         return false;
     } catch (const std::exception& ex) {
         gm::core::Error generic(std::string("GameResources load failed: ") + ex.what());
         StoreError(generic);
-        gm::core::Logger::Error("[GameResources] %s", generic.what());
+        gm::core::Logger::Error("[GameResources] {}", generic.what());
         gm::core::Event::Trigger(gotmilked::GameEvents::ResourceLoadFailed);
         gm::core::Event::TriggerWithData(gotmilked::GameEvents::ResourceLoadFailed, m_lastError.get());
         return false;
@@ -99,12 +99,11 @@ bool GameResources::Load(const std::filesystem::path& assetsDir,
             m_mesh = gm::ResourceManager::LoadMesh(m_meshGuid, m_meshPath);
             gm::core::Event::Trigger(gotmilked::GameEvents::ResourceMeshLoaded);
         } catch (const gm::core::ResourceError& err) {
-            gm::core::Logger::Warning("[GameResources] Optional mesh not loaded: %s", err.what());
+            gm::core::Logger::Warning("[GameResources] Optional mesh not loaded: {}", err.what());
             m_meshPath.clear();
         }
     } else {
-        gm::core::Logger::Warning("[GameResources] Optional mesh not found: %s", 
-                    m_meshPath.c_str());
+        gm::core::Logger::Warning("[GameResources] Optional mesh not found: {}", m_meshPath);
         m_meshPath.clear(); // Clear path to indicate mesh is not available
     }
 
@@ -154,14 +153,14 @@ bool GameResources::ReloadShader() {
         return true;
     } catch (const gm::core::Error& err) {
         StoreError(err);
-        gm::core::Logger::Error("[GameResources] %s", err.what());
+        gm::core::Logger::Error("[GameResources] {}", err.what());
         gm::core::Event::Trigger(gotmilked::GameEvents::ResourceLoadFailed);
         gm::core::Event::TriggerWithData(gotmilked::GameEvents::ResourceLoadFailed, m_lastError.get());
         return false;
     } catch (const std::exception& ex) {
         gm::core::Error err(std::string("GameResources shader reload failed: ") + ex.what());
         StoreError(err);
-        gm::core::Logger::Error("[GameResources] %s", err.what());
+        gm::core::Logger::Error("[GameResources] {}", err.what());
         gm::core::Event::Trigger(gotmilked::GameEvents::ResourceLoadFailed);
         gm::core::Event::TriggerWithData(gotmilked::GameEvents::ResourceLoadFailed, m_lastError.get());
         return false;
@@ -188,14 +187,14 @@ bool GameResources::ReloadTexture() {
         return true;
     } catch (const gm::core::Error& err) {
         StoreError(err);
-        gm::core::Logger::Error("[GameResources] %s", err.what());
+        gm::core::Logger::Error("[GameResources] {}", err.what());
         gm::core::Event::Trigger(gotmilked::GameEvents::ResourceLoadFailed);
         gm::core::Event::TriggerWithData(gotmilked::GameEvents::ResourceLoadFailed, m_lastError.get());
         return false;
     } catch (const std::exception& ex) {
         gm::core::Error err(std::string("GameResources texture reload failed: ") + ex.what());
         StoreError(err);
-        gm::core::Logger::Error("[GameResources] %s", err.what());
+        gm::core::Logger::Error("[GameResources] {}", err.what());
         gm::core::Event::Trigger(gotmilked::GameEvents::ResourceLoadFailed);
         gm::core::Event::TriggerWithData(gotmilked::GameEvents::ResourceLoadFailed, m_lastError.get());
         return false;
@@ -219,14 +218,14 @@ bool GameResources::ReloadMesh() {
         return true;
     } catch (const gm::core::Error& err) {
         StoreError(err);
-        gm::core::Logger::Error("[GameResources] %s", err.what());
+        gm::core::Logger::Error("[GameResources] {}", err.what());
         gm::core::Event::Trigger(gotmilked::GameEvents::ResourceLoadFailed);
         gm::core::Event::TriggerWithData(gotmilked::GameEvents::ResourceLoadFailed, m_lastError.get());
         return false;
     } catch (const std::exception& ex) {
         gm::core::Error err(std::string("GameResources mesh reload failed: ") + ex.what());
         StoreError(err);
-        gm::core::Logger::Error("[GameResources] %s", err.what());
+        gm::core::Logger::Error("[GameResources] {}", err.what());
         gm::core::Event::Trigger(gotmilked::GameEvents::ResourceLoadFailed);
         gm::core::Event::TriggerWithData(gotmilked::GameEvents::ResourceLoadFailed, m_lastError.get());
         return false;

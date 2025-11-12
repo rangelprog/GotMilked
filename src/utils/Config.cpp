@@ -43,7 +43,7 @@ static T GetOrDefault(const nlohmann::json& obj, const char* key, const T& fallb
     try {
         return it->get<T>();
     } catch (const nlohmann::json::exception& e) {
-        gm::core::Logger::Warning("[ConfigLoader] Failed to parse key '%s': %s", key, e.what());
+        gm::core::Logger::Warning("[ConfigLoader] Failed to parse key '{}': {}", key, e.what());
         return fallback;
     }
 }
@@ -81,14 +81,14 @@ ConfigLoadResult ConfigLoader::Load(const std::filesystem::path& path) {
     std::error_code ec;
     if (path.empty() || !std::filesystem::exists(path, ec)) {
         gm::core::Logger::Warning(
-            "[ConfigLoader] Config file '%s' not found, using defaults",
-            path.empty() ? "<none>" : path.string().c_str());
+            "[ConfigLoader] Config file '{}' not found, using defaults",
+            path.empty() ? "<none>" : path.string());
         return result;
     }
 
     std::ifstream file(path);
     if (!file) {
-        gm::core::Logger::Error("[ConfigLoader] Failed to open config file '%s'", path.string().c_str());
+        gm::core::Logger::Error("[ConfigLoader] Failed to open config file '{}'", path.string());
         return result;
     }
 
@@ -96,8 +96,8 @@ ConfigLoadResult ConfigLoader::Load(const std::filesystem::path& path) {
     try {
         file >> json;
     } catch (const nlohmann::json::exception& e) {
-        gm::core::Logger::Error("[ConfigLoader] Failed to parse JSON '%s': %s",
-                                path.string().c_str(), e.what());
+        gm::core::Logger::Error("[ConfigLoader] Failed to parse JSON '{}': {}",
+                                path.string(), e.what());
         return result;
     }
 
@@ -134,14 +134,14 @@ ConfigLoadResult ConfigLoader::Load(const std::filesystem::path& path) {
     result.config.hotReload.pollIntervalSeconds =
         GetOrDefault<double>(hotReloadObj, "pollIntervalSeconds", result.config.hotReload.pollIntervalSeconds);
     if (result.config.hotReload.pollIntervalSeconds <= 0.0) {
-        gm::core::Logger::Warning("[ConfigLoader] hotReload.pollIntervalSeconds (%.3f) must be positive; clamping to 0.1",
+        gm::core::Logger::Warning("[ConfigLoader] hotReload.pollIntervalSeconds ({:.3f}) must be positive; clamping to 0.1",
                                   result.config.hotReload.pollIntervalSeconds);
         result.config.hotReload.pollIntervalSeconds = 0.1;
     }
 
     result.config.configDirectory = baseDir;
     result.loadedFromFile = true;
-    gm::core::Logger::Info("[ConfigLoader] Loaded config from '%s'", path.string().c_str());
+    gm::core::Logger::Info("[ConfigLoader] Loaded config from '{}'", path.string());
     return result;
 }
 

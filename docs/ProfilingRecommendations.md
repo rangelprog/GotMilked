@@ -308,8 +308,8 @@ public:
     void LogResults() {
         core::Logger::Info("=== System Performance ===");
         for (const auto& [name, timing] : m_systemTimings) {
-            core::Logger::Info("%s: %.2fms (avg), %d calls",
-                              timing.name.c_str(),
+        core::Logger::Info("{}: {:.2f}ms (avg), {} calls",
+                              timing.name,
                               timing.averageTime,
                               timing.callCount);
         }
@@ -377,8 +377,8 @@ public:
         auto& afterSnap = m_snapshots[after];
         
         size_t diff = afterSnap.currentAllocated - beforeSnap.currentAllocated;
-        core::Logger::Info("Memory change: %s -> %s: %zu bytes (%.2f MB)",
-                          before.c_str(), after.c_str(), diff, diff / 1024.0f / 1024.0f);
+        core::Logger::Info("Memory change: {} -> {}: {} bytes ({:.2f} MB)",
+                          before, after, diff, diff / 1024.0f / 1024.0f);
     }
     
 private:
@@ -416,11 +416,11 @@ public:
     
     void LogStats() {
         core::Logger::Info("=== Render Stats ===");
-        core::Logger::Info("Draw Calls: %d", m_drawCalls);
-        core::Logger::Info("Triangles: %d", m_triangles);
-        core::Logger::Info("Vertices: %d", m_vertices);
-        core::Logger::Info("Texture Binds: %d", m_textureBinds);
-        core::Logger::Info("Shader Binds: %d", m_shaderBinds);
+        core::Logger::Info("Draw Calls: {}", m_drawCalls);
+        core::Logger::Info("Triangles: {}", m_triangles);
+        core::Logger::Info("Vertices: {}", m_vertices);
+        core::Logger::Info("Texture Binds: {}", m_textureBinds);
+        core::Logger::Info("Shader Binds: {}", m_shaderBinds);
     }
     
 private:
@@ -478,7 +478,7 @@ void CompareProfiles(const Profile& before, const Profile& after) {
         (before.averageFrameTime - after.averageFrameTime) / 
         before.averageFrameTime * 100.0f;
     
-    core::Logger::Info("Frame time improvement: %.2f%%", frameTimeImprovement);
+    core::Logger::Info("Frame time improvement: {:.2f}%", frameTimeImprovement);
     
     // Verify no regressions
     assert(after.averageFrameTime <= before.averageFrameTime * 1.05f);  // Allow 5% variance
@@ -554,7 +554,7 @@ public:
         
         // Log or store timing
         if (timeMs > 1.0f) {  // Only log if > 1ms
-            core::Logger::Debug("[Zone] %s: %.2f ms", m_name, timeMs);
+            core::Logger::Debug("[Zone] {}: {:.2f} ms", m_name, timeMs);
         }
     }
     
@@ -637,9 +637,9 @@ public:
     static void PrintStats() {
         std::lock_guard<std::mutex> lock(s_mutex);
         core::Logger::Info("=== Memory Stats ===");
-        core::Logger::Info("Total Allocated: %.2f MB", s_totalAllocated / 1024.0f / 1024.0f);
-        core::Logger::Info("Allocation Count: %zu", s_allocationCount);
-        core::Logger::Info("Active Allocations: %zu", s_allocations.size());
+        core::Logger::Info("Total Allocated: {:.2f} MB", s_totalAllocated / 1024.0f / 1024.0f);
+        core::Logger::Info("Allocation Count: {}", s_allocationCount);
+        core::Logger::Info("Active Allocations: {}", s_allocations.size());
     }
     
 private:
@@ -716,7 +716,7 @@ public:
         glGetQueryObjectui64v(m_query, GL_QUERY_RESULT, &timeElapsed);
         float timeMs = timeElapsed / 1000000.0f;  // Convert to ms
         
-        core::Logger::Info("GPU Time: %.2f ms", timeMs);
+        core::Logger::Info("GPU Time: {:.2f} ms", timeMs);
         
         glDeleteQueries(1, &m_query);
     }
@@ -816,7 +816,7 @@ public:
     void LogCounters() {
         core::Logger::Info("=== Performance Counters ===");
         for (const auto& [name, value] : m_counters) {
-            core::Logger::Info("%s: %d", name.c_str(), value);
+            core::Logger::Info("{}: {}", name.c_str(), value);
         }
     }
     
@@ -894,7 +894,7 @@ public:
         // Fail if performance regressed by more than 5%
         if (current.averageFrameTime > baseline.averageFrameTime * 1.05f) {
             core::Logger::Error("Performance regression detected!");
-            core::Logger::Error("Baseline: %.2f ms, Current: %.2f ms",
+            core::Logger::Error("Baseline: {:.2f} ms, Current: {:.2f} ms",
                                baseline.averageFrameTime, current.averageFrameTime);
             return false;
         }

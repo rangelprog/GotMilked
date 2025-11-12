@@ -1,8 +1,12 @@
 #pragma once
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <string_view>
 #include <memory>
+#include <mutex>
+#include <vector>
+#include <cstring>
 
 namespace gm {
 
@@ -12,9 +16,47 @@ class Mesh;
 
 class ResourceManager {
 private:
-    static std::unordered_map<std::string, std::shared_ptr<Shader>> shaders;
-    static std::unordered_map<std::string, std::shared_ptr<Texture>> textures;
-    static std::unordered_map<std::string, std::shared_ptr<Mesh>> meshes;
+    struct CStringHash {
+        using is_transparent = void;
+        std::size_t operator()(const char* value) const noexcept {
+            return std::hash<std::string_view>{}(std::string_view{value});
+        }
+        std::size_t operator()(std::string_view value) const noexcept {
+            return std::hash<std::string_view>{}(value);
+        }
+    };
+
+    struct CStringEqual {
+        using is_transparent = void;
+        bool operator()(const char* lhs, const char* rhs) const noexcept {
+            return std::strcmp(lhs, rhs) == 0;
+        }
+        bool operator()(std::string_view lhs, const char* rhs) const noexcept {
+            return lhs == std::string_view{rhs};
+        }
+        bool operator()(const char* lhs, std::string_view rhs) const noexcept {
+            return std::string_view{lhs} == rhs;
+        }
+        bool operator()(std::string_view lhs, std::string_view rhs) const noexcept {
+            return lhs == rhs;
+        }
+    };
+
+    using ShaderMap = std::unordered_map<const char*, std::shared_ptr<Shader>, CStringHash, CStringEqual>;
+    using TextureMap = std::unordered_map<const char*, std::shared_ptr<Texture>, CStringHash, CStringEqual>;
+    using MeshMap   = std::unordered_map<const char*, std::shared_ptr<Mesh>, CStringHash, CStringEqual>;
+    using StringSet = std::unordered_set<const char*, CStringHash, CStringEqual>;
+
+    static ShaderMap shaders;
+    static TextureMap textures;
+    static MeshMap meshes;
+
+    static StringSet internedStrings;
+    static std::vector<std::unique_ptr<char[]>> stringStorage;
+    static std::mutex stringPoolMutex;
+
+    static const char* InternString(std::string_view value);
+    static void ClearInternedStrings();
 
     ResourceManager() = delete;  // Static class
     

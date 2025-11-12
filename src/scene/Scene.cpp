@@ -18,11 +18,14 @@
 #include <cmath>
 #include <unordered_map>
 #include <functional>
+#include <iterator>
 
 namespace gm {
 
 namespace {
 constexpr std::string_view kGameObjectSystemName = "GameObjectUpdate";
+constexpr std::size_t kCleanupBatchThreshold = 12;
+constexpr int kMaxCleanupDelayFrames = 4;
 } // namespace
 
 class GameObjectUpdateSystem final : public SceneSystem {
@@ -152,32 +155,130 @@ void Scene::UpdateActiveLists() {
     m_activeListsDirty = false;
 }
 
+void Scene::EnsureNameLookup() {
+    if (!m_nameLookupDirty) {
+        return;
+    }
+
+    objectsByName.clear();
+
+    for (const auto& gameObject : gameObjects) {
+        if (!gameObject || gameObject->IsDestroyed()) {
+            continue;
+        }
+
+        const std::string& objName = gameObject->GetName();
+        if (objName.empty()) {
+            continue;
+        }
+
+        auto [it, inserted] = objectsByName.emplace(objName, gameObject);
+        if (!inserted) {
+            auto existing = it->second;
+            if (existing && existing != gameObject) {
+                core::Logger::Warning("[Scene] Duplicate GameObject name '{}' detected; keeping first instance",
+                                      objName);
+            }
+        }
+    }
+
+    m_nameLookupDirty = false;
+}
+
+void Scene::HandleGameObjectRename(GameObject& object, const std::string& oldName, const std::string& newName) {
+    if (&object == nullptr || oldName == newName) {
+        return;
+    }
+
+    MarkNameLookupDirty();
+
+    if (newName.empty()) {
+        return;
+    }
+
+    EnsureNameLookup();
+
+    auto it = objectsByName.find(newName);
+    if (it != objectsByName.end()) {
+        auto existing = it->second;
+        if (existing && existing.get() != &object) {
+            core::Logger::Warning("[Scene] GameObject rename conflict: '{}' already exists; keeping first instance",
+                                  newName);
+        }
+    }
+}
+
+void Scene::ResetCleanupCounters() {
+    m_destroyedSinceLastCleanup = 0;
+    m_framesSinceLastCleanup = 0;
+}
+
 void Scene::CleanupDestroyedObjects() {
-    // Remove destroyed GameObjects
-    auto it = std::remove_if(gameObjects.begin(), gameObjects.end(),
-        [this](const std::shared_ptr<GameObject>& obj) {
-            if (obj && obj->IsDestroyed()) {
-                // Remove from tags map
-                for (auto& [tag, objects] : objectsByTag) {
-                    auto tagIt = std::remove(objects.begin(), objects.end(), obj);
-                    objects.erase(tagIt, objects.end());
-                }
-                // Remove from name map (GetName() returns const reference, no copy)
-                const std::string& objName = obj->GetName();
+    if (m_destroyedSinceLastCleanup == 0) {
+        return;
+    }
+
+    ++m_framesSinceLastCleanup;
+
+    if (m_destroyedSinceLastCleanup < kCleanupBatchThreshold &&
+        m_framesSinceLastCleanup < kMaxCleanupDelayFrames) {
+        return;
+    }
+
+    std::vector<std::shared_ptr<GameObject>> recycledObjects;
+    bool removedAny = false;
+
+    for (auto it = gameObjects.begin(); it != gameObjects.end();) {
+        auto& obj = *it;
+        if (obj && obj->IsDestroyed()) {
+            // Remove from tags map
+            for (auto& [tag, objects] : objectsByTag) {
+                auto tagIt = std::remove(objects.begin(), objects.end(), obj);
+                objects.erase(tagIt, objects.end());
+            }
+
+            // Remove from name map
+            const std::string& objName = obj->GetName();
+            if (!objName.empty()) {
                 auto nameIt = objectsByName.find(objName);
                 if (nameIt != objectsByName.end() && nameIt->second == obj) {
                     objectsByName.erase(nameIt);
                 }
-                return true;
             }
-            return false;
-        });
-    
-    bool removed = (it != gameObjects.end());
-    if (removed) {
-        gameObjects.erase(it, gameObjects.end());
-        m_activeListsDirty = true;  // Mark lists as dirty when objects are removed
+
+            obj->SetScene(nullptr);
+            recycledObjects.push_back(std::move(obj));
+            it = gameObjects.erase(it);
+            removedAny = true;
+        } else {
+            ++it;
+        }
     }
+
+    if (removedAny) {
+        m_activeListsDirty = true;  // Mark lists as dirty when objects are removed
+        MarkNameLookupDirty();
+    }
+
+    for (auto& recycled : recycledObjects) {
+        ReleaseGameObject(std::move(recycled));
+    }
+
+    ResetCleanupCounters();
+}
+
+void Scene::ReleaseGameObject(std::shared_ptr<GameObject> gameObject) {
+    if (!gameObject) {
+        return;
+    }
+    GameObject* raw = gameObject.get();
+    raw->ResetForReuse();
+    raw->SetScene(nullptr);
+    m_availableGameObjects.push_back(std::move(gameObject));
+}
+
+void Scene::ClearObjectPool() {
+    m_availableGameObjects.clear();
 }
 
 void Scene::InitializeSystems() {
@@ -245,12 +346,19 @@ void Scene::Cleanup() {
 
     ShutdownSystems();
 
+    for (auto& obj : gameObjects) {
+        if (obj) {
+            ReleaseGameObject(std::move(obj));
+        }
+    }
     gameObjects.clear();
     objectsByTag.clear();
     objectsByName.clear();
     m_activeRenderables.clear();
     m_activeUpdatables.clear();
     m_activeListsDirty = true;
+    m_nameLookupDirty = true;
+    ResetCleanupCounters();
     isInitialized = false;
 }
 
@@ -259,17 +367,40 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string& name) {
         core::Logger::Warning("[Scene] Creating GameObject with empty name");
     }
     
+    EnsureNameLookup();
+
     // Check if name already exists
-    if (objectsByName.find(name) != objectsByName.end()) {
-        core::Logger::Warning("[Scene] GameObject with name '%s' already exists, returning existing object",
-                              name.c_str());
-        return objectsByName[name];
+    if (!name.empty()) {
+        auto existingIt = objectsByName.find(name);
+        if (existingIt != objectsByName.end() && existingIt->second) {
+            core::Logger::Warning("[Scene] GameObject with name '{}' already exists, returning existing object",
+                                  name);
+            return existingIt->second;
+        }
     }
-    
-    auto gameObject = std::make_shared<GameObject>(name);
+    auto gameObject = AcquireGameObject(name);
     gameObjects.push_back(gameObject);
-    objectsByName[name] = gameObject;
+    MarkNameLookupDirty();
     m_activeListsDirty = true;  // Mark lists as dirty when object is added
+    return gameObject;
+}
+
+std::shared_ptr<GameObject> Scene::AcquireGameObject(const std::string& name) {
+    for (auto it = m_availableGameObjects.rbegin(); it != m_availableGameObjects.rend(); ++it) {
+        if (*it && it->use_count() == 1) {
+            std::shared_ptr<GameObject> gameObject = std::move(*it);
+            m_availableGameObjects.erase(std::next(it).base());
+            GameObject* raw = gameObject.get();
+            raw->ResetForReuse();
+            raw->SetScene(this);
+            raw->SetName(name);
+            raw->SetActive(true);
+            return gameObject;
+        }
+    }
+
+    auto gameObject = std::make_shared<GameObject>(name);
+    gameObject->SetScene(this);
     return gameObject;
 }
 
@@ -288,8 +419,8 @@ void Scene::DestroyGameObject(std::shared_ptr<GameObject> gameObject) {
     }
     
     if (gameObject->IsDestroyed()) {
-        core::Logger::Warning("[Scene] GameObject '%s' is already marked for destruction",
-                              gameObject->GetName().c_str());
+        core::Logger::Warning("[Scene] GameObject '{}' is already marked for destruction",
+                              gameObject->GetName());
         return;
     }
     
@@ -304,27 +435,25 @@ void Scene::DestroyGameObject(std::shared_ptr<GameObject> gameObject) {
         UntagGameObject(gameObject, tag);
     }
 
-    const std::string& name = gameObject->GetName();
-    if (!name.empty()) {
-        auto nameIt = objectsByName.find(name);
-        if (nameIt != objectsByName.end() && nameIt->second == gameObject) {
-            objectsByName.erase(nameIt);
-        }
-    }
-
     gameObject->Destroy();
     m_activeListsDirty = true;  // Mark lists as dirty when object is destroyed
+    MarkNameLookupDirty();
+    ++m_destroyedSinceLastCleanup;
 }
 
 void Scene::DestroyGameObjectByName(const std::string& name) {
+    EnsureNameLookup();
     auto it = objectsByName.find(name);
-    if (it != objectsByName.end()) {
+    if (it != objectsByName.end() && it->second && !it->second->IsDestroyed()) {
         it->second->Destroy();
         m_activeListsDirty = true;  // Mark lists as dirty when object is destroyed
+        MarkNameLookupDirty();
+        ++m_destroyedSinceLastCleanup;
     }
 }
 
 std::shared_ptr<GameObject> Scene::FindGameObjectByName(const std::string& name) {
+    EnsureNameLookup();
     auto it = objectsByName.find(name);
     if (it != objectsByName.end()) {
         return it->second;
@@ -351,8 +480,7 @@ void Scene::RegisterSystem(const SceneSystemPtr& system) {
         });
 
     if (duplicate != systems.end()) {
-        core::Logger::Warning("[Scene] SceneSystem '%.*s' already registered", 
-                              static_cast<int>(nameView.length()), nameView.data());
+        core::Logger::Warning("[Scene] SceneSystem '{}' already registered", nameView);
         return;
     }
 
@@ -368,8 +496,8 @@ void Scene::RegisterSystem(const SceneSystemPtr& system) {
 
 bool Scene::UnregisterSystem(std::string_view name) {
     if (name == kGameObjectSystemName) {
-        core::Logger::Warning("[Scene] '%s' is a built-in system and cannot be unregistered",
-                              name.data());
+        core::Logger::Warning("[Scene] '{}' is a built-in system and cannot be unregistered",
+                              name);
         return false;
     }
 
@@ -457,12 +585,12 @@ void Scene::UntagGameObject(std::shared_ptr<GameObject> gameObject, const std::s
 
 void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovDeg) {
     if (fbw <= 0 || fbh <= 0) {
-        core::Logger::Warning("[Scene] Invalid framebuffer size (%d x %d)", fbw, fbh);
+        core::Logger::Warning("[Scene] Invalid framebuffer size ({} x {})", fbw, fbh);
         return;
     }
     
     if (fovDeg <= 0.0f || fovDeg >= 180.0f) {
-        core::Logger::Warning("[Scene] Invalid FOV: %.2f degrees (expected 0-180)", fovDeg);
+        core::Logger::Warning("[Scene] Invalid FOV: {:.2f} degrees (expected 0-180)", fovDeg);
         return;
     }
 
@@ -554,6 +682,8 @@ bool Scene::LoadFromFile(const std::string& filepath) {
     if (result) {
         // Mark active lists as dirty after loading (objects may have different active states)
         m_activeListsDirty = true;
+        MarkNameLookupDirty();
+        ResetCleanupCounters();
     }
     return result;
 }

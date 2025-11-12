@@ -57,41 +57,42 @@ static json mat4ToJson(const glm::mat4& m) {
 
 bool SceneSerializer::SaveToFile(Scene& scene, const std::string& filepath) {
     try {
-        // Build JSON object
-        json sceneJson;
-        
-        // Scene metadata
-        sceneJson["name"] = scene.GetName();
-        sceneJson["isPaused"] = scene.IsPaused();
-        
-        // Serialize all GameObjects
-        const auto& allObjects = scene.GetAllGameObjects();
-        json gameObjectsJson = json::array();
-        for (const auto& obj : allObjects) {
-            if (obj && !obj->IsDestroyed()) {
-                gameObjectsJson.push_back(SerializeGameObject(obj));
-            }
-        }
-        sceneJson["gameObjects"] = gameObjectsJson;
-        
-        // Write directly to file with compact format (no indentation) to reduce memory
-        // Use compact format for smaller file size and less memory during dump
         std::ofstream file(filepath, std::ios::binary);
         if (!file.is_open()) {
-            core::Logger::Error("[SceneSerializer] Failed to open file for writing: %s",
-                                filepath.c_str());
+            core::Logger::Error("[SceneSerializer] Failed to open file for writing: {}", filepath);
             return false;
         }
-        
-        // Use compact format (indent = -1) to reduce memory usage
-        // For debugging, use indent = 4, for production use indent = -1
-        file << sceneJson.dump(-1);  // -1 = compact (no indentation, minimal whitespace)
-        file.close();
-        
-        core::Logger::Debug("[SceneSerializer] Saved scene to: %s", filepath.c_str());
+
+        file << '{';
+        file << "\"name\":" << json(scene.GetName()).dump();
+        file << ",\"isPaused\":" << (scene.IsPaused() ? "true" : "false");
+        file << ",\"gameObjects\":[";
+
+        bool first = true;
+        const auto& allObjects = scene.GetAllGameObjects();
+        for (const auto& obj : allObjects) {
+            if (!obj || obj->IsDestroyed()) {
+                continue;
+            }
+            if (!first) {
+                file << ',';
+            }
+            first = false;
+            file << SerializeGameObject(obj).dump(-1);
+        }
+
+        file << "]}";
+        file.flush();
+
+        if (!file.good()) {
+            core::Logger::Error("[SceneSerializer] Failed while writing scene to {}", filepath);
+            return false;
+        }
+
+        core::Logger::Debug("[SceneSerializer] Saved scene to: {}", filepath);
         return true;
     } catch (const std::exception& e) {
-        core::Logger::Error("[SceneSerializer] Error saving scene: %s", e.what());
+        core::Logger::Error("[SceneSerializer] Error saving scene: {}", e.what());
         return false;
     }
 }
@@ -100,8 +101,7 @@ bool SceneSerializer::LoadFromFile(Scene& scene, const std::string& filepath) {
     try {
         std::ifstream file(filepath, std::ios::binary | std::ios::ate);
         if (!file.is_open()) {
-            core::Logger::Error("[SceneSerializer] Failed to open file for reading: %s",
-                                filepath.c_str());
+            core::Logger::Error("[SceneSerializer] Failed to open file for reading: {}", filepath);
             return false;
         }
         
@@ -120,7 +120,7 @@ bool SceneSerializer::LoadFromFile(Scene& scene, const std::string& filepath) {
         
         return Deserialize(scene, buffer);
     } catch (const std::exception& e) {
-        core::Logger::Error("[SceneSerializer] Error loading scene: %s", e.what());
+        core::Logger::Error("[SceneSerializer] Error loading scene: {}", e.what());
         return false;
     }
 }
@@ -173,11 +173,11 @@ bool SceneSerializer::Deserialize(Scene& scene, const std::string& jsonString) {
             scene.SetPaused(sceneJson["isPaused"].get<bool>());
         }
         
-        core::Logger::Debug("[SceneSerializer] Loaded scene with %zu objects",
+        core::Logger::Debug("[SceneSerializer] Loaded scene with {} objects",
                            scene.GetAllGameObjects().size());
         return true;
     } catch (const std::exception& e) {
-        core::Logger::Error("[SceneSerializer] Error deserializing scene: %s", e.what());
+        core::Logger::Error("[SceneSerializer] Error deserializing scene: {}", e.what());
         return false;
     }
 }
@@ -244,8 +244,8 @@ std::shared_ptr<GameObject> SceneSerializer::DeserializeGameObject(Scene& scene,
     auto obj = scene.CreateGameObject(name);
     
     if (!obj) {
-        core::Logger::Warning("[SceneSerializer] Failed to create GameObject: %s",
-                              name.c_str());
+        core::Logger::Warning("[SceneSerializer] Failed to create GameObject: {}",
+                              name);
         return nullptr;
     }
     
@@ -285,7 +285,7 @@ json SceneSerializer::SerializeComponent(Component* component) {
     compJson["type"] = type;
     compJson["active"] = component->IsActive();
     
-    core::Logger::Debug("[SceneSerializer] Serializing component type: %s", type.c_str());
+    core::Logger::Debug("[SceneSerializer] Serializing component type: {}", type);
     
     // Component-specific serialization
     if (type == "TransformComponent" || type == "Transform") {
@@ -300,23 +300,23 @@ json SceneSerializer::SerializeComponent(Component* component) {
     } else {
         // Try registered custom component serializers
         auto& registry = CustomSerializerRegistry();
-        core::Logger::Debug("[SceneSerializer] Looking for custom serializer for type: %s (registry size: %zu)", 
-            type.c_str(), registry.size());
+        core::Logger::Debug("[SceneSerializer] Looking for custom serializer for type: {} (registry size: {})", 
+            type, registry.size());
         auto it = registry.find(type);
         if (it != registry.end() && it->second.serialize) {
-            core::Logger::Info("[SceneSerializer] Found custom serializer for type: %s", type.c_str());
+            core::Logger::Info("[SceneSerializer] Found custom serializer for type: {}", type);
             json customData = it->second.serialize(component);
             if (!customData.is_null() && !customData.empty()) {
                 compJson["data"] = customData;
-                core::Logger::Info("[SceneSerializer] Successfully serialized component: %s", type.c_str());
+                core::Logger::Info("[SceneSerializer] Successfully serialized component: {}", type);
             } else {
-                core::Logger::Warning("[SceneSerializer] Custom serializer returned empty data for type: %s", type.c_str());
+                core::Logger::Warning("[SceneSerializer] Custom serializer returned empty data for type: {}", type);
                 return json(); // Return null to skip
             }
         } else {
             // Unknown component type - skip
-            core::Logger::Warning("[SceneSerializer] Unknown component type: %s (skipping)",
-                                  type.c_str());
+            core::Logger::Warning("[SceneSerializer] Unknown component type: {} (skipping)",
+                                  type);
             return json(); // Return null to skip
         }
     }
@@ -331,8 +331,8 @@ void SceneSerializer::DeserializeComponent(GameObject* obj, const json& componen
     }
     
     std::string type = componentJson["type"].get<std::string>();
-    core::Logger::Debug("[SceneSerializer] Deserializing component type: %s for GameObject: %s", 
-        type.c_str(), obj ? obj->GetName().c_str() : "null");
+    core::Logger::Debug("[SceneSerializer] Deserializing component type: {} for GameObject: {}", 
+        type, obj ? obj->GetName() : "null");
     
     bool active = true;
     if (componentJson.contains("active") && componentJson["active"].is_boolean()) {
@@ -355,32 +355,32 @@ void SceneSerializer::DeserializeComponent(GameObject* obj, const json& componen
     } else {
         // Try registered custom component deserializers
         auto& registry = CustomSerializerRegistry();
-        core::Logger::Debug("[SceneSerializer] Looking for custom serializer for type: %s (registry size: %zu)", 
-            type.c_str(), registry.size());
+        core::Logger::Debug("[SceneSerializer] Looking for custom serializer for type: {} (registry size: {})", 
+            type, registry.size());
         auto it = registry.find(type);
         if (it != registry.end() && it->second.deserialize) {
-            core::Logger::Info("[SceneSerializer] Found custom deserializer for type: %s", type.c_str());
+            core::Logger::Info("[SceneSerializer] Found custom deserializer for type: {}", type);
             component = it->second.deserialize(obj, data);
             if (component) {
-                core::Logger::Info("[SceneSerializer] Custom deserializer returned component: %s", 
-                    component->GetName().c_str());
+                core::Logger::Info("[SceneSerializer] Custom deserializer returned component: {}", 
+                    component->GetName());
             } else {
-                core::Logger::Warning("[SceneSerializer] Custom deserializer returned null for type: %s", type.c_str());
+                core::Logger::Warning("[SceneSerializer] Custom deserializer returned null for type: {}", type);
             }
         } else {
             core::Logger::Warning(
-                "[SceneSerializer] Unknown component type during load: %s (skipping)",
-                type.c_str());
+                "[SceneSerializer] Unknown component type during load: {} (skipping)",
+                type);
         }
     }
     
     // Set component active state
     if (component) {
         component->SetActive(active);
-        core::Logger::Debug("[SceneSerializer] Component %s set active=%s", 
-            component->GetName().c_str(), active ? "true" : "false");
+        core::Logger::Debug("[SceneSerializer] Component {} set active={}", 
+            component->GetName(), active);
     } else {
-        core::Logger::Warning("[SceneSerializer] Failed to deserialize component type: %s", type.c_str());
+        core::Logger::Warning("[SceneSerializer] Failed to deserialize component type: {}", type);
     }
 }
 

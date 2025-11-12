@@ -66,7 +66,7 @@ void RegisterSerializers() {
                 gm::core::Logger::Error("[SceneSerializer] Failed to create EditableTerrainComponent");
                 return nullptr;
             }
-            gm::core::Logger::Info("[SceneSerializer] Created EditableTerrainComponent for GameObject '%s'", obj->GetName().c_str());
+            gm::core::Logger::Info("[SceneSerializer] Created EditableTerrainComponent for GameObject '{}'", obj->GetName());
             
             // Deserialize terrain data
             int resolution = data.value("resolution", gotmilked::GameConstants::Terrain::DefaultResolution);
@@ -141,11 +141,11 @@ void RegisterSerializers() {
             
             if (!hasRequiredGUIDs && hasRequiredResources) {
                 gm::core::Logger::Warning(
-                    "[SceneSerializer] StaticMeshComponent on GameObject '%s' has resources but no GUIDs. "
-                    "Resources will not be restored after load. Mesh GUID: %s, Shader GUID: %s",
-                    meshComp->GetOwner() ? meshComp->GetOwner()->GetName().c_str() : "unknown",
-                    meshGuid.empty() ? "missing" : meshGuid.c_str(),
-                    shaderGuid.empty() ? "missing" : shaderGuid.c_str());
+                    "[SceneSerializer] StaticMeshComponent on GameObject '{}' has resources but no GUIDs. "
+                    "Resources will not be restored after load. Mesh GUID: {}, Shader GUID: {}",
+                    meshComp->GetOwner() ? meshComp->GetOwner()->GetName() : "unknown",
+                    meshGuid.empty() ? "missing" : meshGuid,
+                    shaderGuid.empty() ? "missing" : shaderGuid);
             }
             
             if (!meshGuid.empty()) {
@@ -166,10 +166,10 @@ void RegisterSerializers() {
             
             // Log serialization success
             gm::core::Logger::Debug(
-                "[SceneSerializer] Serialized StaticMeshComponent: meshGuid=%s, shaderGuid=%s, materialGuid=%s",
-                meshGuid.empty() ? "(none)" : meshGuid.c_str(),
-                shaderGuid.empty() ? "(none)" : shaderGuid.c_str(),
-                materialGuid.empty() ? "(none)" : materialGuid.c_str());
+                "[SceneSerializer] Serialized StaticMeshComponent: meshGuid={}, shaderGuid={}, materialGuid={}",
+                meshGuid.empty() ? "(none)" : meshGuid,
+                shaderGuid.empty() ? "(none)" : shaderGuid,
+                materialGuid.empty() ? "(none)" : materialGuid);
             
             return data;
         },
@@ -336,8 +336,8 @@ void RegisterSerializers() {
                 return nullptr;
             }
             
-            gm::core::Logger::Info("[SceneSerializer] Created RigidBodyComponent for GameObject '%s'", 
-                obj->GetName().c_str());
+            gm::core::Logger::Info("[SceneSerializer] Created RigidBodyComponent for GameObject '{}'",
+                obj->GetName());
             
             // Deserialize body type
             if (data.contains("bodyType") && data["bodyType"].is_string()) {

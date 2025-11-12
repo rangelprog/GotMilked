@@ -36,9 +36,9 @@ namespace gm::core {
 
 **Usage:**
 ```cpp
-gm::core::Logger::Info("Player health: %d", health);
-gm::core::Logger::Warning("Low memory: %zu bytes", bytes);
-gm::core::Logger::Error("Failed to load texture: %s", path.c_str());
+gm::core::Logger::Info("Player health: {}", health);
+gm::core::Logger::Warning("Low memory: {} bytes", bytes);
+gm::core::Logger::Error("Failed to load texture: {}", path);
 ```
 
 ---
@@ -67,7 +67,7 @@ namespace gm::core {
 ```cpp
 // Subscribe to event
 gm::core::Event::Subscribe("PlayerDied", []() {
-    gm::core::Logger::Info("Player died!");
+gm::core::Logger::Info("Player died!");
 });
 
 // Trigger event

@@ -108,9 +108,9 @@ SaveManager::SaveManager(std::filesystem::path saveDirectory)
     std::error_code ec;
     if (!std::filesystem::exists(m_saveDirectory, ec)) {
         if (!std::filesystem::create_directories(m_saveDirectory, ec)) {
-            gm::core::Logger::Error("[SaveManager] Failed to create save directory: %s (%s)",
-                                    m_saveDirectory.string().c_str(),
-                                    ec.message().c_str());
+            gm::core::Logger::Error("[SaveManager] Failed to create save directory: {} ({})",
+                                    m_saveDirectory.string(),
+                                    ec.message());
         }
     }
 }
@@ -175,8 +175,8 @@ SaveLoadResult SaveManager::QuickSaveWithJson(const nlohmann::json& json) {
         return result;
     }
 
-    gm::core::Logger::Info("[SaveManager] Saved quick save '%s' to %s",
-                           slotName.c_str(), path.string().c_str());
+    gm::core::Logger::Info("[SaveManager] Saved quick save '{}' to {}",
+                           slotName, path.string());
     result.success = true;
     return result;
 }
@@ -242,8 +242,8 @@ SaveLoadResult SaveManager::SaveToSlot(const std::string& slotName, const SaveGa
         return result;
     }
 
-    gm::core::Logger::Info("[SaveManager] Saved slot '%s' to %s",
-                           slotName.c_str(), path.string().c_str());
+    gm::core::Logger::Info("[SaveManager] Saved slot '{}' to {}",
+                           slotName, path.string());
     result.success = true;
     return result;
 }

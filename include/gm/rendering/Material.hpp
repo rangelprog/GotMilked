@@ -29,32 +29,32 @@ public:
 
     // Material properties
     // Diffuse
-    void SetDiffuseColor(const glm::vec3& color) { m_diffuseColor = color; }
+    void SetDiffuseColor(const glm::vec3& color) { m_diffuseColor = color; m_cacheDirty = true; }
     const glm::vec3& GetDiffuseColor() const { return m_diffuseColor; }
-    void SetDiffuseTexture(Texture* texture) { m_diffuseTexture = texture; }
+    void SetDiffuseTexture(Texture* texture) { m_diffuseTexture = texture; m_cacheDirty = true; }
     Texture* GetDiffuseTexture() const { return m_diffuseTexture; }
     bool HasDiffuseTexture() const { return m_diffuseTexture != nullptr; }
 
     // Specular
-    void SetSpecularColor(const glm::vec3& color) { m_specularColor = color; }
+    void SetSpecularColor(const glm::vec3& color) { m_specularColor = color; m_cacheDirty = true; }
     const glm::vec3& GetSpecularColor() const { return m_specularColor; }
-    void SetSpecularTexture(Texture* texture) { m_specularTexture = texture; }
+    void SetSpecularTexture(Texture* texture) { m_specularTexture = texture; m_cacheDirty = true; }
     Texture* GetSpecularTexture() const { return m_specularTexture; }
     bool HasSpecularTexture() const { return m_specularTexture != nullptr; }
 
     // Shininess (specular power)
-    void SetShininess(float shininess) { m_shininess = shininess; }
+    void SetShininess(float shininess) { m_shininess = shininess; m_cacheDirty = true; }
     float GetShininess() const { return m_shininess; }
 
     // Normal map
-    void SetNormalTexture(Texture* texture) { m_normalTexture = texture; }
+    void SetNormalTexture(Texture* texture) { m_normalTexture = texture; m_cacheDirty = true; }
     Texture* GetNormalTexture() const { return m_normalTexture; }
     bool HasNormalTexture() const { return m_normalTexture != nullptr; }
 
     // Emission
-    void SetEmissionColor(const glm::vec3& color) { m_emissionColor = color; }
+    void SetEmissionColor(const glm::vec3& color) { m_emissionColor = color; m_cacheDirty = true; }
     const glm::vec3& GetEmissionColor() const { return m_emissionColor; }
-    void SetEmissionTexture(Texture* texture) { m_emissionTexture = texture; }
+    void SetEmissionTexture(Texture* texture) { m_emissionTexture = texture; m_cacheDirty = true; }
     Texture* GetEmissionTexture() const { return m_emissionTexture; }
     bool HasEmissionTexture() const { return m_emissionTexture != nullptr; }
 
@@ -86,6 +86,11 @@ private:
 
     // Metadata
     std::string m_name = "Unnamed Material";
+    mutable glm::vec3 m_cachedDiffuse;
+    mutable glm::vec3 m_cachedSpecular;
+    mutable glm::vec3 m_cachedEmission;
+    mutable float m_cachedShininess = 32.0f;
+    mutable bool m_cacheDirty = true;
 };
 
 } // namespace gm

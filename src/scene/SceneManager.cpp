@@ -12,15 +12,15 @@ std::shared_ptr<Scene> SceneManager::CreateScene(const std::string& name) {
     }
     
     if (scenes.find(name) != scenes.end()) {
-        core::Logger::Warning("[SceneManager] Scene '%s' already exists, returning existing scene",
-                              name.c_str());
+        core::Logger::Warning("[SceneManager] Scene '{}' already exists, returning existing scene",
+                              name);
         return scenes[name];
     }
 
     auto scene = std::make_shared<Scene>(name);
     scenes[name] = scene;
     
-    core::Logger::Info("[SceneManager] Created scene '%s'", name.c_str());
+    core::Logger::Info("[SceneManager] Created scene '{}'", name);
     return scene;
 }
 
@@ -41,7 +41,7 @@ void SceneManager::UnloadScene(const std::string& name) {
             activeScene = nullptr;
         }
         
-        core::Logger::Info("[SceneManager] Unloaded scene '%s'", name.c_str());
+        core::Logger::Info("[SceneManager] Unloaded scene '{}'", name);
     }
 }
 
@@ -75,9 +75,9 @@ void SceneManager::SetActiveScene(const std::string& name) {
     auto scene = GetScene(name);
     if (scene) {
         activeScene = scene;
-        core::Logger::Info("[SceneManager] Set active scene to '%s'", name.c_str());
+        core::Logger::Info("[SceneManager] Set active scene to '{}'", name);
     } else {
-        core::Logger::Error("[SceneManager] Scene '%s' not found", name.c_str());
+        core::Logger::Error("[SceneManager] Scene '{}' not found", name);
     }
 }
 
@@ -88,8 +88,8 @@ void SceneManager::InitActiveScene() {
     }
     
     if (activeScene->IsInitialized()) {
-        core::Logger::Warning("[SceneManager] Active scene '%s' is already initialized",
-                              activeScene->GetName().c_str());
+        core::Logger::Warning("[SceneManager] Active scene '{}' is already initialized",
+                              activeScene->GetName());
         return;
     }
     
@@ -102,7 +102,7 @@ void SceneManager::UpdateActiveScene(float deltaTime) {
     }
     
     if (deltaTime < 0.0f) {
-        core::Logger::Warning("[SceneManager] Negative deltaTime (%.6f), clamping to 0",
+        core::Logger::Warning("[SceneManager] Negative deltaTime ({:.6f}), clamping to 0",
                               deltaTime);
         deltaTime = 0.0f;
     }
