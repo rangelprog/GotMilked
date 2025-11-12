@@ -1,5 +1,6 @@
 #include "gm/rendering/Texture.hpp"
 #include <glad/glad.h>
+#include "gm/core/Error.hpp"
 #include "gm/core/Logger.hpp"
 #include <cstdlib>
 #include <cstring>
@@ -79,19 +80,20 @@ Texture Texture::makeChecker(int w, int h, int cell) {
         }
     }
     Texture t;
-    t.createRGBA8(w, h, px, true);
+    if (!t.createRGBA8(w, h, px, true)) {
+        throw gm::core::GraphicsError("texture.makeChecker", "Failed to allocate GPU texture");
+    }
     return t;
 }
 
-Texture Texture::loadOrDie(const std::string& path, bool flipY) {
+Texture Texture::loadOrThrow(const std::string& path, bool flipY) {
     stbi_set_flip_vertically_on_load(flipY ? 1 : 0);
 
     int w = 0, h = 0, comp = 0;
     unsigned char* data = stbi_load(path.c_str(), &w, &h, &comp, 4);
     if (!data) {
-        core::Logger::Error("Texture load FAILED: %s (%s)", path.c_str(),
-                            stbi_failure_reason());
-        std::abort();
+        std::string reason = stbi_failure_reason() ? stbi_failure_reason() : "unknown";
+        throw gm::core::GraphicsError("texture.load", std::string("Failed to load ") + path + ": " + reason);
     }
 
     std::vector<std::uint8_t> pixels(static_cast<size_t>(w * h * 4));
@@ -100,8 +102,7 @@ Texture Texture::loadOrDie(const std::string& path, bool flipY) {
 
     Texture t;
     if (!t.createRGBA8(w, h, pixels, true)) {
-        core::Logger::Error("Texture upload FAILED: %s", path.c_str());
-        std::abort();
+        throw gm::core::GraphicsError("texture.upload", std::string("Failed to upload ") + path);
     }
     return t;
 }

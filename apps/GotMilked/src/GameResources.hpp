@@ -9,6 +9,7 @@
 #include "gm/rendering/Mesh.hpp"
 #include "gm/rendering/Material.hpp"
 #include "gm/utils/Config.hpp"
+#include "gm/core/Error.hpp"
 
 // Forward declaration for test helper (defined in tests)
 struct TestAssetBundle;
@@ -39,6 +40,8 @@ public:
     bool ReloadMesh();
     bool ReloadAll();
     void Release();
+
+    const gm::core::Error* GetLastError() const { return m_lastError.get(); }
 
     // Resource accessors
     gm::Shader* GetShader() const { return m_shader ? m_shader.get() : nullptr; }
@@ -72,5 +75,8 @@ private:
     std::string m_meshPath;
     
     std::filesystem::path m_assetsDir;
+    std::shared_ptr<gm::core::Error> m_lastError;
+
+    void StoreError(const gm::core::Error& err);
 };
 

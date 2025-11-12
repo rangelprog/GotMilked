@@ -2,6 +2,7 @@
 #include "gm/utils/Config.hpp"
 #include "gm/utils/ResourceManager.hpp"
 #include "gm/core/Logger.hpp"
+#include "gm/core/Error.hpp"
 #include "TestAssetHelpers.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -116,6 +117,7 @@ TEST_CASE("GameResources loads assets via config", "[game_resources]") {
 
     bool loaded = resources.Load(bundle.root, config);
     REQUIRE(loaded);
+    REQUIRE(resources.GetLastError() == nullptr);
 
     // Verify resources are loaded
     REQUIRE(resources.GetShader() != nullptr);
@@ -138,6 +140,7 @@ TEST_CASE("GameResources loads assets via config", "[game_resources]") {
     REQUIRE(resources.GetTerrainMaterial()->GetDiffuseTexture() != nullptr);
 
     resources.Release();
+    REQUIRE(resources.GetLastError() == nullptr);
 }
 
 TEST_CASE("GameResources legacy load handles missing assets gracefully", "[game_resources]") {
@@ -176,12 +179,10 @@ TEST_CASE("GameResources legacy load handles missing assets gracefully", "[game_
 
     bool loaded = resources.Load(assetsDir.string());
     REQUIRE(loaded);
-    REQUIRE(resources.GetShader() != nullptr);
-    REQUIRE(resources.GetTexture() != nullptr);
-    REQUIRE(resources.GetTerrainMaterial() != nullptr);
-    REQUIRE(resources.GetMesh() != nullptr);
+    REQUIRE(resources.GetLastError() == nullptr);
 
     resources.Release();
+    REQUIRE(resources.GetLastError() == nullptr);
 }
 
 TEST_CASE("GameResources can reload shaders", "[game_resources][reload]") {
@@ -200,6 +201,7 @@ TEST_CASE("GameResources can reload shaders", "[game_resources][reload]") {
 
     bool loaded = resources.Load(bundle.root, config);
     REQUIRE(loaded);
+    REQUIRE(resources.GetLastError() == nullptr);
 
     gm::Shader* originalShader = resources.GetShader();
     REQUIRE(originalShader != nullptr);
@@ -207,6 +209,7 @@ TEST_CASE("GameResources can reload shaders", "[game_resources][reload]") {
     // Reload shader
     bool reloaded = resources.ReloadShader();
     REQUIRE(reloaded);
+    REQUIRE(resources.GetLastError() == nullptr);
 
     gm::Shader* reloadedShader = resources.GetShader();
     REQUIRE(reloadedShader != nullptr);
@@ -214,6 +217,7 @@ TEST_CASE("GameResources can reload shaders", "[game_resources][reload]") {
     REQUIRE(reloadedShader != originalShader);
 
     resources.Release();
+    REQUIRE(resources.GetLastError() == nullptr);
 }
 
 TEST_CASE("GameResources can reload textures", "[game_resources][reload]") {
@@ -232,6 +236,7 @@ TEST_CASE("GameResources can reload textures", "[game_resources][reload]") {
 
     bool loaded = resources.Load(bundle.root, config);
     REQUIRE(loaded);
+    REQUIRE(resources.GetLastError() == nullptr);
 
     gm::Texture* originalTexture = resources.GetTexture();
     REQUIRE(originalTexture != nullptr);
@@ -239,6 +244,7 @@ TEST_CASE("GameResources can reload textures", "[game_resources][reload]") {
     // Reload texture
     bool reloaded = resources.ReloadTexture();
     REQUIRE(reloaded);
+    REQUIRE(resources.GetLastError() == nullptr);
 
     gm::Texture* reloadedTexture = resources.GetTexture();
     REQUIRE(reloadedTexture != nullptr);
@@ -249,6 +255,7 @@ TEST_CASE("GameResources can reload textures", "[game_resources][reload]") {
     REQUIRE(resources.GetTerrainMaterial()->GetDiffuseTexture() == reloadedTexture);
 
     resources.Release();
+    REQUIRE(resources.GetLastError() == nullptr);
 }
 
 TEST_CASE("GameResources can reload meshes", "[game_resources][reload]") {
@@ -267,6 +274,7 @@ TEST_CASE("GameResources can reload meshes", "[game_resources][reload]") {
 
     bool loaded = resources.Load(bundle.root, config);
     REQUIRE(loaded);
+    REQUIRE(resources.GetLastError() == nullptr);
 
     gm::Mesh* originalMesh = resources.GetMesh();
     REQUIRE(originalMesh != nullptr);
@@ -274,6 +282,7 @@ TEST_CASE("GameResources can reload meshes", "[game_resources][reload]") {
     // Reload mesh
     bool reloaded = resources.ReloadMesh();
     REQUIRE(reloaded);
+    REQUIRE(resources.GetLastError() == nullptr);
 
     gm::Mesh* reloadedMesh = resources.GetMesh();
     REQUIRE(reloadedMesh != nullptr);
@@ -281,6 +290,7 @@ TEST_CASE("GameResources can reload meshes", "[game_resources][reload]") {
     REQUIRE(reloadedMesh != originalMesh);
 
     resources.Release();
+    REQUIRE(resources.GetLastError() == nullptr);
 }
 
 TEST_CASE("GameResources reloads all resources", "[game_resources][reload]") {
@@ -299,10 +309,12 @@ TEST_CASE("GameResources reloads all resources", "[game_resources][reload]") {
 
     bool loaded = resources.Load(bundle.root, config);
     REQUIRE(loaded);
+    REQUIRE(resources.GetLastError() == nullptr);
 
     // Reload all resources
     bool reloaded = resources.ReloadAll();
     REQUIRE(reloaded);
+    REQUIRE(resources.GetLastError() == nullptr);
 
     // Verify all resources are still present
     REQUIRE(resources.GetShader() != nullptr);
@@ -311,6 +323,7 @@ TEST_CASE("GameResources reloads all resources", "[game_resources][reload]") {
     REQUIRE(resources.GetTerrainMaterial() != nullptr);
 
     resources.Release();
+    REQUIRE(resources.GetLastError() == nullptr);
 }
 
 TEST_CASE("GameResources releases loaded resources", "[game_resources]") {
@@ -329,6 +342,7 @@ TEST_CASE("GameResources releases loaded resources", "[game_resources]") {
 
     bool loaded = resources.Load(bundle.root, config);
     REQUIRE(loaded);
+    REQUIRE(resources.GetLastError() == nullptr);
 
     // Verify resources are loaded
     REQUIRE(resources.GetShader() != nullptr);
@@ -338,6 +352,7 @@ TEST_CASE("GameResources releases loaded resources", "[game_resources]") {
 
     // Release resources
     resources.Release();
+    REQUIRE(resources.GetLastError() == nullptr);
 
     // Verify resources are released
     REQUIRE(resources.GetShader() == nullptr);
@@ -364,15 +379,19 @@ TEST_CASE("GameResources reload methods fail safely when not loaded", "[game_res
     // Try to reload without loading first - should fail gracefully
     bool shaderReloaded = resources.ReloadShader();
     REQUIRE_FALSE(shaderReloaded);
+    REQUIRE(resources.GetLastError() != nullptr);
 
     bool textureReloaded = resources.ReloadTexture();
     REQUIRE_FALSE(textureReloaded);
+    REQUIRE(resources.GetLastError() != nullptr);
 
     bool meshReloaded = resources.ReloadMesh();
     REQUIRE_FALSE(meshReloaded);
+    REQUIRE(resources.GetLastError() != nullptr);
 
     bool allReloaded = resources.ReloadAll();
     REQUIRE_FALSE(allReloaded);
+    REQUIRE(resources.GetLastError() != nullptr);
 }
 
 TEST_CASE("GameResources load fails with invalid shader paths", "[game_resources][error]") {
@@ -393,8 +412,11 @@ TEST_CASE("GameResources load fails with invalid shader paths", "[game_resources
     bool loaded = resources.Load(bundle.root, config);
     REQUIRE_FALSE(loaded); // Should fail to load
 
-    // Resources should not be loaded
-    REQUIRE(resources.GetShader() == nullptr);
+    const gm::core::Error* err = resources.GetLastError();
+    REQUIRE(err != nullptr);
+    auto resourceErr = dynamic_cast<const gm::core::ResourceError*>(err);
+    REQUIRE(resourceErr != nullptr);
+    REQUIRE(resourceErr->resourceType() == "shader");
 }
 
 TEST_CASE("GameResources loads without optional mesh", "[game_resources]") {
@@ -415,6 +437,7 @@ TEST_CASE("GameResources loads without optional mesh", "[game_resources]") {
     bool loaded = resources.Load(bundle.root, config);
     // Should still load successfully even without mesh
     REQUIRE(loaded);
+    REQUIRE(resources.GetLastError() == nullptr);
 
     // Shader and texture should be loaded
     REQUIRE(resources.GetShader() != nullptr);
@@ -426,5 +449,6 @@ TEST_CASE("GameResources loads without optional mesh", "[game_resources]") {
     REQUIRE(resources.GetMeshPath().empty());
 
     resources.Release();
+    REQUIRE(resources.GetLastError() == nullptr);
 }
 } // namespace

@@ -6,6 +6,7 @@
 #include "gm/core/Time.hpp"
 #include "gm/core/Input.hpp"
 #include "gm/core/InputBindings.hpp"
+#include "gm/core/Error.hpp"
 
 // Rendering
 #include "gm/rendering/Camera.hpp"

@@ -16,6 +16,20 @@ This guide summarizes how to build, run, and extend the GotMilked engine. It com
 2. Build: `cmake --build build`
 3. Run the game: `build/apps/GotMilked/Debug/GotMilked.exe`
 
+### Run Tests
+
+The repository ships with a Catch2-based test suite that validates serialization, resource loading, and rendering smoke paths.
+
+1. Build the aggregated test binary: `cmake --build build --target GotMilkedTests --config Debug`
+2. Execute all tests: `ctest --test-dir build/tests -C Debug`
+
+Useful flags:
+
+- Filter by test name or tag: `ctest --test-dir build/tests -C Debug -R GameResources` or run a single case via `build/tests/Debug/GotMilkedTests.exe "Scene draws without errors"`.
+- Emit full failure logs: `ctest --test-dir build/tests -C Debug --output-on-failure`.
+
+Catch2 discovers tests automatically (`catch_discover_tests`), so adding a new `TEST_CASE` in `tests/` is enough for CMake to register it the next time you configure the project.
+
 The GotMilked game demonstrates engine features (scene management, rendering, serialization). It provides a clean starting point for building farming game content.
 
 ---
@@ -62,7 +76,7 @@ The scene system revolves around `gm::Scene` and `gm::GameObject`. The detailed 
 
 The engine supplies basic rendering wrappers but leaves resource ownership to the application:
 
-- Use `gm::Texture::loadOrDie`, `gm::Shader::loadFromFiles`, and `gm::Mesh` (via `ObjLoader`) to load data.
+- Use `gm::Texture::loadOrThrow`, `gm::Shader::loadFromFiles`, and `gm::Mesh` (via `ObjLoader`) to load data.
 - Use `gm::ResourceManager` for centralized resource loading and caching. Resources are loaded by name and automatically cached, preventing duplicate loads. `Has*` helpers let you check cache state, while `Reload*` APIs force a refresh from disk and log any failures.
 - When serializing, store asset identifiers (paths or GUIDs) in the component JSON so resources can be rehydrated on load.
 - Register asset GUIDs with `gm::ResourceRegistry` so scenes can resolve resources even if files move between releases.

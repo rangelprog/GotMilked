@@ -3,9 +3,11 @@
 #include "gm/rendering/Texture.hpp"
 #include "gm/rendering/Mesh.hpp"
 #include "gm/utils/ObjLoader.hpp"
+#include "gm/core/Error.hpp"
 #include "gm/core/Logger.hpp"
 
 #include <exception>
+#include <sstream>
 #include <string_view>
 
 namespace gm {
@@ -34,15 +36,16 @@ std::shared_ptr<Shader> ResourceManager::LoadShader(const std::string& name,
     }
     
     auto shader = std::make_shared<Shader>();
-    if (shader->loadFromFiles(vertPath, fragPath)) {
-        shaders[name] = shader;
-        core::Logger::Info("[ResourceManager] Loaded shader '%s' (%s, %s)",
-                           name.c_str(), vertPath.c_str(), fragPath.c_str());
-        return shader;
+    if (!shader->loadFromFiles(vertPath, fragPath)) {
+        std::ostringstream oss;
+        oss << "Failed to load shader (" << vertPath << ", " << fragPath << ")";
+        throw core::ResourceError("shader", name, oss.str());
     }
-    core::Logger::Error("[ResourceManager] Failed to load shader '%s' (%s, %s)",
-                        name.c_str(), vertPath.c_str(), fragPath.c_str());
-    return nullptr;
+
+    shaders[name] = shader;
+    core::Logger::Info("[ResourceManager] Loaded shader '%s' (%s, %s)",
+                       name.c_str(), vertPath.c_str(), fragPath.c_str());
+    return shader;
 }
 
 std::shared_ptr<Shader> ResourceManager::GetShader(const std::string& name) {
@@ -83,39 +86,35 @@ bool ResourceManager::HasShader(std::string_view name) {
 std::shared_ptr<Shader> ResourceManager::ReloadShader(const std::string& name,
     const std::string& vertPath, const std::string& fragPath) {
     auto shader = std::make_shared<Shader>();
-    if (shader->loadFromFiles(vertPath, fragPath)) {
-        shaders[name] = shader;
-        core::Logger::Info("[ResourceManager] Reloaded shader '%s' (%s, %s)",
-                           name.c_str(), vertPath.c_str(), fragPath.c_str());
-        return shader;
+    if (!shader->loadFromFiles(vertPath, fragPath)) {
+        std::ostringstream oss;
+        oss << "Failed to reload shader (" << vertPath << ", " << fragPath << ")";
+        throw core::ResourceError("shader", name, oss.str());
     }
-    core::Logger::Error("[ResourceManager] Failed to reload shader '%s' (%s, %s)",
-                        name.c_str(), vertPath.c_str(), fragPath.c_str());
-    return nullptr;
+
+    shaders[name] = shader;
+    core::Logger::Info("[ResourceManager] Reloaded shader '%s' (%s, %s)",
+                       name.c_str(), vertPath.c_str(), fragPath.c_str());
+    return shader;
 }
 
 std::shared_ptr<Texture> ResourceManager::LoadTexture(const std::string& name,
     const std::string& path) {
-    // Use find() instead of operator[] to avoid default construction
     auto it = textures.find(name);
     if (it != textures.end()) {
         return it->second;
     }
     
     try {
-        auto texture = std::make_shared<Texture>(Texture::loadOrDie(path));
+        auto texture = std::make_shared<Texture>(Texture::loadOrThrow(path));
         textures[name] = texture;
         core::Logger::Info("[ResourceManager] Loaded texture '%s' (%s)",
                            name.c_str(), path.c_str());
         return texture;
+    } catch (const core::GraphicsError& err) {
+        throw core::ResourceError("texture", name, std::string(err.what()));
     } catch (const std::exception& ex) {
-        core::Logger::Error("[ResourceManager] Failed to load texture '%s' (%s): %s",
-                            name.c_str(), path.c_str(), ex.what());
-        return nullptr;
-    } catch (...) {
-        core::Logger::Error("[ResourceManager] Failed to load texture '%s' (%s): unknown error",
-                            name.c_str(), path.c_str());
-        return nullptr;
+        throw core::ResourceError("texture", name, ex.what());
     }
 }
 
@@ -157,25 +156,20 @@ bool ResourceManager::HasTexture(std::string_view name) {
 std::shared_ptr<Texture> ResourceManager::ReloadTexture(const std::string& name,
     const std::string& path) {
     try {
-        auto texture = std::make_shared<Texture>(Texture::loadOrDie(path));
+        auto texture = std::make_shared<Texture>(Texture::loadOrThrow(path));
         textures[name] = texture;
         core::Logger::Info("[ResourceManager] Reloaded texture '%s' (%s)",
                            name.c_str(), path.c_str());
         return texture;
+    } catch (const core::GraphicsError& err) {
+        throw core::ResourceError("texture", name, std::string(err.what()));
     } catch (const std::exception& ex) {
-        core::Logger::Error("[ResourceManager] Failed to reload texture '%s' (%s): %s",
-                            name.c_str(), path.c_str(), ex.what());
-        return nullptr;
-    } catch (...) {
-        core::Logger::Error("[ResourceManager] Failed to reload texture '%s' (%s): unknown error",
-                            name.c_str(), path.c_str());
-        return nullptr;
+        throw core::ResourceError("texture", name, ex.what());
     }
 }
 
 std::shared_ptr<Mesh> ResourceManager::LoadMesh(const std::string& name,
     const std::string& path) {
-    // Use find() instead of operator[] to avoid default construction
     auto it = meshes.find(name);
     if (it != meshes.end()) {
         return it->second;
@@ -187,14 +181,10 @@ std::shared_ptr<Mesh> ResourceManager::LoadMesh(const std::string& name,
         core::Logger::Info("[ResourceManager] Loaded mesh '%s' (%s)",
                            name.c_str(), path.c_str());
         return mesh;
+    } catch (const core::ResourceError&) {
+        throw;
     } catch (const std::exception& ex) {
-        core::Logger::Error("[ResourceManager] Failed to load mesh '%s' (%s): %s",
-                            name.c_str(), path.c_str(), ex.what());
-        return nullptr;
-    } catch (...) {
-        core::Logger::Error("[ResourceManager] Failed to load mesh '%s' (%s): unknown error",
-                            name.c_str(), path.c_str());
-        return nullptr;
+        throw core::ResourceError("mesh", name, ex.what());
     }
 }
 
@@ -241,14 +231,10 @@ std::shared_ptr<Mesh> ResourceManager::ReloadMesh(const std::string& name,
         core::Logger::Info("[ResourceManager] Reloaded mesh '%s' (%s)",
                            name.c_str(), path.c_str());
         return mesh;
+    } catch (const core::ResourceError&) {
+        throw;
     } catch (const std::exception& ex) {
-        core::Logger::Error("[ResourceManager] Failed to reload mesh '%s' (%s): %s",
-                            name.c_str(), path.c_str(), ex.what());
-        return nullptr;
-    } catch (...) {
-        core::Logger::Error("[ResourceManager] Failed to reload mesh '%s' (%s): unknown error",
-                            name.c_str(), path.c_str());
-        return nullptr;
+        throw core::ResourceError("mesh", name, ex.what());
     }
 }
 

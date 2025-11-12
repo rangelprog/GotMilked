@@ -527,7 +527,7 @@ namespace gm {
     class Texture {
     public:
         static std::shared_ptr<Texture> Load(const std::string& path);
-        static std::shared_ptr<Texture> loadOrDie(const std::string& path);
+        static std::shared_ptr<Texture> loadOrThrow(const std::string& path);
         
         void Bind(unsigned int unit = 0);
         unsigned int GetID() const;

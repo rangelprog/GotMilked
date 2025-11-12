@@ -1,5 +1,6 @@
 #pragma once
 #include <glad/glad.h>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -23,7 +24,7 @@ public:
     GLuint id() const { return m_id; }
 
     static Texture makeChecker(int w = 256, int h = 256, int cell = 16);
-    static Texture loadOrDie(const std::string& path, bool flipY = true);
+    static Texture loadOrThrow(const std::string& path, bool flipY = true);
 
 private:
     GLuint m_id{0};
