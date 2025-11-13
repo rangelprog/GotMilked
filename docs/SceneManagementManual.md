@@ -10,7 +10,7 @@ This manual explains how to create, update, serialize, and manage scenes in the 
 - **GameObject**: A named entity inside a scene. Owns a set of components and metadata.
 - **Component**: Behaviour or data attached to a `GameObject` (e.g., transform, material, light).
 - **SceneSystem**: Frame-level service that plugs into the scene lifecycle (init/update/shutdown). See [Section 5](#5-scene-systems-and-async-updates).
-- **SceneManager**: Singleton that owns all scenes, handles loading/unloading, and tracks the active scene.
+- **SceneManager**: Engine-owned service that manages scenes, handles loading/unloading, and tracks the active scene. You can instantiate it per test/tool or let `GameApp` own one for gameplay.
 
 ---
 
@@ -19,7 +19,7 @@ This manual explains how to create, update, serialize, and manage scenes in the 
 ### 2.1 Creating a Scene
 
 ```cpp
-auto& sceneManager = gm::SceneManager::Instance();
+gm::SceneManager sceneManager;
 auto scene = sceneManager.CreateScene("Level1");
 sceneManager.SetActiveScene("Level1");
 ```
@@ -241,7 +241,8 @@ public:
     bool RunsAsync() const override { return true; } // opt into worker execution
 };
 
-auto scene = gm::SceneManager::Instance().CreateScene("Level1");
+gm::SceneManager sceneManager;
+auto scene = sceneManager.CreateScene("Level1");
 scene->RegisterSystem(std::make_shared<AnimationSystem>());
 ```
 
@@ -283,7 +284,7 @@ To avoid hardcoding file paths into scene JSON, register assets with `gm::Resour
 ### 5.1 Loading and Activating
 
 ```cpp
-auto& sceneManager = gm::SceneManager::Instance();
+gm::SceneManager sceneManager;
 sceneManager.LoadScene("MainMenu");          // Returns a shared_ptr<Scene>
 sceneManager.SetActiveScene("MainMenu");
 ```
@@ -316,14 +317,18 @@ sceneManager.UpdateActiveScene(deltaTime);
 
 ```cpp
 class EnemySpawner {
+    gm::SceneManager& sceneManager;
     std::string sceneName{"Level1"};
     float spawnTimer = 0.0f;
     float spawnInterval = 2.0f;
     int maxEnemies = 10;
 
 public:
+    explicit EnemySpawner(gm::SceneManager& manager)
+        : sceneManager(manager) {}
+
     void Update(float deltaTime) {
-        auto scene = gm::SceneManager::Instance().GetScene(sceneName);
+        auto scene = sceneManager.GetScene(sceneName);
         if (!scene) return;
 
         auto enemies = scene->FindGameObjectsByTag("enemy");
@@ -357,8 +362,7 @@ private:
 
 ### 6.2 Multi-Scene Flow
 
-```cpp
-auto& sceneManager = gm::SceneManager::Instance();
+gm::SceneManager sceneManager;
 auto menuScene = sceneManager.LoadScene("Menu");
 sceneManager.SetActiveScene("Menu");
 // ... menu logic ...
@@ -371,8 +375,7 @@ sceneManager.InitActiveScene();
 
 ### 6.3 Tag-Based Gameplay Actions
 
-```cpp
-auto scene = gm::SceneManager::Instance().GetActiveScene();
+auto scene = sceneManager.GetActiveScene();
 auto interactables = scene->FindGameObjectsByTag("interactable");
 for (auto& obj : interactables) {
     auto component = obj->GetComponent<InteractableComponent>();
@@ -390,10 +393,10 @@ for (auto& projectile : projectiles) {
 
 ### 6.4 Game Loop Integration
 
-```cpp
+gm::SceneManager sceneManager;
+
 while (!glfwWindowShouldClose(window)) {
     input->Poll();
-    auto& sceneManager = gm::SceneManager::Instance();
     sceneManager.UpdateActiveScene(deltaTime);
 
     auto scene = sceneManager.GetActiveScene();

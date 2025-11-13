@@ -112,8 +112,6 @@ void SceneManager::UpdateActiveScene(float deltaTime) {
 
 void SceneManager::Shutdown() {
     UnloadAllScenes();
-    // Static local instance is automatically destroyed on program exit
-    // No manual cleanup needed
 }
 
 } // namespace gm

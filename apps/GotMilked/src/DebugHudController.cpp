@@ -5,8 +5,31 @@
 #include "EditableTerrainComponent.hpp"
 #include "gm/tooling/DebugConsole.hpp"
 #include "gm/tooling/Overlay.hpp"
+#include "gm/utils/Profiler.hpp"
+
+#include <imgui.h>
 
 namespace gm::debug {
+
+namespace {
+void RenderProfilerOverlay() {
+    auto profile = gm::utils::Profiler::Instance().GetLastFrame();
+    ImGui::SetNextWindowBgAlpha(0.35f);
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoFocusOnAppearing |
+                             ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize |
+                             ImGuiWindowFlags_NoMove;
+    ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f), ImGuiCond_Always);
+    if (ImGui::Begin("Frame Profiler", nullptr, flags)) {
+        const double fps = profile.frameTimeMs > 0.0 ? 1000.0 / profile.frameTimeMs : 0.0;
+        ImGui::Text("Frame: %.2f ms (%.0f FPS)", profile.frameTimeMs, fps);
+        ImGui::Separator();
+        for (const auto& sample : profile.samples) {
+            ImGui::Text("%-32s %.2f ms", sample.name.c_str(), sample.durationMs);
+        }
+    }
+    ImGui::End();
+}
+} // namespace
 
 void DebugHudController::SetDebugMenu(DebugMenu* menu) {
     m_menu = menu;
@@ -56,6 +79,9 @@ void DebugHudController::RenderHud() {
     m_menu->SetConsoleVisible(m_consoleVisible);
     m_menu->Render(m_menuVisible);
     m_consoleVisible = m_menu->IsConsoleVisible();
+    if (m_profilerVisible) {
+        RenderProfilerOverlay();
+    }
 }
 
 void DebugHudController::RenderTerrainEditors() {
@@ -105,6 +131,10 @@ void DebugHudController::SetTerrainEditingEnabled(bool enabled) {
 void DebugHudController::Refresh() {
     ApplyVisibility();
     SetOverlayVisible(m_overlayVisible);
+}
+
+void DebugHudController::ToggleProfiler() {
+    m_profilerVisible = !m_profilerVisible;
 }
 
 } // namespace gm::debug

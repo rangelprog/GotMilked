@@ -36,6 +36,7 @@ void SetupDefaultBindings(InputManager& inputManager) {
     BindKeyboardAction(inputManager, "QuickSave", GLFW_KEY_F5, InputTriggerType::OnPress);
     BindKeyboardAction(inputManager, "QuickLoad", GLFW_KEY_F9, InputTriggerType::OnPress);
     BindKeyboardAction(inputManager, "ToggleOverlay", GLFW_KEY_F1, InputTriggerType::OnPress);
+    BindKeyboardAction(inputManager, "Interact", GLFW_KEY_E, InputTriggerType::OnPress);
 }
 
 void BindKeyboardAction(InputManager& inputManager,

@@ -89,3 +89,31 @@ TEST_CASE("Scene draws without errors", "[scene][rendering][smoke]") {
     resources.Release();
 }
 
+TEST_CASE("Smoketest scene loads gameplay actors", "[scene][smoketest]") {
+    GlfwContext context;
+    TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
+    TempDir assets(bundle.root);
+
+    GameResources resources;
+    PopulateGameResourcesFromTestAssets(bundle, resources);
+    REQUIRE(resources.GetShader());
+    REQUIRE(resources.GetMesh());
+
+    gm::Scene scene("SmoketestScene");
+    gm::Camera camera({0.0f, 1.5f, 4.0f});
+
+    gotmilked::PopulateSmoketestScene(scene, camera, resources);
+
+    auto npcA = scene.FindGameObjectByName("QuestGiver_A");
+    auto npcB = scene.FindGameObjectByName("QuestGiver_B");
+    REQUIRE(npcA);
+    REQUIRE(npcB);
+
+    auto truck = scene.FindGameObjectByName("BarnTruck");
+    auto tractor = scene.FindGameObjectByName("FieldTractor");
+    REQUIRE(truck);
+    REQUIRE(tractor);
+
+    resources.Release();
+}
+

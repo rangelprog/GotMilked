@@ -37,11 +37,9 @@ int GameApp::Run(const GameAppCallbacks& callbacks) {
         return EXIT_FAILURE;
     }
 
-    SceneManager& sceneManager = SceneManager::Instance();
-
     GameAppContext context{
         m_window,
-        sceneManager,
+        &m_sceneManager,
         [this]() { RequestExit(); },
         [this](bool enabled) { SetVSyncEnabled(enabled); },
         [this]() -> bool { return IsVSyncEnabled(); }
@@ -59,12 +57,12 @@ int GameApp::Run(const GameAppCallbacks& callbacks) {
         if (callbacks.onShutdown) {
             callbacks.onShutdown(context);
         }
-        sceneManager.Shutdown();
+        m_sceneManager.Shutdown();
         ShutdownWindow();
         return EXIT_FAILURE;
     }
 
-    sceneManager.InitActiveScene();
+    m_sceneManager.InitActiveScene();
 
     double lastTime = glfwGetTime();
     double lastTitleUpdate = lastTime;
@@ -78,7 +76,7 @@ int GameApp::Run(const GameAppCallbacks& callbacks) {
         inputManager.Update();
         glfwPollEvents();
 
-        sceneManager.UpdateActiveScene(dt);
+        m_sceneManager.UpdateActiveScene(dt);
 
         if (callbacks.onUpdate) {
             callbacks.onUpdate(context, dt);
@@ -108,7 +106,7 @@ int GameApp::Run(const GameAppCallbacks& callbacks) {
         callbacks.onShutdown(context);
     }
 
-    sceneManager.Shutdown();
+    m_sceneManager.Shutdown();
     ShutdownWindow();
     return EXIT_SUCCESS;
 }

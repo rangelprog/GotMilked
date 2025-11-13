@@ -19,5 +19,12 @@ void PopulateInitialScene(
     GLFWwindow* window = nullptr,
     std::function<float()> fovProvider = {});
 
+void PopulateSmoketestScene(
+    gm::Scene& scene,
+    gm::Camera& camera,
+    GameResources& resources,
+    GLFWwindow* window = nullptr,
+    std::function<float()> fovProvider = {});
+
 } // namespace gotmilked
 

@@ -7,26 +7,26 @@ This guide summarizes how to build, run, and extend the GotMilked engine. It com
 ## 1. Build & Run
 
 ### Prerequisites
-- CMake 3.27+
+- CMake 3.21+
 - Visual Studio 2022 (or another compiler supported by CMake)
 - Windows 10 SDK (build files target 10.0.26100.0 by default)
 
 ### Steps
-1. Configure: `cmake -S . -B build`
-2. Build: `cmake --build build`
-3. Run the game: `build/apps/GotMilked/Debug/GotMilked.exe`
+1. Configure (preset recommended): `cmake --preset windows-msvc` (Linux: `cmake --preset linux-clang`)
+2. Build: `cmake --build --preset windows-msvc`
+3. Run the game: `build/windows-msvc-debug/apps/GotMilked/GotMilked.exe`
 
 ### Run Tests
 
 The repository ships with a Catch2-based test suite that validates serialization, resource loading, and rendering smoke paths.
 
-1. Build the aggregated test binary: `cmake --build build --target GotMilkedTests --config Debug`
-2. Execute all tests: `ctest --test-dir build/tests -C Debug`
+1. Build the aggregated test binary: `cmake --build --preset windows-msvc --target GotMilkedTests`
+2. Execute all tests: `ctest --preset windows-msvc`
 
 Useful flags:
 
-- Filter by test name or tag: `ctest --test-dir build/tests -C Debug -R GameResources` or run a single case via `build/tests/Debug/GotMilkedTests.exe "Scene draws without errors"`.
-- Emit full failure logs: `ctest --test-dir build/tests -C Debug --output-on-failure`.
+- Filter by test name or tag: `ctest --preset windows-msvc -R GameResources` or run a single case via `build/windows-msvc-debug/tests/GotMilkedTests.exe "Scene draws without errors"`.
+- Emit full failure logs: `ctest --preset windows-msvc --output-on-failure`.
 
 Catch2 discovers tests automatically (`catch_discover_tests`), so adding a new `TEST_CASE` in `tests/` is enough for CMake to register it the next time you configure the project.
 
@@ -39,6 +39,8 @@ The GotMilked game demonstrates engine features (scene management, rendering, se
 - Edit `apps/GotMilked/config.json` to change window defaults, toggle VSync, enable/disable resource hot reload, or relocate asset/save directories. Relative paths resolve against the config file’s directory, so source and build trees stay in sync. Hot reload polls watched files every `pollIntervalSeconds` (default 0.5s) and rebinds assets in the running scene whenever they change.
 - Saves are written to the configured `paths.saves` directory. Press `F5` for a quick save and `F9` to load the most recent quick save (stubbed to capture camera and scene state). Slot-based saving lives in `gm::save::SaveManager` for future expansion. If no saves path is specified, the engine now defaults to the user documents folder (`~/Documents/GotMilked/saves` or `%USERPROFILE%\Documents\GotMilked\saves`).
 - Press `F1` to toggle the debug HUD (ImGui). Build the HUD by configuring CMake with `-DGM_ENABLE_DEBUG_TOOLS=ON`. Once the HUD is visible, open the Debug menu to toggle the tooling overlay, console, or terrain editor. Terrain resolution changes now resample the existing heightmap instead of wiping it, so you can refine sculpted terrain without losing detail. Disable hot reload or trigger a manual reload directly from the overlay when debugging assets.
+- Run `cmake --build --preset windows-msvc --target lock-deps` to prefetch third-party dependencies into `external/`, avoiding network fetches during normal builds.
+- Sanitizer presets (`windows-asan`, `linux-clang-asan`) enable AddressSanitizer via toolchain files; use them to catch memory issues early when working on engine code.
 
 ---
 
@@ -77,7 +79,7 @@ The scene system revolves around `gm::Scene` and `gm::GameObject`. The detailed 
 The engine supplies basic rendering wrappers but leaves resource ownership to the application:
 
 - Use `gm::Texture::loadOrThrow`, `gm::Shader::loadFromFiles`, and `gm::Mesh` (via `ObjLoader`) to load data.
-- Use `gm::ResourceManager` for centralized resource loading and caching. Recent changes added string-view aware lookups and reload tests; use `Has*` helpers to check cache state, while `Reload*` APIs force a refresh and invalidate relevant render-state caches.
+- Use `gm::ResourceManager` for centralized resource loading and caching. The manager now tracks GUID aliases (legacy asset names, file stems, hashed IDs) so hot reload only rebinds components that depend on a changed asset instead of sweeping the entire scene.
 - When serializing, store asset identifiers (paths or GUIDs) in the component JSON so resources can be rehydrated on load.
 - Register asset GUIDs with `gm::ResourceRegistry` so scenes can resolve resources even if files move between releases.
 

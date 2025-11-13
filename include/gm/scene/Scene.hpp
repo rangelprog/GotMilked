@@ -8,6 +8,7 @@
 #include <glm/glm.hpp>
 #include "SceneSystem.hpp"
 #include "gm/rendering/LightManager.hpp"
+#include "gm/utils/ThreadPool.hpp"
 
 namespace gm {
 
@@ -69,10 +70,18 @@ private:
         std::vector<glm::mat3> normalMatrices;
         std::vector<std::shared_ptr<GameObject>> gameObjects;  // Keep reference for camera access
     };
+
+    struct InstancedGroup {
+        class Mesh* mesh = nullptr;
+        class Shader* shader = nullptr;
+        std::shared_ptr<class Material> material;
+        std::vector<std::shared_ptr<GameObject>> objects;
+    };
     
     void CollectInstancedBatches(std::vector<InstancedBatch>& batches, const Frustum* frustum) const;
     void RenderInstancedBatch(const InstancedBatch& batch, Shader& shader, const Camera& cam) const;
     bool m_instancedRenderingEnabled = true;  // Enable/disable instanced rendering
+    gm::utils::ThreadPool m_updateThreadPool;
 
 public:
     Scene(const std::string& name = "Unnamed Scene");
@@ -112,6 +121,9 @@ public:
     std::vector<std::shared_ptr<GameObject>> FindGameObjectsByTag(const std::string& tag);
     std::vector<std::shared_ptr<GameObject>>& GetAllGameObjects() { return gameObjects; }
     std::vector<std::shared_ptr<GameObject>> GetRootGameObjects() const;
+    const std::vector<std::shared_ptr<GameObject>>& GetActiveRenderables();
+    const std::vector<InstancedGroup>& GetInstancedGroups() const;
+    void InvalidateInstancedGroups() { m_instancedGroupsDirty = true; }
 
     // Tags
     void TagGameObject(std::shared_ptr<GameObject> gameObject, const std::string& tag);
@@ -122,8 +134,8 @@ public:
     bool LoadFromFile(const std::string& filepath);
     
     // Optimization: Mark active lists as dirty (call when GameObject active state changes)
-    void MarkActiveListsDirty() { m_activeListsDirty = true; }
-    void BumpReloadVersion() { ++m_reloadVersion; m_activeListsDirty = true; }
+    void MarkActiveListsDirty() { m_activeListsDirty = true; m_instancedGroupsDirty = true; }
+    void BumpReloadVersion() { ++m_reloadVersion; m_activeListsDirty = true; m_instancedGroupsDirty = true; }
     std::uint64_t CurrentReloadVersion() const { return m_reloadVersion; }
     
     // Frustum culling
@@ -141,6 +153,7 @@ private:
     void ShutdownSystems();
     void RunSystems(float deltaTime);
     void UpdateActiveLists();  // Rebuild active renderable/updatable lists
+    void EnsureInstancedGroups() const;
     void EnsureNameLookup();
     void HandleGameObjectRename(GameObject& object, const std::string& oldName, const std::string& newName);
     void MarkNameLookupDirty() { m_nameLookupDirty = true; }
@@ -156,6 +169,9 @@ private:
 
     std::uint64_t m_unnamedObjectCounter = 0;
     std::uint64_t m_reloadVersion = 0;
+    mutable bool m_instancedGroupsDirty = true;
+    mutable std::vector<InstancedGroup> m_instancedGroups;
+    mutable std::uint64_t m_instancedGroupsVersion = 0;
 };
 
 }

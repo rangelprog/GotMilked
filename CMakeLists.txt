@@ -31,126 +31,8 @@ function(gm_apply_warnings target)
     endif()
 endfunction()
 
-# ---------------------------
-# Dependencies (FetchContent)
-# ---------------------------
-include(FetchContent)
-set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
-
-# GLFW
-FetchContent_Declare(
-  glfw
-  GIT_REPOSITORY https://github.com/glfw/glfw.git
-  GIT_TAG        3.4
-)
-FetchContent_MakeAvailable(glfw)
-
-# glad (modern GL loader)
-FetchContent_Declare(
-  glad
-  GIT_REPOSITORY https://github.com/Dav1dde/glad.git
-  GIT_TAG        v0.1.36
-)
-
-set(GLAD_PROFILE "core")
-set(GLAD_API "gl=4.6")
-set(GLAD_GENERATOR "c")
-FetchContent_MakeAvailable(glad)
-
-# glm (header-only)
-FetchContent_Declare(
-  glm
-  GIT_REPOSITORY https://github.com/g-truc/glm.git
-  GIT_TAG        1.0.1
-)
-FetchContent_MakeAvailable(glm)
-
-# Jolt Physics (header-only with single implementation file)
-set(JPH_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-set(JPH_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(JPH_DOUBLE_PRECISION OFF CACHE BOOL "" FORCE)
-set(JPH_PROFILE OFF CACHE BOOL "" FORCE)
-set(USE_STATIC_MSVC_RUNTIME_LIBRARY OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(
-  Jolt
-  GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
-  GIT_TAG        v5.0.0
-  SOURCE_SUBDIR  Build
-)
-FetchContent_MakeAvailable(Jolt)
-
-# Dear ImGui
-FetchContent_Declare(
-  imgui
-  GIT_REPOSITORY https://github.com/ocornut/imgui.git
-  GIT_TAG        v1.90.2
-)
-FetchContent_MakeAvailable(imgui)
-
-# ImGuizmo (ImGui gizmo helper)
-FetchContent_Declare(
-  ImGuizmo
-  GIT_REPOSITORY https://github.com/CedricGuillemet/ImGuizmo.git
-  GIT_TAG        master
-)
-FetchContent_MakeAvailable(ImGuizmo)
-if(NOT ImGuizmo_SOURCE_DIR AND imguizmo_SOURCE_DIR)
-  set(ImGuizmo_SOURCE_DIR ${imguizmo_SOURCE_DIR})
-endif()
-
-# nlohmann/json (header-only JSON library)
-FetchContent_Declare(
-  json
-  GIT_REPOSITORY https://github.com/nlohmann/json.git
-  GIT_TAG        v3.11.3
-)
-FetchContent_MakeAvailable(json)
-
-# Catch2 (unit testing framework)
-FetchContent_Declare(
-  Catch2
-  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG        v3.5.2
-)
-FetchContent_MakeAvailable(Catch2)
-
-# fmt (formatting library)
-FetchContent_Declare(
-  fmt
-  GIT_REPOSITORY https://github.com/fmtlib/fmt.git
-  GIT_TAG        10.2.1
-)
-FetchContent_MakeAvailable(fmt)
-
-# Create imgui library manually since it doesn't have a CMakeLists.txt
-if(NOT TARGET imgui)
-  add_library(imgui STATIC
-    ${imgui_SOURCE_DIR}/imgui.cpp
-    ${imgui_SOURCE_DIR}/imgui_demo.cpp
-    ${imgui_SOURCE_DIR}/imgui_draw.cpp
-    ${imgui_SOURCE_DIR}/imgui_tables.cpp
-    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
-  )
-  target_include_directories(imgui PUBLIC
-    ${imgui_SOURCE_DIR}
-    ${imgui_SOURCE_DIR}/backends
-  )
-  target_link_libraries(imgui PUBLIC glfw)
-endif()
-
-# ---------------------------
-# Applications / Executables
-# ---------------------------
-if (GM_BUILD_GAME)
-    add_subdirectory(apps/GotMilked)
-endif()
-
-if (GM_BUILD_TESTS)
-    enable_testing()
-    add_subdirectory(tests)
-endif()
+set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/external")
+include(cmake/Dependencies.cmake)
 
 add_library(GotMilkedEngine
     # Core systems
@@ -195,6 +77,8 @@ add_library(GotMilkedEngine
     src/utils/Config.cpp
     src/utils/HotReloader.cpp
     src/utils/FileDialog.cpp
+    src/utils/ThreadPool.cpp
+    src/utils/Profiler.cpp
 
     # Physics
     src/physics/PhysicsWorld.cpp
@@ -206,20 +90,28 @@ add_library(GotMilkedEngine
 
     # Gameplay
     src/gameplay/FlyCameraController.cpp
+    src/gameplay/CameraRigComponent.cpp
+    src/gameplay/CameraRigSystem.cpp
+    src/gameplay/QuestTriggerComponent.cpp
+    src/gameplay/QuestTriggerSystem.cpp
 
     # Save / Tooling
     src/save/SaveManager.cpp
     src/save/SaveSnapshotHelpers.cpp
+    src/save/SaveVersion.cpp
+    src/save/SaveDiff.cpp
     src/tooling/Overlay.cpp
 
     # Assets
     src/assets/AssetCatalog.cpp
+    src/assets/AssetDatabase.cpp
 )
 
 if(GM_ENABLE_DEBUG_TOOLS)
     target_sources(GotMilkedEngine PRIVATE
         src/tooling/DebugConsole.cpp
         src/debug/GridRenderer.cpp
+        src/debug/TerrainEditingSystem.cpp
     )
 endif()
 
@@ -252,15 +144,29 @@ target_include_directories(GotMilkedEngine
         ${CMAKE_CURRENT_SOURCE_DIR}/src/debug
 )
 target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm::glm imgui Jolt)
-target_link_libraries(GotMilkedEngine PUBLIC fmt::fmt)
+target_link_libraries(GotMilkedEngine PUBLIC fmt::fmt nlohmann_json::nlohmann_json)
+gm_apply_warnings(GotMilkedEngine)
 
 # Windows-specific libraries for user documents path resolution
 if(WIN32)
     target_link_libraries(GotMilkedEngine PRIVATE ole32)
 endif()
 
-# Include directories for dependencies
-target_include_directories(GotMilkedEngine PUBLIC ${json_SOURCE_DIR}/include)
-# Jolt include directory - FetchContent populates jolt_SOURCE_DIR (lowercase)
-target_include_directories(GotMilkedEngine PUBLIC ${jolt_SOURCE_DIR})
-# Note: Jolt is header-only with JPH_IMPLEMENTATION in JoltImpl.cpp, so no library linking needed
+target_include_directories(GotMilkedEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(GotMilkedEngine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+add_custom_target(lock-deps
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/LockDeps.cmake
+    COMMENT "Pre-fetching and locking third-party dependencies")
+
+# ---------------------------
+# Applications / Executables
+# ---------------------------
+if (GM_BUILD_GAME)
+    add_subdirectory(apps/GotMilked)
+endif()
+
+if (GM_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

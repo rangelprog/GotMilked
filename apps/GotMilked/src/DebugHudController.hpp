@@ -35,6 +35,10 @@ public:
     void RenderHud();
     void RenderTerrainEditors();
 
+    void ToggleProfiler();
+    void SetProfilerVisible(bool visible) { m_profilerVisible = visible; }
+    bool IsProfilerVisible() const { return m_profilerVisible; }
+
     bool GetMenuVisible() const { return m_menuVisible; }
     bool GetConsoleVisible() const { return m_consoleVisible; }
     void SetConsoleVisible(bool visible);
@@ -59,6 +63,7 @@ private:
     bool m_consoleVisible = false;
     bool m_overlayVisible = false;
     bool m_terrainEditingEnabled = false;
+    bool m_profilerVisible = false;
 };
 
 } // namespace gm::debug

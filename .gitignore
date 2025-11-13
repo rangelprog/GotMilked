@@ -16,3 +16,6 @@ CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 *.vcxproj*
+external/
+**/_deps/
+cmake/deps-cache/

@@ -5,6 +5,7 @@ set(GOTMILKED_TEST_SOURCES
     ResourceManagerTests.cpp
     SceneDrawSmokeTest.cpp
     GameResourcesTests.cpp
+    PhysicsWorldTests.cpp
     TestAssetHelpers.cpp
     LoggerTests.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameResources.cpp

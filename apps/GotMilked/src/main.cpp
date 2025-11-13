@@ -39,7 +39,11 @@ int main() {
     gm::core::GameAppCallbacks callbacks;
     callbacks.onInit = [&](gm::core::GameAppContext& ctx) {
       try {
-        return game.Init(ctx.window);
+        if (!ctx.sceneManager) {
+          gm::core::Logger::Error("[main] GameAppContext missing SceneManager");
+          return false;
+        }
+        return game.Init(ctx.window, *ctx.sceneManager);
       } catch (const std::exception& ex) {
         gm::core::Logger::Error("[main] Exception in onInit: {}", ex.what());
         return false;

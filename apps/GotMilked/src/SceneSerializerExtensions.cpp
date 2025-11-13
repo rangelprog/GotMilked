@@ -10,6 +10,8 @@
 #include "gm/scene/GameObject.hpp"
 #include "gm/rendering/Mesh.hpp"
 #include "gm/core/Logger.hpp"
+#include "gm/gameplay/CameraRigComponent.hpp"
+#include "gm/gameplay/QuestTriggerComponent.hpp"
 #include <nlohmann/json.hpp>
 #include <glm/vec3.hpp>
 #include <algorithm>
@@ -21,7 +23,14 @@ namespace SceneSerializerExtensions {
 void RegisterSerializers() {
     // Register components with the factory
     auto& factory = gm::scene::ComponentFactory::Instance();
-    
+
+    if (!factory.Register<gm::gameplay::CameraRigComponent>("CameraRigComponent")) {
+        gm::core::Logger::Warning("[SceneSerializerExtensions] CameraRigComponent already registered in factory");
+    }
+    if (!factory.Register<gm::gameplay::QuestTriggerComponent>("QuestTriggerComponent")) {
+        gm::core::Logger::Warning("[SceneSerializerExtensions] QuestTriggerComponent already registered in factory");
+    }
+
     #if GM_DEBUG_TOOLS
     using gm::debug::EditableTerrainComponent;
     if (!factory.Register<EditableTerrainComponent>("EditableTerrainComponent")) {
@@ -35,6 +44,125 @@ void RegisterSerializers() {
         gm::core::Logger::Warning("[SceneSerializerExtensions] RigidBodyComponent already registered in factory");
     }
     
+    gm::SceneSerializer::RegisterComponentSerializer(
+        "CameraRigComponent",
+        [](gm::Component* component) -> nlohmann::json {
+            auto* rig = dynamic_cast<gm::gameplay::CameraRigComponent*>(component);
+            if (!rig) {
+                return nlohmann::json();
+            }
+
+            const auto& config = rig->GetConfig();
+            nlohmann::json data;
+            data["rigId"] = rig->GetRigId();
+            data["baseSpeed"] = config.baseSpeed;
+            data["sprintMultiplier"] = config.sprintMultiplier;
+            data["fovMin"] = config.fovMin;
+            data["fovMax"] = config.fovMax;
+            data["fovScrollSensitivity"] = config.fovScrollSensitivity;
+            data["initialFov"] = config.initialFov;
+            data["captureMouseOnFocus"] = rig->CaptureMouseOnFocus();
+            data["autoActivate"] = rig->AutoActivate();
+            return data;
+        },
+        [](gm::GameObject* obj, const nlohmann::json& data) -> gm::Component* {
+            if (!data.is_object()) {
+                return nullptr;
+            }
+
+            auto& factory = gm::scene::ComponentFactory::Instance();
+            auto rig = std::dynamic_pointer_cast<gm::gameplay::CameraRigComponent>(
+                factory.Create("CameraRigComponent", obj));
+            if (!rig) {
+                gm::core::Logger::Error("[SceneSerializer] Failed to create CameraRigComponent");
+                return nullptr;
+            }
+
+            auto config = rig->GetConfig();
+            if (data.contains("baseSpeed") && data["baseSpeed"].is_number()) {
+                config.baseSpeed = data["baseSpeed"].get<float>();
+            }
+            if (data.contains("sprintMultiplier") && data["sprintMultiplier"].is_number()) {
+                config.sprintMultiplier = data["sprintMultiplier"].get<float>();
+            }
+            if (data.contains("fovMin") && data["fovMin"].is_number()) {
+                config.fovMin = data["fovMin"].get<float>();
+            }
+            if (data.contains("fovMax") && data["fovMax"].is_number()) {
+                config.fovMax = data["fovMax"].get<float>();
+            }
+            if (data.contains("fovScrollSensitivity") && data["fovScrollSensitivity"].is_number()) {
+                config.fovScrollSensitivity = data["fovScrollSensitivity"].get<float>();
+            }
+            if (data.contains("initialFov") && data["initialFov"].is_number()) {
+                config.initialFov = data["initialFov"].get<float>();
+            }
+            rig->SetConfig(config);
+
+            if (data.contains("rigId") && data["rigId"].is_string()) {
+                rig->SetRigId(data["rigId"].get<std::string>());
+            }
+            if (data.contains("captureMouseOnFocus") && data["captureMouseOnFocus"].is_boolean()) {
+                rig->SetCaptureMouseOnFocus(data["captureMouseOnFocus"].get<bool>());
+            }
+            if (data.contains("autoActivate") && data["autoActivate"].is_boolean()) {
+                rig->SetAutoActivate(data["autoActivate"].get<bool>());
+            }
+
+            return rig.get();
+        });
+
+    gm::SceneSerializer::RegisterComponentSerializer(
+        "QuestTriggerComponent",
+        [](gm::Component* component) -> nlohmann::json {
+            auto* quest = dynamic_cast<gm::gameplay::QuestTriggerComponent*>(component);
+            if (!quest) {
+                return nlohmann::json();
+            }
+            nlohmann::json data;
+            data["questId"] = quest->GetQuestId();
+            data["activationRadius"] = quest->GetActivationRadius();
+            data["triggerOnSceneLoad"] = quest->TriggerOnSceneLoad();
+            data["triggerOnInteract"] = quest->TriggerOnInteract();
+            data["repeatable"] = quest->IsRepeatable();
+            data["activationAction"] = quest->GetActivationAction();
+            return data;
+        },
+        [](gm::GameObject* obj, const nlohmann::json& data) -> gm::Component* {
+            if (!data.is_object()) {
+                return nullptr;
+            }
+
+            auto& factory = gm::scene::ComponentFactory::Instance();
+            auto quest = std::dynamic_pointer_cast<gm::gameplay::QuestTriggerComponent>(
+                factory.Create("QuestTriggerComponent", obj));
+            if (!quest) {
+                gm::core::Logger::Error("[SceneSerializer] Failed to create QuestTriggerComponent");
+                return nullptr;
+            }
+
+            if (data.contains("questId") && data["questId"].is_string()) {
+                quest->SetQuestId(data["questId"].get<std::string>());
+            }
+            if (data.contains("activationRadius") && data["activationRadius"].is_number()) {
+                quest->SetActivationRadius(data["activationRadius"].get<float>());
+            }
+            if (data.contains("triggerOnSceneLoad") && data["triggerOnSceneLoad"].is_boolean()) {
+                quest->SetTriggerOnSceneLoad(data["triggerOnSceneLoad"].get<bool>());
+            }
+            if (data.contains("triggerOnInteract") && data["triggerOnInteract"].is_boolean()) {
+                quest->SetTriggerOnInteract(data["triggerOnInteract"].get<bool>());
+            }
+            if (data.contains("repeatable") && data["repeatable"].is_boolean()) {
+                quest->SetRepeatable(data["repeatable"].get<bool>());
+            }
+            if (data.contains("activationAction") && data["activationAction"].is_string()) {
+                quest->SetActivationAction(data["activationAction"].get<std::string>());
+            }
+
+            return quest.get();
+        });
+
     #if GM_DEBUG_TOOLS
     // Register EditableTerrainComponent serializer
     gm::SceneSerializer::RegisterComponentSerializer(
@@ -451,14 +579,17 @@ void RegisterSerializers() {
 }
 
 void UnregisterSerializers() {
-    #if GM_DEBUG_TOOLS
+#if GM_DEBUG_TOOLS
     gm::SceneSerializer::UnregisterComponentSerializer("EditableTerrainComponent");
-    #endif
+#endif
+    gm::SceneSerializer::UnregisterComponentSerializer("CameraRigComponent");
+    gm::SceneSerializer::UnregisterComponentSerializer("QuestTriggerComponent");
     gm::SceneSerializer::UnregisterComponentSerializer("StaticMeshComponent");
     gm::SceneSerializer::UnregisterComponentSerializer("RigidBodyComponent");
-    
-    // Optionally unregister from factory (usually not needed, but available)
+
     auto& factory = gm::scene::ComponentFactory::Instance();
+    factory.Unregister("CameraRigComponent");
+    factory.Unregister("QuestTriggerComponent");
     #if GM_DEBUG_TOOLS
     factory.Unregister("EditableTerrainComponent");
     #endif

@@ -10,6 +10,7 @@
 #include <nlohmann/json.hpp>
 
 #include "gm/core/Logger.hpp"
+#include "gm/save/SaveVersion.hpp"
 
 namespace gm::save {
 
@@ -20,7 +21,7 @@ constexpr const char* kSaveExtension = ".json";
 
 nlohmann::json ToJson(const SaveGameData& data) {
     nlohmann::json json = {
-        {"version", data.version},
+        {"version", SaveVersionToJson(data.version)},
         {"sceneName", data.sceneName},
         {"camera", {
             {"position", {data.cameraPosition.x, data.cameraPosition.y, data.cameraPosition.z}},
@@ -61,7 +62,9 @@ nlohmann::json ToJson(const SaveGameData& data) {
 std::optional<SaveGameData> FromJson(const nlohmann::json& json, std::string& outError) {
     SaveGameData data;
     try {
-        data.version = json.value("version", data.version);
+        if (json.contains("version")) {
+            data.version = ParseSaveVersion(json["version"]);
+        }
         data.sceneName = json.value("sceneName", data.sceneName);
 
         if (json.contains("camera")) {
@@ -206,7 +209,12 @@ SaveLoadResult SaveManager::QuickSaveWithJson(const nlohmann::json& json) {
         return result;
     }
 
-    out << json.dump(2);
+    nlohmann::json output = json;
+    if (!output.contains("version")) {
+        output["version"] = SaveVersionToJson(SaveVersion::Current());
+    }
+
+    out << output.dump(2);
     if (!out.good()) {
         result.message = "Failed while writing save data";
         return result;
@@ -223,29 +231,7 @@ SaveLoadResult SaveManager::QuickLoad(SaveGameData& outData) const {
 }
 
 SaveLoadResult SaveManager::QuickLoadWithJson(nlohmann::json& outJson) const {
-    std::filesystem::path path = GetMostRecentQuickSave();
-    SaveLoadResult result;
-    
-    if (path.empty()) {
-        result.message = "No quick save found";
-        return result;
-    }
-
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
-        result.message = "Save file not found: " + path.string();
-        return result;
-    }
-
-    try {
-        in >> outJson;
-    } catch (const nlohmann::json::exception& ex) {
-        result.message = std::string("Failed to parse save: ") + ex.what();
-        return result;
-    }
-
-    result.success = true;
-    return result;
+    return LoadMostRecentQuickSaveJson(outJson);
 }
 
 SaveLoadResult SaveManager::SaveToSlot(const std::string& slotName, const SaveGameData& data) {
@@ -387,6 +373,37 @@ std::filesystem::path SaveManager::GetMostRecentQuickSave() const {
     }
     
     return mostRecent;
+}
+
+SaveLoadResult SaveManager::LoadMostRecentQuickSaveJson(nlohmann::json& outJson) const {
+    std::filesystem::path path = GetMostRecentQuickSave();
+    SaveLoadResult result;
+
+    if (path.empty()) {
+        result.message = "No quick save found";
+        return result;
+    }
+
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        result.message = "Save file not found: " + path.string();
+        return result;
+    }
+
+    try {
+        in >> outJson;
+    } catch (const nlohmann::json::exception& ex) {
+        result.message = std::string("Failed to parse save: ") + ex.what();
+        return result;
+    }
+
+    if (!outJson.contains("version")) {
+        gm::core::Logger::Warning("[SaveManager] Quick save '{}' missing version; assuming current", path.string());
+        outJson["version"] = SaveVersionToJson(SaveVersion::Current());
+    }
+
+    result.success = true;
+    return result;
 }
 
 } // namespace gm::save

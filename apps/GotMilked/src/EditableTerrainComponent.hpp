@@ -3,6 +3,7 @@
 #if GM_DEBUG_TOOLS
 
 #include "gm/scene/Component.hpp"
+#include "gm/debug/ITerrainEditing.hpp"
 #include "GameConstants.hpp"
 
 #include <array>
@@ -26,7 +27,7 @@ class TransformComponent;
 
 namespace gm::debug {
 
-class EditableTerrainComponent : public gm::Component {
+class EditableTerrainComponent : public gm::Component, public ITerrainEditing {
 public:
     enum class BrushMode {
         Sculpt = 0,
@@ -41,13 +42,13 @@ public:
     void Update(float deltaTime) override;
     void Render() override;
 
-    void SetCamera(gm::Camera* camera) { m_camera = camera; }
+    void SetCamera(gm::Camera* camera) override { m_camera = camera; }
     void SetShader(gm::Shader* shader) { m_shader = shader; }
     void SetMaterial(std::shared_ptr<gm::Material> material) { m_material = std::move(material); }
-    void SetWindow(GLFWwindow* window) { m_window = window; }
+    void SetWindow(GLFWwindow* window) override { m_window = window; }
     void SetTerrainSize(float sizeMeters);
     void SetResolution(int resolution);
-    void SetFovProvider(std::function<float()> provider) { m_fovProvider = std::move(provider); }
+    void SetFovProvider(std::function<float()> provider) override { m_fovProvider = std::move(provider); }
 
     bool IsEditingEnabled() const { return m_editingEnabled; }
     void SetEditingEnabled(bool enabled) { m_editingEnabled = enabled; }

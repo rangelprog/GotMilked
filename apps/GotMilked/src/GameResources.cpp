@@ -6,7 +6,7 @@
 #include "gm/rendering/Texture.hpp"
 #include "gm/rendering/Mesh.hpp"
 #include "gm/rendering/Material.hpp"
-#include "gm/assets/AssetCatalog.hpp"
+#include "gm/assets/AssetDatabase.hpp"
 #include "gm/utils/ResourceManifest.hpp"
 #include "gm/utils/ResourceManager.hpp"
 #include "gm/utils/ResourceRegistry.hpp"
@@ -15,124 +15,32 @@
 #include "gm/core/Error.hpp"
 
 #include <algorithm>
-#include <array>
 #include <cctype>
 #include <exception>
 #include <filesystem>
-#include <sstream>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 #include <fmt/format.h>
 #include <glm/vec3.hpp>
 
 namespace {
-
-std::string ToLower(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    return value;
-}
-
-bool EndsWith(std::string_view value, std::string_view suffix) {
-    return value.size() >= suffix.size() &&
-           std::equal(suffix.rbegin(), suffix.rend(), value.rbegin());
-}
-
-std::filesystem::path ResolveAssetPath(const std::filesystem::path& base, const std::string& input) {
-    std::filesystem::path path(input);
-    if (path.is_absolute()) {
-        return path.lexically_normal();
-    }
-    return (base / path).lexically_normal();
-}
-
-std::string RelativeToAssets(const std::filesystem::path& base, const std::filesystem::path& absolute) {
-    std::error_code ec;
-    auto relative = std::filesystem::relative(absolute, base, ec);
-    if (ec) {
-        return absolute.lexically_normal().generic_string();
-    }
-    return relative.lexically_normal().generic_string();
-}
-
-bool IsVertexShaderPath(const std::string& relativeLower) {
-    static const std::array<std::string_view, 6> kVertexSuffixes{
-        ".vert", ".vert.glsl", ".vs", ".vs.glsl", ".vertex", ".vertex.glsl"
-    };
-    for (auto suffix : kVertexSuffixes) {
-        if (EndsWith(relativeLower, suffix)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool IsFragmentShaderPath(const std::string& relativeLower) {
-    static const std::array<std::string_view, 6> kFragmentSuffixes{
-        ".frag", ".frag.glsl", ".fs", ".fs.glsl", ".pixel", ".pixel.glsl"
-    };
-    for (auto suffix : kFragmentSuffixes) {
-        if (EndsWith(relativeLower, suffix)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-std::string ShaderBaseKey(std::string relativeLower) {
-    static const std::array<std::string_view, 6> kStageSuffixes{
-        ".vert", ".vs", ".vertex", ".frag", ".fs", ".pixel"
-    };
-    static const std::array<std::string_view, 3> kFormatSuffixes{
-        ".glsl", ".hlsl", ".shader"
-    };
-
-    for (auto suffix : kFormatSuffixes) {
-        if (EndsWith(relativeLower, suffix)) {
-            relativeLower.resize(relativeLower.size() - suffix.size());
-            break;
-        }
-    }
-
-    for (auto suffix : kStageSuffixes) {
-        if (EndsWith(relativeLower, suffix)) {
-            relativeLower.resize(relativeLower.size() - suffix.size());
-            break;
-        }
-    }
-
-    while (!relativeLower.empty() && relativeLower.back() == '.') {
-        relativeLower.pop_back();
-    }
-
-    return relativeLower;
-}
-
-std::uint64_t Fnv1a64(std::string_view data) {
-    constexpr std::uint64_t kOffset = 14695981039346656037ull;
-    constexpr std::uint64_t kPrime = 1099511628211ull;
-    std::uint64_t hash = kOffset;
-    for (unsigned char c : data) {
-        hash ^= static_cast<std::uint64_t>(c);
-        hash *= kPrime;
-    }
-    return hash;
-}
-
-std::string GenerateDeterministicGuid(std::string_view prefix, std::string_view key) {
-    auto hash = Fnv1a64(key);
-    return fmt::format("{}::{:016x}", prefix, hash);
-}
 
 bool FileExists(const std::filesystem::path& path) {
     std::error_code ec;
     return std::filesystem::exists(path, ec);
 }
 
-struct ShaderFilePair {
-    std::optional<gm::assets::AssetDescriptor> vertex;
-    std::optional<gm::assets::AssetDescriptor> fragment;
+std::string NormalizeAliasKey(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return value;
+}
+
+const std::unordered_map<std::string, std::vector<std::string>> kLegacyShaderAliases{
+    {"shaders/simple", {"game_shader"}}
 };
 
 std::shared_ptr<gm::core::Error> CloneError(const gm::core::Error& err) {
@@ -146,6 +54,120 @@ std::shared_ptr<gm::core::Error> CloneError(const gm::core::Error& err) {
 }
 
 } // namespace
+
+void GameResources::ReportIssue(const std::string& message, bool isError) const {
+    const bool hasReporter = static_cast<bool>(m_issueReporter);
+    if (isError) {
+        if (hasReporter) {
+            gm::core::Logger::Debug("[GameResources] {}", message);
+        } else {
+            gm::core::Logger::Error("[GameResources] {}", message);
+        }
+    } else {
+        if (hasReporter) {
+            gm::core::Logger::Debug("[GameResources] {}", message);
+        } else {
+            gm::core::Logger::Warning("[GameResources] {}", message);
+        }
+    }
+    if (hasReporter && isError) {
+        m_issueReporter(message, isError);
+    }
+}
+
+void GameResources::ValidateManifests(const std::vector<gm::assets::AssetDatabase::ManifestRecord>& manifests) {
+    for (const auto& manifest : manifests) {
+        const auto& descriptor = manifest.descriptor;
+        const std::filesystem::path& absolute = descriptor.absolutePath;
+        if (absolute.empty() || !std::filesystem::exists(absolute)) {
+            continue;
+        }
+
+        auto result = gm::utils::LoadResourceManifest(absolute);
+        const std::string displayName = descriptor.relativePath.empty()
+            ? absolute.filename().string()
+            : descriptor.relativePath;
+
+        if (!result.success) {
+            for (const auto& error : result.errors) {
+                ReportIssue(fmt::format("Manifest '{}': {}", displayName, error), true);
+            }
+        }
+
+        for (const auto& warning : result.warnings) {
+            ReportIssue(fmt::format("Manifest '{}': {}", displayName, warning), false);
+        }
+    }
+}
+
+void GameResources::RegisterShaderAlias(const std::string& alias, const std::string& guid) {
+    if (alias.empty() || guid.empty()) {
+        return;
+    }
+    m_shaderAliases[NormalizeAliasKey(alias)] = guid;
+}
+
+void GameResources::RegisterMeshAlias(const std::string& alias, const std::string& guid) {
+    if (alias.empty() || guid.empty()) {
+        return;
+    }
+    m_meshAliases[NormalizeAliasKey(alias)] = guid;
+}
+
+void GameResources::RegisterMaterialAlias(const std::string& alias, const std::string& guid) {
+    if (alias.empty() || guid.empty()) {
+        return;
+    }
+    m_materialAliases[NormalizeAliasKey(alias)] = guid;
+}
+
+std::string GameResources::ResolveShaderGuid(const std::string& guid) const {
+    if (guid.empty()) {
+        return {};
+    }
+    auto it = m_shaderAliases.find(NormalizeAliasKey(guid));
+    if (it != m_shaderAliases.end()) {
+        return it->second;
+    }
+    return {};
+}
+
+std::string GameResources::ResolveMeshGuid(const std::string& guid) const {
+    if (guid.empty()) {
+        return {};
+    }
+    auto it = m_meshAliases.find(NormalizeAliasKey(guid));
+    if (it != m_meshAliases.end()) {
+        return it->second;
+    }
+    return {};
+}
+
+std::string GameResources::ResolveMaterialGuid(const std::string& guid) const {
+    if (guid.empty()) {
+        return {};
+    }
+    auto it = m_materialAliases.find(NormalizeAliasKey(guid));
+    if (it != m_materialAliases.end()) {
+        return it->second;
+    }
+    return {};
+}
+
+std::string GameResources::ResolveShaderAlias(const std::string& guid) const {
+    auto resolved = ResolveShaderGuid(guid);
+    return resolved.empty() ? guid : resolved;
+}
+
+std::string GameResources::ResolveMeshAlias(const std::string& guid) const {
+    auto resolved = ResolveMeshGuid(guid);
+    return resolved.empty() ? guid : resolved;
+}
+
+std::string GameResources::ResolveMaterialAlias(const std::string& guid) const {
+    auto resolved = ResolveMaterialGuid(guid);
+    return resolved.empty() ? guid : resolved;
+}
 
 GameResources::~GameResources() {
     Release();
@@ -167,129 +189,96 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
     }
     m_assetsDir = canonical;
 
-    auto& catalog = gm::assets::AssetCatalog::Instance();
-    catalog.SetAssetRoot(m_assetsDir);
-    catalog.Scan();
+    auto& assetDatabase = gm::assets::AssetDatabase::Instance();
+    assetDatabase.Initialize(m_assetsDir);
+    assetDatabase.WaitForInitialIndex();
+    assetDatabase.WaitUntilIdle();
 
-    const auto catalogAssets = catalog.GetAllAssets();
+    const auto manifestRecords = assetDatabase.GetManifestRecords();
+    ValidateManifests(manifestRecords);
 
-    std::unordered_map<std::string, gm::assets::AssetDescriptor> meshAssets;
-    std::unordered_map<std::string, ShaderFilePair> shaderFilePairs;
-
-    auto isUnderDirectory = [](const std::string& relative, std::string_view directory) {
-        if (relative.size() < directory.size()) {
-            return false;
-        }
-        return std::equal(directory.begin(), directory.end(), relative.begin());
-    };
-
-    for (const auto& asset : catalogAssets) {
-        switch (asset.type) {
-        case gm::assets::AssetType::Mesh:
-            if (isUnderDirectory(asset.relativePath, "models/")) {
-                meshAssets.emplace(asset.guid, asset);
-            }
-            break;
-        case gm::assets::AssetType::Shader: {
-            const auto relativeLower = ToLower(asset.relativePath);
-            if (!isUnderDirectory(asset.relativePath, "shaders/")) {
-                break;
-            }
-            auto baseKey = ShaderBaseKey(relativeLower);
-            auto& pair = shaderFilePairs[baseKey];
-            if (IsVertexShaderPath(relativeLower)) {
-                pair.vertex = asset;
-            } else if (IsFragmentShaderPath(relativeLower)) {
-                pair.fragment = asset;
-            }
-            break;
-        }
-        case gm::assets::AssetType::Prefab:
-            if (isUnderDirectory(asset.relativePath, "prefabs/")) {
-                m_prefabSources[asset.guid] = asset.relativePath;
-            }
-            break;
-        default:
-            break;
-        }
-    }
+    const auto shaderRecords = assetDatabase.GetShaderBatches();
+    const auto meshRecords = assetDatabase.GetMeshRecords();
+    const auto prefabRecords = assetDatabase.GetPrefabRecords();
 
     std::unordered_set<std::string> loadedShaderGuids;
     std::unordered_set<std::string> loadedMeshGuids;
-    std::unordered_set<std::string> consumedShaderBases;
 
     m_prefabSources.clear();
+    m_shaderAliases.clear();
+    m_meshAliases.clear();
+    m_materialAliases.clear();
 
     bool success = false;
 
     try {
-        for (const auto& [baseKey, files] : shaderFilePairs) {
-            if (baseKey.empty()) {
+        for (const auto& record : shaderRecords) {
+            if (record.guid.empty()) {
                 continue;
             }
-            if (consumedShaderBases.count(baseKey)) {
-                continue;
-            }
-            if (!files.vertex || !files.fragment) {
-                continue;
-            }
-            if (!isUnderDirectory(files.vertex->relativePath, "shaders/") ||
-                !isUnderDirectory(files.fragment->relativePath, "shaders/")) {
+            if (loadedShaderGuids.count(record.guid) || m_shaders.count(record.guid)) {
                 continue;
             }
 
-            auto vertPath = (m_assetsDir / files.vertex->relativePath).lexically_normal();
-            auto fragPath = (m_assetsDir / files.fragment->relativePath).lexically_normal();
+            auto vertPath = record.vertex.absolutePath.lexically_normal();
+            auto fragPath = record.fragment.absolutePath.lexically_normal();
 
             if (!FileExists(vertPath) || !FileExists(fragPath)) {
-                gm::core::Logger::Warning("[GameResources] Catalog shader '{}' missing files ({} / {})",
-                                          baseKey,
-                                          vertPath.generic_string(),
-                                          fragPath.generic_string());
+                ReportIssue(fmt::format("Catalog shader '{}' missing files ({} / {})",
+                                        record.baseKey,
+                                        vertPath.generic_string(),
+                                        fragPath.generic_string()), true);
                 continue;
-            }
-
-            std::string guid = files.vertex->guid;
-            if (loadedShaderGuids.count(guid) || m_shaders.count(guid)) {
-                guid = GenerateDeterministicGuid("shader", baseKey);
-            }
-            if (loadedShaderGuids.count(guid) || m_shaders.count(guid)) {
-                guid = GenerateDeterministicGuid("shader_auto", baseKey);
             }
 
             gm::ResourceManager::ShaderDescriptor descriptor{
-                guid,
+                record.guid,
                 vertPath.string(),
                 fragPath.string()
             };
             auto handle = gm::ResourceManager::LoadShader(descriptor);
             auto shader = handle.Lock();
             if (!shader) {
-                throw gm::core::ResourceError("shader", guid, "Loaded shader handle is empty");
+                throw gm::core::ResourceError("shader", record.guid, "Loaded shader handle is empty");
             }
             shader->Use();
             shader->SetInt("uTex", 0);
 
-            m_shaders[guid] = shader;
-            m_shaderSources[guid] = ShaderSources{descriptor.vertexPath, descriptor.fragmentPath};
-            registry.RegisterShader(guid, descriptor.vertexPath, descriptor.fragmentPath);
-            loadedShaderGuids.insert(guid);
-            consumedShaderBases.insert(baseKey);
+            m_shaders[record.guid] = shader;
+            m_shaderSources[record.guid] = ShaderSources{descriptor.vertexPath, descriptor.fragmentPath};
+            registry.RegisterShader(record.guid, descriptor.vertexPath, descriptor.fragmentPath);
+            loadedShaderGuids.insert(record.guid);
+
+            RegisterShaderAlias(record.baseKey, record.guid);
+            RegisterShaderAlias(record.vertex.relativePath, record.guid);
+            RegisterShaderAlias(record.fragment.relativePath, record.guid);
+
+            std::filesystem::path vertexRel(record.vertex.relativePath);
+            std::filesystem::path fragmentRel(record.fragment.relativePath);
+            RegisterShaderAlias(vertexRel.stem().string(), record.guid);
+            RegisterShaderAlias(fragmentRel.stem().string(), record.guid);
+
+            if (auto legacyIt = kLegacyShaderAliases.find(record.baseKey); legacyIt != kLegacyShaderAliases.end()) {
+                for (const auto& alias : legacyIt->second) {
+                    RegisterShaderAlias(alias, record.guid);
+                }
+            }
+            if (auto pos = record.guid.find("::"); pos != std::string::npos && pos + 2 < record.guid.size()) {
+                RegisterShaderAlias(record.guid.substr(pos + 2), record.guid);
+            }
         }
 
-        for (const auto& [guid, descriptor] : meshAssets) {
-            if (loadedMeshGuids.count(guid)) {
-                continue;
-            }
-            if (!isUnderDirectory(descriptor.relativePath, "models/")) {
+        for (const auto& meshRecord : meshRecords) {
+            const auto& guid = meshRecord.guid;
+            if (guid.empty() || loadedMeshGuids.count(guid)) {
                 continue;
             }
 
-            auto path = (m_assetsDir / descriptor.relativePath).lexically_normal();
+            auto path = meshRecord.descriptor.absolutePath.lexically_normal();
             if (!FileExists(path)) {
-                gm::core::Logger::Warning("[GameResources] Catalog mesh '{}' missing file '{}'",
-                                          guid,
-                                          path.generic_string());
+                ReportIssue(fmt::format("Catalog mesh '{}' missing file '{}'",
+                                        guid,
+                                        path.generic_string()), true);
                 continue;
             }
 
@@ -312,6 +301,22 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
             m_meshSources[guid] = entry;
             registry.RegisterMesh(guid, entry.path);
             loadedMeshGuids.insert(guid);
+
+            RegisterMeshAlias(meshRecord.descriptor.relativePath, guid);
+            std::filesystem::path meshRel(meshRecord.descriptor.relativePath);
+            RegisterMeshAlias(meshRel.stem().string(), guid);
+            std::filesystem::path withoutExt = meshRel;
+            withoutExt.replace_extension();
+            RegisterMeshAlias(withoutExt.string(), guid);
+            if (auto pos = guid.find("::"); pos != std::string::npos && pos + 2 < guid.size()) {
+                RegisterMeshAlias(guid.substr(pos + 2), guid);
+            }
+        }
+
+        for (const auto& prefabRecord : prefabRecords) {
+            if (!prefabRecord.guid.empty()) {
+                m_prefabSources[prefabRecord.guid] = prefabRecord.descriptor.relativePath;
+            }
         }
 
         RegisterDefaults();
@@ -328,19 +333,18 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
         success = true;
     } catch (const gm::core::Error& err) {
         StoreError(err);
-        gm::core::Logger::Error("[GameResources] {}", err.what());
+        ReportIssue(err.what(), true);
         gm::core::Event::Trigger(gotmilked::GameEvents::ResourceLoadFailed);
         gm::core::Event::TriggerWithData(gotmilked::GameEvents::ResourceLoadFailed, m_lastError.get());
     } catch (const std::exception& ex) {
         gm::core::Error err(std::string("GameResources load failed: ") + ex.what());
         StoreError(err);
-        gm::core::Logger::Error("[GameResources] {}", err.what());
+        ReportIssue(err.what(), true);
         gm::core::Event::Trigger(gotmilked::GameEvents::ResourceLoadFailed);
         gm::core::Event::TriggerWithData(gotmilked::GameEvents::ResourceLoadFailed, m_lastError.get());
     }
 
     RegisterCatalogListener();
-    catalog.StartWatching();
 
     return success;
 }
@@ -350,8 +354,8 @@ void GameResources::RegisterCatalogListener() {
         return;
     }
 
-    auto& catalog = gm::assets::AssetCatalog::Instance();
-    m_catalogListener = catalog.RegisterListener([this](const gm::assets::AssetEvent& event) {
+    auto& database = gm::assets::AssetDatabase::Instance();
+    m_catalogListener = database.RegisterListener([this](const gm::assets::AssetEvent& event) {
         std::lock_guard<std::mutex> lock(m_catalogEventMutex);
         m_catalogEvents.push_back(event);
         m_catalogDirty.store(true, std::memory_order_relaxed);
@@ -359,9 +363,9 @@ void GameResources::RegisterCatalogListener() {
 }
 
 void GameResources::UnregisterCatalogListener() {
-    auto& catalog = gm::assets::AssetCatalog::Instance();
+    auto& database = gm::assets::AssetDatabase::Instance();
     if (m_catalogListener != 0) {
-        catalog.UnregisterListener(m_catalogListener);
+        database.UnregisterListener(m_catalogListener);
         m_catalogListener = 0;
     }
 
@@ -462,7 +466,7 @@ void GameResources::EnsureTextureRegistered(const std::string& guid, std::shared
         entry.srgb = true;
         entry.flipY = true;
         if (!m_assetsDir.empty()) {
-            if (auto descriptor = gm::assets::AssetCatalog::Instance().FindByGuid(guid)) {
+            if (auto descriptor = gm::assets::AssetDatabase::Instance().FindByGuid(guid)) {
                 if (!descriptor->relativePath.empty()) {
                     entry.path = (m_assetsDir / descriptor->relativePath).lexically_normal().string();
                 }
@@ -480,8 +484,21 @@ void GameResources::StoreError(const gm::core::Error& err) {
 }
 
 gm::Shader* GameResources::GetShader(const std::string& guid) const {
+    if (guid.empty()) {
+        return nullptr;
+    }
     auto it = m_shaders.find(guid);
-    return it != m_shaders.end() ? it->second.get() : nullptr;
+    if (it != m_shaders.end()) {
+        return it->second.get();
+    }
+    auto resolved = ResolveShaderGuid(guid);
+    if (!resolved.empty()) {
+        auto resolvedIt = m_shaders.find(resolved);
+        if (resolvedIt != m_shaders.end()) {
+            return resolvedIt->second.get();
+        }
+    }
+    return nullptr;
 }
 
 gm::Texture* GameResources::GetTexture(const std::string& guid) const {
@@ -490,14 +507,36 @@ gm::Texture* GameResources::GetTexture(const std::string& guid) const {
 }
 
 gm::Mesh* GameResources::GetMesh(const std::string& guid) const {
+    if (guid.empty()) {
+        return nullptr;
+    }
     auto it = m_meshes.find(guid);
-    return it != m_meshes.end() ? it->second.get() : nullptr;
+    if (it != m_meshes.end()) {
+        return it->second.get();
+    }
+    auto resolved = ResolveMeshGuid(guid);
+    if (!resolved.empty()) {
+        auto resolvedIt = m_meshes.find(resolved);
+        if (resolvedIt != m_meshes.end()) {
+            return resolvedIt->second.get();
+        }
+    }
+    return nullptr;
 }
 
 std::shared_ptr<gm::Material> GameResources::GetMaterial(const std::string& guid) const {
-    auto it = m_materials.find(guid);
-    if (it != m_materials.end()) {
-        return it->second;
+    if (!guid.empty()) {
+        auto it = m_materials.find(guid);
+        if (it != m_materials.end()) {
+            return it->second;
+        }
+        auto resolved = ResolveMaterialGuid(guid);
+        if (!resolved.empty()) {
+            auto resolvedIt = m_materials.find(resolved);
+            if (resolvedIt != m_materials.end()) {
+                return resolvedIt->second;
+            }
+        }
     }
     return nullptr;
 }
@@ -519,7 +558,7 @@ std::shared_ptr<gm::Texture> GameResources::EnsureTextureAvailable(const std::st
         return it->second;
     }
 
-    auto descriptorOpt = gm::assets::AssetCatalog::Instance().FindByGuid(guid);
+    auto descriptorOpt = gm::assets::AssetDatabase::Instance().FindByGuid(guid);
     if (!descriptorOpt) {
         return nullptr;
     }
@@ -776,8 +815,6 @@ bool GameResources::ReloadAll() {
 }
 
 void GameResources::Release() {
-    auto& catalog = gm::assets::AssetCatalog::Instance();
-    catalog.StopWatching();
     UnregisterCatalogListener();
 
     auto& registry = gm::ResourceRegistry::Instance();
@@ -803,6 +840,9 @@ void GameResources::Release() {
     m_meshSources.clear();
     m_materialSources.clear();
     m_prefabSources.clear();
+    m_shaderAliases.clear();
+    m_meshAliases.clear();
+    m_materialAliases.clear();
 
     m_defaultShaderGuid.clear();
     m_defaultShaderVertPath.clear();

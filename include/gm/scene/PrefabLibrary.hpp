@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -28,6 +29,7 @@ class PrefabLibrary {
 public:
     bool LoadDirectory(const std::filesystem::path& root);
     bool LoadPrefabFile(const std::filesystem::path& filePath);
+    void SetMessageCallback(std::function<void(const std::string&, bool isError)> callback) { m_messageCallback = std::move(callback); }
 
     const PrefabDefinition* GetPrefab(const std::string& name) const;
     std::vector<std::string> GetPrefabNames() const;
@@ -41,6 +43,9 @@ public:
 
 private:
     std::unordered_map<std::string, PrefabDefinition> m_prefabs;
+    std::function<void(const std::string&, bool)> m_messageCallback;
+
+    void DispatchMessage(const std::string& message, bool isError) const;
 };
 
 } // namespace gm::scene

@@ -365,4 +365,60 @@ TEST_CASE("GameResources loads without optional mesh", "[game_resources]") {
     resources.Release();
     REQUIRE(resources.GetLastError() == nullptr);
 }
+
+TEST_CASE("GameResources reload maintains shader aliases", "[game_resources][hot_reload]") {
+    GlfwContext glContext;
+    TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
+    TempDir assets(bundle.root);
+    ScopedResourceManagerReset resourceReset;
+
+    std::filesystem::path assetsDir = SetupBasicAssets(bundle);
+    GameResources resources;
+    REQUIRE(resources.Load(assetsDir));
+    REQUIRE(resources.GetLastError() == nullptr);
+
+    auto shaderGuid = resources.GetShaderGuid();
+    REQUIRE_FALSE(shaderGuid.empty());
+    gm::Shader* originalShader = resources.GetShader(shaderGuid);
+    REQUIRE(originalShader != nullptr);
+
+    // Touch shader file to simulate an edit
+    {
+        std::ofstream(assetsDir / "shaders" / "simple.vert.glsl", std::ios::app) << "\n// hot reload";
+    }
+
+    REQUIRE(resources.ReloadShader(shaderGuid));
+    REQUIRE(resources.GetLastError() == nullptr);
+
+    gm::Shader* reloadedShader = resources.GetShader(shaderGuid);
+    REQUIRE(reloadedShader != nullptr);
+    REQUIRE(resources.GetShader("game_shader") == reloadedShader);
+    REQUIRE(resources.GetShader("shaders/simple") == reloadedShader);
+
+    resources.Release();
+}
+
+TEST_CASE("GameResources reports reload failures", "[game_resources][errors]") {
+    GlfwContext glContext;
+    TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
+    TempDir assets(bundle.root);
+    ScopedResourceManagerReset resourceReset;
+
+    std::filesystem::path assetsDir = SetupBasicAssets(bundle);
+    GameResources resources;
+    REQUIRE(resources.Load(assetsDir));
+
+    std::vector<std::string> reported;
+    resources.SetIssueReporter([&](const std::string& msg, bool isError) {
+        if (isError) {
+            reported.push_back(msg);
+        }
+    });
+
+    REQUIRE_FALSE(resources.ReloadShader("missing-shader"));
+    REQUIRE(resources.GetLastError() != nullptr);
+    REQUIRE_FALSE(reported.empty());
+
+    resources.Release();
+}
 } // namespace

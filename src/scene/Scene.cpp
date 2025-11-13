@@ -39,7 +39,8 @@ public:
 };
 
 Scene::Scene(const std::string& name)
-    : sceneName(name) {
+    : sceneName(name)
+    , m_updateThreadPool(std::max<std::size_t>(1, std::thread::hardware_concurrency())) {
     m_gameObjectPool.Reserve(kInitialObjectPoolCapacity);
     RegisterSystem(std::make_shared<GameObjectUpdateSystem>());
 }
@@ -95,8 +96,8 @@ void Scene::UpdateGameObjects(float deltaTime) {
         return;
     }
 
-    const unsigned int hwThreads = std::max(1u, std::thread::hardware_concurrency());
-    const std::size_t workerCount = std::min<std::size_t>(hwThreads, count);
+    const std::size_t poolThreads = std::max<std::size_t>(1, m_updateThreadPool.ThreadCount());
+    const std::size_t workerCount = std::max<std::size_t>(1, std::min<std::size_t>(poolThreads, count));
 
     const std::size_t chunkSize = (count + workerCount - 1) / workerCount;
 
@@ -109,27 +110,25 @@ void Scene::UpdateGameObjects(float deltaTime) {
         }
     };
 
-    std::vector<std::future<void>> workers;
-    workers.reserve(workerCount > 0 ? workerCount - 1 : 0);
-
-    std::size_t start = chunkSize;
-    for (std::size_t worker = 1; worker < workerCount; ++worker, start += chunkSize) {
-        const std::size_t begin = std::min(start, count);
-        const std::size_t end = std::min(begin + chunkSize, count);
-        if (begin >= end) {
-            break;
+    std::vector<std::future<void>> tasks;
+    if (workerCount > 1) {
+        tasks.reserve(workerCount - 1);
+        std::size_t start = chunkSize;
+        for (std::size_t worker = 1; worker < workerCount; ++worker, start += chunkSize) {
+            const std::size_t begin = std::min(start, count);
+            const std::size_t end = std::min(begin + chunkSize, count);
+            if (begin >= end) {
+                break;
+            }
+            tasks.emplace_back(m_updateThreadPool.Submit(processRange, begin, end));
         }
-
-        workers.emplace_back(std::async(std::launch::async, processRange, begin, end));
     }
 
     const std::size_t primaryEnd = std::min(chunkSize, count);
     processRange(0, primaryEnd);
 
-    for (auto& worker : workers) {
-        if (worker.valid()) {
-            worker.get();
-        }
+    for (auto& task : tasks) {
+        task.get();
     }
 }
 
@@ -138,6 +137,7 @@ void Scene::UpdateActiveLists() {
     if (!m_activeListsDirty) {
         return;
     }
+    m_instancedGroupsDirty = true;
     
     m_activeRenderables.clear();
     m_activeUpdatables.clear();
@@ -156,6 +156,82 @@ void Scene::UpdateActiveLists() {
     }
     
     m_activeListsDirty = false;
+}
+
+const std::vector<std::shared_ptr<GameObject>>& Scene::GetActiveRenderables() {
+    UpdateActiveLists();
+    return m_activeRenderables;
+}
+
+const std::vector<Scene::InstancedGroup>& Scene::GetInstancedGroups() const {
+    EnsureInstancedGroups();
+    return m_instancedGroups;
+}
+
+void Scene::EnsureInstancedGroups() const {
+    if (!m_instancedGroupsDirty && m_instancedGroupsVersion == m_reloadVersion) {
+        return;
+    }
+
+    const_cast<Scene*>(this)->UpdateActiveLists();
+
+    m_instancedGroups.clear();
+
+    struct BatchKey {
+        Mesh* mesh = nullptr;
+        Shader* shader = nullptr;
+        const Material* material = nullptr;
+
+        bool operator==(const BatchKey& other) const {
+            return mesh == other.mesh && shader == other.shader && material == other.material;
+        }
+    };
+
+    struct BatchKeyHash {
+        std::size_t operator()(const BatchKey& key) const {
+            std::size_t h1 = std::hash<Mesh*>{}(key.mesh);
+            std::size_t h2 = std::hash<Shader*>{}(key.shader);
+            std::size_t h3 = std::hash<const Material*>{}(key.material);
+            return h1 ^ (h2 << 1) ^ (h3 << 2);
+        }
+    };
+
+    std::unordered_map<BatchKey, std::size_t, BatchKeyHash> lookup;
+    lookup.reserve(m_activeRenderables.size());
+
+    for (const auto& gameObject : m_activeRenderables) {
+        if (!gameObject || gameObject->IsDestroyed()) {
+            continue;
+        }
+
+        auto meshComp = gameObject->GetComponent<gm::scene::StaticMeshComponent>();
+        if (!meshComp || !meshComp->IsActive()) {
+            continue;
+        }
+
+        Mesh* mesh = meshComp->GetMesh();
+        Shader* shader = meshComp->GetShader();
+        auto material = meshComp->GetMaterial();
+
+        if (!mesh || !shader) {
+            continue;
+        }
+
+        BatchKey key{ mesh, shader, material.get() };
+        auto [it, inserted] = lookup.try_emplace(key, m_instancedGroups.size());
+        if (inserted) {
+            InstancedGroup group;
+            group.mesh = mesh;
+            group.shader = shader;
+            group.material = material;
+            m_instancedGroups.push_back(std::move(group));
+        }
+
+        m_instancedGroups[it->second].objects.push_back(gameObject);
+    }
+
+    m_instancedGroupsDirty = false;
+    m_instancedGroupsVersion = m_reloadVersion;
 }
 
 void Scene::InitializeSystems() {
@@ -355,16 +431,25 @@ void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovD
     if (m_instancedRenderingEnabled) {
         std::vector<InstancedBatch> batches;
         CollectInstancedBatches(batches, frustumPtr);
+
+        std::unordered_set<const GameObject*> instancedObjects;
+        instancedObjects.reserve(batches.size() * 4);
         
         // Render instanced batches
         for (const auto& batch : batches) {
             if (batch.modelMatrices.size() > 1) {
                 // Use instanced rendering for batches with multiple instances
                 RenderInstancedBatch(batch, shader, cam);
+                for (const auto& obj : batch.gameObjects) {
+                    if (obj) {
+                        instancedObjects.insert(obj.get());
+                    }
+                }
             } else if (batch.modelMatrices.size() == 1) {
                 // Single instance, render normally
                 if (!batch.gameObjects.empty() && batch.gameObjects[0]) {
                     batch.gameObjects[0]->Render();
+                    instancedObjects.insert(batch.gameObjects[0].get());
                 }
             }
         }
@@ -372,23 +457,12 @@ void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovD
         // Render non-instanced objects (those without StaticMeshComponent or unique combinations)
         for (const auto& gameObject : m_activeRenderables) {
             if (gameObject && !gameObject->IsDestroyed()) {
-                // Check if this object was already rendered in a batch
-                bool alreadyRendered = false;
-                for (const auto& batch : batches) {
-                    for (const auto& batchedObj : batch.gameObjects) {
-                        if (batchedObj == gameObject) {
-                            alreadyRendered = true;
-                            break;
-                        }
-                    }
-                    if (alreadyRendered) break;
+                if (instancedObjects.find(gameObject.get()) != instancedObjects.end()) {
+                    continue;
                 }
-                
-                if (!alreadyRendered) {
-                    // Skip frustum culling if disabled, or render if in frustum
-                    if (!m_frustumCullingEnabled || IsInFrustum(*gameObject, frustum)) {
-                        gameObject->Render();
-                    }
+                // Skip frustum culling if disabled, or render if in frustum
+                if (!m_frustumCullingEnabled || !frustumPtr || IsInFrustum(*gameObject, *frustumPtr)) {
+                    gameObject->Render();
                 }
             }
         }
@@ -397,7 +471,7 @@ void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovD
         for (const auto& gameObject : m_activeRenderables) {
             if (gameObject && !gameObject->IsDestroyed()) {
                 // Skip frustum culling if disabled, or render if in frustum
-                if (!m_frustumCullingEnabled || IsInFrustum(*gameObject, frustum)) {
+                if (!m_frustumCullingEnabled || !frustumPtr || IsInFrustum(*gameObject, *frustumPtr)) {
                     gameObject->Render();
                 }
             }
@@ -528,85 +602,56 @@ bool Scene::IsInFrustum(const GameObject& obj, const Frustum& frustum) const {
 }
 
 void Scene::CollectInstancedBatches(std::vector<InstancedBatch>& batches, const Frustum* frustum) const {
-    // Map to group StaticMeshComponents by (mesh, shader, material) combination
-    struct BatchKey {
-        Mesh* mesh;
-        Shader* shader;
-        Material* material;  // Use raw pointer for comparison
-        
-        bool operator==(const BatchKey& other) const {
-            return mesh == other.mesh && shader == other.shader && material == other.material;
-        }
-    };
-    
-    struct BatchKeyHash {
-        std::size_t operator()(const BatchKey& key) const {
-            std::size_t h1 = std::hash<Mesh*>{}(key.mesh);
-            std::size_t h2 = std::hash<Shader*>{}(key.shader);
-            std::size_t h3 = std::hash<Material*>{}(key.material);
-            return h1 ^ (h2 << 1) ^ (h3 << 2);
-        }
-    };
-    
-    std::unordered_map<BatchKey, InstancedBatch, BatchKeyHash> batchMap;
-    
-    // Collect all StaticMeshComponents
-    for (const auto& gameObject : m_activeRenderables) {
-        if (!gameObject || gameObject->IsDestroyed()) {
+    EnsureInstancedGroups();
+
+    batches.reserve(m_instancedGroups.size());
+
+    for (const auto& group : m_instancedGroups) {
+        if (group.objects.empty()) {
             continue;
         }
-        
-        // Frustum culling
-        if (frustum && !IsInFrustum(*gameObject, *frustum)) {
-            continue;
-        }
-        
-        auto meshComp = gameObject->GetComponent<gm::scene::StaticMeshComponent>();
-        if (!meshComp || !meshComp->IsActive()) {
-            continue;
-        }
-        
-        Mesh* mesh = meshComp->GetMesh();
-        Shader* shader = meshComp->GetShader();
-        auto material = meshComp->GetMaterial();
-        
-        if (!mesh || !shader) {
-            continue;  // Skip if required resources are missing
-        }
-        
-        BatchKey key{mesh, shader, material.get()};
-        
-        // Get or create batch
-        auto it = batchMap.find(key);
-        if (it == batchMap.end()) {
-            InstancedBatch batch;
-            batch.mesh = mesh;
-            batch.shader = shader;
-            batch.material = material;
-            // Reserve capacity for batch vectors to avoid reallocations
-            // Estimate based on active renderables (most batches will have multiple instances)
-            const size_t estimatedInstances = std::min(m_activeRenderables.size(), size_t(100));
-            batch.modelMatrices.reserve(estimatedInstances);
-            batch.normalMatrices.reserve(estimatedInstances);
-            batch.gameObjects.reserve(estimatedInstances);
-            batchMap[key] = std::move(batch);
-            it = batchMap.find(key);
-        }
-        
-        // Add transform data to batch
-        auto transform = gameObject->GetTransform();
-        if (transform) {
+
+        InstancedBatch batch;
+        batch.mesh = group.mesh;
+        batch.shader = group.shader;
+        batch.material = group.material;
+
+        const size_t estimatedInstances = group.objects.size();
+        batch.modelMatrices.reserve(estimatedInstances);
+        batch.normalMatrices.reserve(estimatedInstances);
+        batch.gameObjects.reserve(estimatedInstances);
+
+        for (const auto& gameObject : group.objects) {
+            if (!gameObject || gameObject->IsDestroyed()) {
+                continue;
+            }
+
+            if (frustum && !IsInFrustum(*gameObject, *frustum)) {
+                continue;
+            }
+
+            auto meshComp = gameObject->GetComponent<gm::scene::StaticMeshComponent>();
+            if (!meshComp || !meshComp->IsActive()) {
+                continue;
+            }
+
+            if (!meshComp->GetMesh() || !meshComp->GetShader()) {
+                continue;
+            }
+
+            auto transform = gameObject->GetTransform();
+            if (!transform) {
+                continue;
+            }
+
             glm::mat4 model = transform->GetMatrix();
             glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(model)));
-            it->second.modelMatrices.push_back(model);
-            it->second.normalMatrices.push_back(normalMat);
-            it->second.gameObjects.push_back(gameObject);
+            batch.modelMatrices.push_back(model);
+            batch.normalMatrices.push_back(normalMat);
+            batch.gameObjects.push_back(gameObject);
         }
-    }
-    
-    // Convert map to vector (only batches with 2+ instances are worth batching)
-    for (auto& [key, batch] : batchMap) {
-        if (batch.modelMatrices.size() >= 2) {
+
+        if (!batch.modelMatrices.empty()) {
             batches.push_back(std::move(batch));
         }
     }

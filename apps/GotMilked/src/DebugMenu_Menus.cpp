@@ -16,7 +16,8 @@
 #include "gm/save/SaveSnapshotHelpers.hpp"
 #include "gm/utils/FileDialog.hpp"
 #include "gm/rendering/Camera.hpp"
-#include "gm/core/Logger.hpp"
+#include "gm/gameplay/FlyCameraController.hpp"
+#include "gm/save/SaveVersion.hpp"
 
 #include <imgui.h>
 #include <nlohmann/json.hpp>
@@ -317,7 +318,7 @@ void DebugMenu::HandleSaveAs() {
                 sceneJson["worldTime"] = data.worldTime;
             }
 
-            sceneJson["version"] = data.version;
+            sceneJson["version"] = gm::save::SaveVersionToJson(data.version);
             sceneJson["sceneName"] = data.sceneName;
 
             std::ofstream file(filePath, std::ios::binary | std::ios::trunc);

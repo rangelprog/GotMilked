@@ -9,6 +9,8 @@
 #include <glm/vec3.hpp>
 #include <nlohmann/json_fwd.hpp>
 
+#include "gm/save/SaveVersion.hpp"
+
 namespace gm::save {
 
 struct SaveMetadata {
@@ -19,7 +21,7 @@ struct SaveMetadata {
 };
 
 struct SaveGameData {
-    std::string version = "0.1.0";
+    SaveVersion version = SaveVersion::Current();
     std::string sceneName;
     glm::vec3 cameraPosition{0.0f};
     glm::vec3 cameraForward{0.0f, 0.0f, -1.0f};
@@ -59,6 +61,7 @@ public:
     SaveLoadResult QuickSaveWithJson(const nlohmann::json& json);
     SaveLoadResult QuickLoad(SaveGameData& outData) const;
     SaveLoadResult QuickLoadWithJson(nlohmann::json& outJson) const;
+    SaveLoadResult LoadMostRecentQuickSaveJson(nlohmann::json& outJson) const;
 
     SaveLoadResult SaveToSlot(const std::string& slotName, const SaveGameData& data);
     SaveLoadResult LoadFromSlot(const std::string& slotName, SaveGameData& outData) const;

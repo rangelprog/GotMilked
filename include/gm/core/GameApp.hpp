@@ -3,13 +3,11 @@
 #include <functional>
 #include <string>
 
+#include "gm/scene/SceneManager.hpp"
+
 struct GLFWwindow;
 
-namespace gm {
-
-class SceneManager;
-
-namespace core {
+namespace gm::core {
 
 struct GameAppConfig {
     int width = 1280;
@@ -23,7 +21,7 @@ struct GameAppConfig {
 
 struct GameAppContext {
     GLFWwindow* window = nullptr;
-    SceneManager& sceneManager;
+    SceneManager* sceneManager = nullptr;
     std::function<void()> requestExit;
     std::function<void(bool)> setVSyncEnabled;
     std::function<bool()> isVSyncEnabled;
@@ -56,8 +54,8 @@ private:
     GLFWwindow* m_window = nullptr;
     bool m_exitRequested = false;
     bool m_vsyncEnabled = true;
+    SceneManager m_sceneManager;
 };
 
-} // namespace core
-} // namespace gm
+} // namespace gm::core
 

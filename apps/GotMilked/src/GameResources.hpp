@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -17,6 +18,7 @@
 #include "gm/utils/ResourceManifest.hpp"
 #include "gm/core/Error.hpp"
 #include "gm/assets/AssetCatalog.hpp"
+#include "gm/assets/AssetDatabase.hpp"
 
 // Forward declaration for test helper (defined in tests)
 struct TestAssetBundle;
@@ -43,6 +45,7 @@ public:
     bool ReloadMesh(const std::string& guid);
     bool ReloadAll();
     void Release();
+    void SetIssueReporter(std::function<void(const std::string&, bool isError)> reporter) { m_issueReporter = std::move(reporter); }
 
     const gm::core::Error* GetLastError() const { return m_lastError.get(); }
 
@@ -96,10 +99,22 @@ public:
     void EnsureTextureRegistered(const std::string& guid, std::shared_ptr<gm::Texture> texture);
     std::shared_ptr<gm::Texture> EnsureTextureAvailable(const std::string& guid);
 
+    std::string ResolveShaderAlias(const std::string& guid) const;
+    std::string ResolveMeshAlias(const std::string& guid) const;
+    std::string ResolveMaterialAlias(const std::string& guid) const;
+
 private:
     bool LoadInternal(const std::filesystem::path& assetsDir);
     void StoreError(const gm::core::Error& err);
     void RegisterDefaults();
+    void ValidateManifests(const std::vector<gm::assets::AssetDatabase::ManifestRecord>& manifests);
+    void ReportIssue(const std::string& message, bool isError) const;
+    void RegisterShaderAlias(const std::string& alias, const std::string& guid);
+    void RegisterMeshAlias(const std::string& alias, const std::string& guid);
+    void RegisterMaterialAlias(const std::string& alias, const std::string& guid);
+    std::string ResolveShaderGuid(const std::string& guid) const;
+    std::string ResolveMeshGuid(const std::string& guid) const;
+    std::string ResolveMaterialGuid(const std::string& guid) const;
 
     struct ShaderSources {
         std::string vertPath;
@@ -116,6 +131,9 @@ private:
     std::unordered_map<std::string, gm::utils::ResourceManifest::MeshEntry> m_meshSources;
     std::unordered_map<std::string, gm::utils::ResourceManifest::MaterialEntry> m_materialSources;
     std::unordered_map<std::string, std::string> m_prefabSources;
+    std::unordered_map<std::string, std::string> m_shaderAliases;
+    std::unordered_map<std::string, std::string> m_meshAliases;
+    std::unordered_map<std::string, std::string> m_materialAliases;
 
     std::string m_defaultShaderGuid;
     std::string m_defaultShaderVertPath;
@@ -129,7 +147,9 @@ private:
     std::filesystem::path m_assetsDir;
     std::shared_ptr<gm::core::Error> m_lastError;
 
-    gm::assets::AssetCatalog::ListenerId m_catalogListener = 0;
+    std::function<void(const std::string&, bool)> m_issueReporter;
+
+    gm::assets::AssetDatabase::ListenerId m_catalogListener = 0;
     std::mutex m_catalogEventMutex;
     std::vector<gm::assets::AssetEvent> m_catalogEvents;
     std::atomic<bool> m_catalogDirty{false};

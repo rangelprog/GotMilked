@@ -65,13 +65,25 @@ namespace gm::core {
 
 **Usage:**
 ```cpp
-// Subscribe to event
-gm::core::Event::Subscribe("PlayerDied", []() {
-gm::core::Logger::Info("Player died!");
+// Subscribe and hold the handle (call Reset() when you want to unsubscribe)
+auto playerDiedSub = gm::core::Event::Subscribe("PlayerDied", []() {
+    gm::core::Logger::Info("Player died!");
 });
+
+// Later, explicitly unsubscribe
+playerDiedSub.Reset();
 
 // Trigger event
 gm::core::Event::Trigger("PlayerDied");
+```
+
+```cpp
+// RAII helper that automatically unsubscribes when it goes out of scope
+gm::core::Event::ScopedSubscription scopedSub{
+    gm::core::Event::Subscribe("PlayerSpawned", []() {
+        gm::core::Logger::Info("Player spawned!");
+    })
+};
 ```
 
 ---
@@ -707,31 +719,48 @@ Centralized resource loading and caching.
 namespace gm::utils {
     class ResourceManager {
     public:
-        static ResourceManager& Instance();
-        
-        std::shared_ptr<Shader> LoadShader(const std::string& name, 
-                                          const std::string& vertPath, 
-                                          const std::string& fragPath);
-        
-        std::shared_ptr<Texture> LoadTexture(const std::string& name, 
-                                            const std::string& path);
-        
-        std::shared_ptr<Mesh> LoadMesh(const std::string& name, 
-                                       const std::string& path);
-        
-        std::shared_ptr<Shader> GetShader(const std::string& name);
-        std::shared_ptr<Texture> GetTexture(const std::string& name);
-        std::shared_ptr<Mesh> GetMesh(const std::string& name);
+        struct ShaderDescriptor {
+            std::string guid;
+            std::string vertexPath;
+            std::string fragmentPath;
+        };
+        struct TextureDescriptor {
+            std::string guid;
+            std::string path;
+        };
+        struct MeshDescriptor {
+            std::string guid;
+            std::string path;
+        };
+
+        static void Init(std::shared_ptr<Registry> registry = nullptr);
+        static void Cleanup();
+
+        static ShaderHandle LoadShader(const ShaderDescriptor& descriptor);
+        static ShaderHandle ReloadShader(const ShaderDescriptor& descriptor);
+        static std::shared_ptr<Shader> GetShader(const std::string& guid);
+
+        static TextureHandle LoadTexture(const TextureDescriptor& descriptor);
+        static TextureHandle ReloadTexture(const TextureDescriptor& descriptor);
+        static std::shared_ptr<Texture> GetTexture(const std::string& guid);
+
+        static MeshHandle LoadMesh(const MeshDescriptor& descriptor);
+        static MeshHandle ReloadMesh(const MeshDescriptor& descriptor);
+        static std::shared_ptr<Mesh> GetMesh(const std::string& guid);
     };
 }
 ```
 
 **Usage:**
 ```cpp
-auto& rm = gm::utils::ResourceManager::Instance();
-auto shader = rm.LoadShader("simple", "shaders/simple.vert.glsl", "shaders/simple.frag.glsl");
-auto texture = rm.LoadTexture("ground", "textures/ground.png");
-auto mesh = rm.LoadMesh("placeholder", "models/placeholder.obj");
+gm::utils::ResourceManager::Init();
+gm::utils::ResourceManager::ShaderDescriptor shaderDesc{
+    .guid = "shader::simple",
+    .vertexPath = "shaders/simple.vert.glsl",
+    .fragmentPath = "shaders/simple.frag.glsl"
+};
+auto shaderHandle = gm::utils::ResourceManager::LoadShader(shaderDesc);
+auto shader = shaderHandle.Lock(); // shared_ptr<gm::Shader>
 ```
 
 ---

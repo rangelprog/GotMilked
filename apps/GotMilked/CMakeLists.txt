@@ -1,6 +1,14 @@
 set(GOTMILKED_SOURCES
   src/main.cpp
   src/Game.cpp
+  src/GameBootstrapper.cpp
+  src/GameRenderer.cpp
+  src/DebugToolingController.cpp
+  src/SceneResourceController.cpp
+  src/GameShutdownController.cpp
+  src/ToolingFacade.cpp
+  src/EventRouter.cpp
+  src/GameLoopController.cpp
   src/SceneSerializerExtensions.cpp
   src/GameResources.cpp
   src/GameSceneHelpers.cpp

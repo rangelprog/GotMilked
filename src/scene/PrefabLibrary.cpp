@@ -12,6 +12,7 @@
 #include <fstream>
 
 #include <nlohmann/json.hpp>
+#include <fmt/format.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
@@ -20,6 +21,13 @@
 namespace gm::scene {
 
 namespace {
+
+struct PrefabValidationResult {
+    std::vector<std::string> errors;
+    std::vector<std::string> warnings;
+
+    bool IsValid() const { return errors.empty(); }
+};
 
 bool IsPrefabFile(const std::filesystem::path& path) {
     return path.has_filename() && path.extension() == ".json";
@@ -65,11 +73,98 @@ void ApplyTransformToGameObject(const std::shared_ptr<gm::GameObject>& object, c
     transform->SetScale(scaling);
 }
 
+void ValidateComponent(const nlohmann::json& componentJson, std::string_view prefabName, std::size_t objectIndex, std::size_t componentIndex, PrefabValidationResult& result) {
+    const std::string context = fmt::format("Prefab '{}' object[{}] component[{}]", prefabName, objectIndex, componentIndex);
+    if (!componentJson.is_object()) {
+        result.errors.push_back(fmt::format("{}: component entry must be an object", context));
+        return;
+    }
+    if (!componentJson.contains("type") || !componentJson["type"].is_string()) {
+        result.errors.push_back(fmt::format("{}: missing required string field 'type'", context));
+    }
+    if (componentJson.contains("data") && !componentJson["data"].is_object()) {
+        result.warnings.push_back(fmt::format("{}: optional 'data' field should be an object", context));
+    }
+    if (componentJson.contains("active") && !componentJson["active"].is_boolean()) {
+        result.warnings.push_back(fmt::format("{}: optional 'active' field should be a boolean", context));
+    }
+}
+
+void ValidateGameObject(const nlohmann::json& objectJson, std::string_view prefabName, std::size_t objectIndex, PrefabValidationResult& result) {
+    const std::string context = fmt::format("Prefab '{}' object[{}]", prefabName, objectIndex);
+    if (!objectJson.is_object()) {
+        result.errors.push_back(fmt::format("{}: entry must be an object", context));
+        return;
+    }
+    if (!objectJson.contains("name") || !objectJson["name"].is_string()) {
+        result.errors.push_back(fmt::format("{}: missing required string field 'name'", context));
+    }
+    if (objectJson.contains("components")) {
+        if (!objectJson["components"].is_array()) {
+            result.errors.push_back(fmt::format("{}: 'components' must be an array", context));
+        } else {
+            std::size_t componentIndex = 0;
+            for (const auto& componentJson : objectJson["components"]) {
+                ValidateComponent(componentJson, prefabName, objectIndex, componentIndex++, result);
+            }
+        }
+    }
+    if (objectJson.contains("tags") && !objectJson["tags"].is_array()) {
+        result.warnings.push_back(fmt::format("{}: optional 'tags' should be an array of strings", context));
+    }
+}
+
+PrefabValidationResult ValidatePrefabJson(const nlohmann::json& json, const std::filesystem::path& filePath) {
+    PrefabValidationResult result;
+    const std::string prefabName = filePath.stem().string();
+    if (!json.is_object()) {
+        result.errors.push_back(fmt::format("Prefab '{}' root must be a JSON object", filePath.string()));
+        return result;
+    }
+
+    if (json.contains("gameObjects")) {
+        if (!json["gameObjects"].is_array()) {
+            result.errors.push_back(fmt::format("Prefab '{}': 'gameObjects' must be an array", filePath.string()));
+        } else if (json["gameObjects"].empty()) {
+            result.errors.push_back(fmt::format("Prefab '{}': 'gameObjects' array must contain at least one entry", filePath.string()));
+        } else {
+            std::size_t index = 0;
+            for (const auto& objectJson : json["gameObjects"]) {
+                ValidateGameObject(objectJson, prefabName, index++, result);
+            }
+        }
+    } else {
+        ValidateGameObject(json, prefabName, 0, result);
+    }
+
+    return result;
+}
+
 } // namespace
+
+void PrefabLibrary::DispatchMessage(const std::string& message, bool isError) const {
+    const bool hasCallback = static_cast<bool>(m_messageCallback);
+    if (isError) {
+        if (hasCallback) {
+            gm::core::Logger::Debug("[PrefabLibrary] {}", message);
+        } else {
+            gm::core::Logger::Error("[PrefabLibrary] {}", message);
+        }
+    } else {
+        if (hasCallback) {
+            gm::core::Logger::Debug("[PrefabLibrary] {}", message);
+        } else {
+            gm::core::Logger::Warning("[PrefabLibrary] {}", message);
+        }
+    }
+    if (hasCallback) {
+        m_messageCallback(message, isError);
+    }
+}
 
 bool PrefabLibrary::LoadDirectory(const std::filesystem::path& root) {
     if (!std::filesystem::exists(root)) {
-        gm::core::Logger::Warning("[PrefabLibrary] Prefab directory does not exist: {}", root.string());
+        DispatchMessage(fmt::format("Prefab directory does not exist: {}", root.string()), false);
         return false;
     }
 
@@ -91,10 +186,21 @@ bool PrefabLibrary::LoadPrefabFile(const std::filesystem::path& filePath) {
         nlohmann::json json;
         std::ifstream file(filePath);
         if (!file.is_open()) {
-            gm::core::Logger::Error("[PrefabLibrary] Failed to open prefab file: {}", filePath.string());
+            DispatchMessage(fmt::format("Failed to open prefab file: {}", filePath.string()), true);
             return false;
         }
         file >> json;
+
+        PrefabValidationResult validation = ValidatePrefabJson(json, filePath);
+        for (const auto& warning : validation.warnings) {
+            DispatchMessage(warning, false);
+        }
+        if (!validation.IsValid()) {
+            for (const auto& error : validation.errors) {
+                DispatchMessage(error, true);
+            }
+            return false;
+        }
 
         PrefabDefinition def;
         def.name = filePath.stem().string();
@@ -115,7 +221,7 @@ bool PrefabLibrary::LoadPrefabFile(const std::filesystem::path& filePath) {
         }
 
         if (def.objects.empty()) {
-            gm::core::Logger::Warning("[PrefabLibrary] Prefab '{}' contains no objects", filePath.string());
+            DispatchMessage(fmt::format("Prefab '{}' contains no objects", filePath.string()), false);
             return false;
         }
 
@@ -123,7 +229,7 @@ bool PrefabLibrary::LoadPrefabFile(const std::filesystem::path& filePath) {
         gm::core::Logger::Info("[PrefabLibrary] Loaded prefab '{}' from {}", def.name, filePath.string());
         return true;
     } catch (const std::exception& ex) {
-        gm::core::Logger::Error("[PrefabLibrary] Failed to parse prefab '{}': {}", filePath.string(), ex.what());
+        DispatchMessage(fmt::format("Failed to parse prefab '{}': {}", filePath.string(), ex.what()), true);
         return false;
     }
 }

@@ -12,21 +12,13 @@ class Scene;
  * Supports multiple active scenes and efficient scene transitions
  */
 class SceneManager {
-private:
-    std::unordered_map<std::string, std::shared_ptr<Scene>> scenes;
-    std::shared_ptr<Scene> activeScene;
-    
+public:
     SceneManager() = default;
     ~SceneManager() = default;
     SceneManager(const SceneManager&) = delete;
     SceneManager& operator=(const SceneManager&) = delete;
-
-public:
-    // Singleton access - uses static local for thread-safe initialization (C++11)
-    static SceneManager& Instance() {
-        static SceneManager instance;
-        return instance;
-    }
+    SceneManager(SceneManager&&) = delete;
+    SceneManager& operator=(SceneManager&&) = delete;
 
     // Scene management
     std::shared_ptr<Scene> CreateScene(const std::string& name);
@@ -46,6 +38,10 @@ public:
 
     // Cleanup
     void Shutdown();
+
+private:
+    std::unordered_map<std::string, std::shared_ptr<Scene>> scenes;
+    std::shared_ptr<Scene> activeScene;
 };
 
 } // namespace gm

@@ -24,11 +24,13 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <cstdarg>
 #include <limits>
 #include <new>
 #include <thread>
+#include <chrono>
+
+#include "gm/core/Logger.hpp"
 
 namespace gm::physics {
 
@@ -160,7 +162,7 @@ void PhysicsWorld::Init(const glm::vec3& gravity) {
 
     m_physicsSystem->SetGravity(JPH::Vec3(gravity.x, gravity.y, gravity.z));
 
-    std::printf("[PhysicsWorld] Initialized\n");
+    gm::core::Logger::Info("[PhysicsWorld] Initialized (threads: {})", jobSystemThreads + 1);
     m_initialized = true;
 }
 
@@ -252,7 +254,7 @@ PhysicsWorld::BodyHandle PhysicsWorld::CreateStaticPlane(gm::GameObject& object,
     JPH::BoxShapeSettings planeSettings(JPH::Vec3(kPlaneHalfExtent, kPlaneHalfThickness, kPlaneHalfExtent));
     JPH::ShapeSettings::ShapeResult shapeResult = planeSettings.Create();
     if (shapeResult.HasError()) {
-        std::printf("[PhysicsWorld] Failed to create plane shape: %s\n", shapeResult.GetError().c_str());
+        gm::core::Logger::Error("[PhysicsWorld] Failed to create plane shape: {}", shapeResult.GetError());
         return {};
     }
 
@@ -268,7 +270,7 @@ PhysicsWorld::BodyHandle PhysicsWorld::CreateStaticPlane(gm::GameObject& object,
     auto& bodyInterface = m_physicsSystem->GetBodyInterface();
     JPH::Body* body = bodyInterface.CreateBody(bodySettings);
     if (!body) {
-        std::printf("[PhysicsWorld] Failed to create static plane body\n");
+        gm::core::Logger::Error("[PhysicsWorld] Failed to create static plane body");
         return {};
     }
 
@@ -290,7 +292,7 @@ PhysicsWorld::BodyHandle PhysicsWorld::CreateDynamicBox(gm::GameObject& object,
     JPH::BoxShapeSettings boxSettings(JPH::Vec3(halfExtent.x, halfExtent.y, halfExtent.z));
     JPH::ShapeSettings::ShapeResult shapeResult = boxSettings.Create();
     if (shapeResult.HasError()) {
-        std::printf("[PhysicsWorld] Failed to create box shape: %s\n", shapeResult.GetError().c_str());
+        gm::core::Logger::Error("[PhysicsWorld] Failed to create box shape: {}", shapeResult.GetError());
         return {};
     }
 
@@ -314,7 +316,7 @@ PhysicsWorld::BodyHandle PhysicsWorld::CreateDynamicBox(gm::GameObject& object,
     auto& bodyInterface = m_physicsSystem->GetBodyInterface();
     JPH::Body* body = bodyInterface.CreateBody(bodySettings);
     if (!body) {
-        std::printf("[PhysicsWorld] Failed to create dynamic body\n");
+        gm::core::Logger::Error("[PhysicsWorld] Failed to create dynamic body");
         return {};
     }
 
@@ -391,6 +393,8 @@ void PhysicsWorld::Step(float deltaTime) {
         return;
     }
 
+    const auto stepStart = std::chrono::high_resolution_clock::now();
+
     // Fixed timestep implementation with accumulator
     // Clamp deltaTime to prevent spiral of death
     float clampedDeltaTime = std::min(deltaTime, m_maxTimeStep);
@@ -400,9 +404,11 @@ void PhysicsWorld::Step(float deltaTime) {
     
     // Run physics simulation at fixed timestep
     // This ensures consistent physics regardless of frame rate
+    int substeps = 0;
     while (m_accumulator >= m_fixedTimeStep) {
         m_physicsSystem->Update(m_fixedTimeStep, collisionSteps, m_tempAllocator.get(), m_jobSystem.get());
         m_accumulator -= m_fixedTimeStep;
+        ++substeps;
     }
 
     // Sync dynamic body transforms to GameObjects
@@ -429,6 +435,15 @@ void PhysicsWorld::Step(float deltaTime) {
         glm::vec3 euler = glm::degrees(glm::eulerAngles(glmQuat));
         transform->SetRotation(euler);
     }
+
+    const auto stepEnd = std::chrono::high_resolution_clock::now();
+    const double elapsedMs = std::chrono::duration<double, std::milli>(stepEnd - stepStart).count();
+#ifdef GM_DEBUG
+    if (substeps > 0) {
+        gm::core::Logger::Debug("[PhysicsWorld] Step dt={:.4f}s substeps={} elapsed={:.3f} ms",
+                                deltaTime, substeps, elapsedMs);
+    }
+#endif
 }
 
 void PhysicsWorld::QueueBodyCreation(BodyHandle handle, gm::GameObject* gameObject) {
