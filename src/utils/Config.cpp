@@ -72,19 +72,6 @@ static T GetOrDefault(const nlohmann::json& obj, const char* key, const T& fallb
 
 } // namespace
 
-std::filesystem::path gm::utils::ResourcePathConfig::ResolvePath(
-    const std::filesystem::path& assetsDir,
-    const std::string& relativePath) const {
-    if (relativePath.empty()) {
-        return NormalizePath(assetsDir);
-    }
-    std::filesystem::path raw(relativePath);
-    if (raw.is_absolute()) {
-        return NormalizePath(raw);
-    }
-    return NormalizePath(assetsDir / raw);
-}
-
 std::filesystem::path ConfigLoader::GetUserDocumentsPath() {
 #ifdef _WIN32
     wchar_t* documentsPath = nullptr;
@@ -180,14 +167,6 @@ ConfigLoadResult ConfigLoader::Load(const std::filesystem::path& path) {
         }
     }
 
-    // Load resource path configuration
-    const auto resourcesObj = json.contains("resources") ? json["resources"] : nlohmann::json::object();
-    result.config.resources.shaderVert = GetOrDefault<std::string>(resourcesObj, "shaderVert", result.config.resources.shaderVert);
-    result.config.resources.shaderFrag = GetOrDefault<std::string>(resourcesObj, "shaderFrag", result.config.resources.shaderFrag);
-    result.config.resources.textureGround = GetOrDefault<std::string>(resourcesObj, "textureGround", result.config.resources.textureGround);
-    result.config.resources.textureCow = GetOrDefault<std::string>(resourcesObj, "textureCow", result.config.resources.textureCow);
-    result.config.resources.meshPlaceholder = GetOrDefault<std::string>(resourcesObj, "meshPlaceholder", result.config.resources.meshPlaceholder);
-
     const auto hotReloadObj = json.contains("hotReload") ? json["hotReload"] : nlohmann::json::object();
     result.config.hotReload.enable = GetOrDefault<bool>(hotReloadObj, "enable", result.config.hotReload.enable);
     result.config.hotReload.pollIntervalSeconds =
@@ -218,7 +197,6 @@ ConfigLoadResult ConfigLoader::Load(const std::filesystem::path& path) {
 
 void ConfigLoader::ValidateConfig(AppConfig& config, ConfigLoadResult& result) {
     ValidateWindowConfig(config.window, result);
-    ValidateResourcePaths(config, result);
     ValidateHotReloadConfig(config.hotReload, result);
     
     // Validate paths exist (warnings only, not errors)
@@ -269,46 +247,6 @@ void ConfigLoader::ValidateWindowConfig(WindowConfig& window, ConfigLoadResult& 
     }
 }
 
-
-void ConfigLoader::ValidateResourcePaths(const AppConfig& config, ConfigLoadResult& result) {
-    const auto& resources = config.resources;
-    const auto& assetsDir = config.paths.assets;
-    
-    // Check if assets directory exists
-    std::error_code ec;
-    if (!std::filesystem::exists(assetsDir, ec)) {
-        result.warnings.push_back(
-            fmt::format("Assets directory does not exist: {}", assetsDir.string()));
-        return; // Can't validate resource paths if assets dir doesn't exist
-    }
-    
-    // Validate shader paths
-    auto shaderVertPath = resources.ResolvePath(assetsDir, resources.shaderVert);
-    if (!std::filesystem::exists(shaderVertPath, ec)) {
-        result.warnings.push_back(
-            fmt::format("Vertex shader not found: {}", shaderVertPath.string()));
-    }
-    
-    auto shaderFragPath = resources.ResolvePath(assetsDir, resources.shaderFrag);
-    if (!std::filesystem::exists(shaderFragPath, ec)) {
-        result.warnings.push_back(
-            fmt::format("Fragment shader not found: {}", shaderFragPath.string()));
-    }
-    
-    // Validate texture paths (warnings only, textures may be optional)
-    auto textureGroundPath = resources.ResolvePath(assetsDir, resources.textureGround);
-    if (!std::filesystem::exists(textureGroundPath, ec)) {
-        result.warnings.push_back(
-            fmt::format("Ground texture not found: {}", textureGroundPath.string()));
-    }
-    
-    // Validate mesh paths (warnings only, meshes may be optional)
-    auto meshPlaceholderPath = resources.ResolvePath(assetsDir, resources.meshPlaceholder);
-    if (!std::filesystem::exists(meshPlaceholderPath, ec)) {
-        result.warnings.push_back(
-            fmt::format("Placeholder mesh not found: {}", meshPlaceholderPath.string()));
-    }
-}
 
 void ConfigLoader::ValidateHotReloadConfig(HotReloadConfig& hotReload, ConfigLoadResult& result) {
     if (hotReload.enable && (hotReload.pollIntervalSeconds < kMinPollInterval || 

@@ -1,0 +1,38 @@
+{
+    "name": "Cow",
+    "gameObjects": [
+      {
+        "name": "Cow",
+        "active": true,
+        "tags": ["prop"],
+        "components": [
+          {
+            "type": "TransformComponent",
+            "active": true,
+            "data": {
+              "position": [0.0, 0.0, 0.0],
+              "rotation": [0.0, 0.0, 0.0],
+              "scale": [1.0, 1.0, 1.0]
+            }
+          },
+          {
+            "type": "StaticMeshComponent",
+            "active": true,
+            "data": {
+              "meshGuid": "cow",
+              "shaderGuid": "game_shader",
+              "materialGuid": "material_crate_default"
+            }
+          },
+          {
+            "type": "MaterialComponent",
+            "active": true,
+            "data": {
+              "materialGuid": "material_crate_default",
+              "overrideColor": [1.0, 1.0, 1.0]
+            }
+          }
+        ]
+      }
+    ]
+  }

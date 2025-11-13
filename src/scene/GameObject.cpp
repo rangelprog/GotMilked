@@ -3,6 +3,7 @@
 #include "gm/scene/Scene.hpp"
 #include "gm/core/Logger.hpp"
 
+#include <algorithm>
 #include <cctype>
 
 namespace gm {
@@ -121,6 +122,8 @@ void GameObject::ResetForReuse() {
     name.clear();
     m_lastKnownName.clear();
     m_hasNameSnapshot = false;
+    m_parent.reset();
+    m_children.clear();
 }
 
 void GameObject::ValidateNameIntegrity() const {
@@ -137,6 +140,79 @@ void GameObject::ValidateNameIntegrity() const {
             name);
         m_lastKnownName = name;
     }
+}
+
+void GameObject::SetParentInternal(const std::shared_ptr<GameObject>& parent) {
+    m_parent = parent;
+}
+
+void GameObject::ClearParentInternal() {
+    m_parent.reset();
+}
+
+void GameObject::AddChildInternal(const std::shared_ptr<GameObject>& child) {
+    if (!child) {
+        return;
+    }
+    for (const auto& existing : m_children) {
+        if (auto locked = existing.lock()) {
+            if (locked == child) {
+                return;
+            }
+        }
+    }
+    m_children.push_back(child);
+}
+
+void GameObject::RemoveChildInternal(const std::shared_ptr<GameObject>& child) {
+    if (!child) {
+        return;
+    }
+    m_children.erase(
+        std::remove_if(m_children.begin(), m_children.end(),
+                       [&child](const std::weak_ptr<GameObject>& candidate) {
+                           auto locked = candidate.lock();
+                           return !locked || locked == child;
+                       }),
+        m_children.end());
+}
+
+void GameObject::ClearChildrenInternal() {
+    m_children.clear();
+}
+
+std::vector<std::shared_ptr<GameObject>> GameObject::GetChildren() const {
+    std::vector<std::shared_ptr<GameObject>> result;
+    result.reserve(m_children.size());
+    for (const auto& weakChild : m_children) {
+        if (auto child = weakChild.lock()) {
+            result.push_back(child);
+        }
+    }
+    return result;
+}
+
+bool GameObject::HasChildren() const {
+    for (const auto& weakChild : m_children) {
+        if (weakChild.lock()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void GameObject::PropagateTransformDirty() const {
+    for (const auto& weakChild : m_children) {
+        if (auto child = weakChild.lock()) {
+            if (auto transform = child->GetTransform()) {
+                transform->MarkWorldDirty();
+            }
+        }
+    }
+}
+
+void GameObject::MarkChildrenTransformsDirty() const {
+    PropagateTransformDirty();
 }
 
 } // namespace gm

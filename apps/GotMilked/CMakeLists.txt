@@ -20,6 +20,10 @@ endif()
 
 add_executable(GotMilked ${GOTMILKED_SOURCES})
 
+if(GM_ENABLE_DEBUG_TOOLS AND MSVC)
+  set_source_files_properties(${ImGuizmo_SOURCE_DIR}/ImGuizmo.cpp PROPERTIES COMPILE_FLAGS "/wd4245")
+endif()
+
 if(GM_ENABLE_DEBUG_TOOLS)
   target_include_directories(GotMilked PRIVATE ${ImGuizmo_SOURCE_DIR})
 endif()

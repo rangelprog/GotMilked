@@ -95,6 +95,8 @@ public:
     std::shared_ptr<GameObject> SpawnGameObject(const std::string& name);
     void DestroyGameObject(std::shared_ptr<GameObject> gameObject);
     void DestroyGameObjectByName(const std::string& name);
+    bool SetParent(const std::shared_ptr<GameObject>& child, const std::shared_ptr<GameObject>& newParent);
+    bool SetParent(const std::shared_ptr<GameObject>& child, GameObject* newParent);
 
     // Systems
     void RegisterSystem(const SceneSystemPtr& system);
@@ -106,8 +108,10 @@ public:
 
     // Querying
     std::shared_ptr<GameObject> FindGameObjectByName(const std::string& name);
+    std::shared_ptr<GameObject> FindGameObjectByPointer(const GameObject* ptr);
     std::vector<std::shared_ptr<GameObject>> FindGameObjectsByTag(const std::string& tag);
     std::vector<std::shared_ptr<GameObject>>& GetAllGameObjects() { return gameObjects; }
+    std::vector<std::shared_ptr<GameObject>> GetRootGameObjects() const;
 
     // Tags
     void TagGameObject(std::shared_ptr<GameObject> gameObject, const std::string& tag);

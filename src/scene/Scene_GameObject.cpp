@@ -1,6 +1,7 @@
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/GameObject.hpp"
 #include "gm/core/Logger.hpp"
+#include "gm/scene/TransformComponent.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -138,6 +139,19 @@ void Scene::DestroyGameObject(std::shared_ptr<GameObject> gameObject) {
         return;
     }
 
+    // Detach from parent before handling children
+    if (auto parent = gameObject->GetParent()) {
+        parent->RemoveChildInternal(gameObject);
+    }
+    gameObject->ClearParentInternal();
+
+    // Recursively destroy children
+    auto children = gameObject->GetChildren();
+    for (auto& child : children) {
+        DestroyGameObject(child);
+    }
+    gameObject->ClearChildrenInternal();
+
     std::vector<std::string> existingTags;
     existingTags.reserve(gameObject->GetTags().size());
     for (const auto& tag : gameObject->GetTags()) {
@@ -158,11 +172,100 @@ void Scene::DestroyGameObjectByName(const std::string& name) {
     EnsureNameLookup();
     auto it = objectsByName.find(name);
     if (it != objectsByName.end() && it->second && !it->second->IsDestroyed()) {
-        it->second->Destroy();
-        m_activeListsDirty = true;
-        MarkNameLookupDirty();
-        ++m_destroyedSinceLastCleanup;
+        DestroyGameObject(it->second);
     }
+}
+
+bool Scene::SetParent(const std::shared_ptr<GameObject>& child, GameObject* newParent) {
+    if (!child) {
+        return false;
+    }
+    std::shared_ptr<GameObject> parentShared;
+    if (newParent) {
+        parentShared = FindGameObjectByPointer(newParent);
+        if (!parentShared) {
+            core::Logger::Warning("[Scene] SetParent could not resolve parent pointer");
+            return false;
+        }
+    }
+    return SetParent(child, parentShared);
+}
+
+bool Scene::SetParent(const std::shared_ptr<GameObject>& child, const std::shared_ptr<GameObject>& newParent) {
+    if (!child) {
+        return false;
+    }
+    if (child->GetSceneInternal() != this) {
+        core::Logger::Warning("[Scene] Attempted to reparent GameObject '{}' that does not belong to this scene",
+                              child->GetName());
+        return false;
+    }
+    if (newParent && newParent->GetSceneInternal() != this) {
+        core::Logger::Warning("[Scene] Attempted to assign parent '{}' from another scene",
+                              newParent->GetName());
+        return false;
+    }
+    if (newParent && newParent.get() == child.get()) {
+        core::Logger::Warning("[Scene] Cannot parent GameObject '{}' to itself", child->GetName());
+        return false;
+    }
+    if (newParent && newParent->IsDestroyed()) {
+        core::Logger::Warning("[Scene] Cannot parent GameObject '{}' to destroyed parent '{}'",
+                              child->GetName(), newParent->GetName());
+        return false;
+    }
+    if (child->IsDestroyed()) {
+        core::Logger::Warning("[Scene] Cannot parent destroyed GameObject '{}'", child->GetName());
+        return false;
+    }
+
+    // Prevent cycles by walking up the ancestry chain
+    if (newParent) {
+        auto ancestor = newParent;
+        while (ancestor) {
+            if (ancestor == child) {
+                core::Logger::Warning("[Scene] Cannot create cyclic parent-child relationship for '{}'",
+                                      child->GetName());
+                return false;
+            }
+            ancestor = ancestor->GetParent();
+        }
+    }
+
+    auto currentParent = child->GetParent();
+    if (currentParent == newParent) {
+        return true;
+    }
+
+    glm::vec3 worldPosition{0.0f};
+    glm::vec3 worldRotation{0.0f};
+    glm::vec3 worldScale{1.0f};
+    if (auto transform = child->GetTransform()) {
+        worldPosition = transform->GetPosition();
+        worldRotation = transform->GetRotation();
+        worldScale = transform->GetScale();
+    }
+
+    if (currentParent) {
+        currentParent->RemoveChildInternal(child);
+    }
+    child->ClearParentInternal();
+
+    if (newParent) {
+        child->SetParentInternal(newParent);
+        newParent->AddChildInternal(child);
+        newParent->MarkChildrenTransformsDirty();
+    }
+
+    if (auto transform = child->GetTransform()) {
+        transform->SetPosition(worldPosition);
+        transform->SetRotation(worldRotation);
+        transform->SetScale(worldScale);
+    } else {
+        child->MarkChildrenTransformsDirty();
+    }
+
+    return true;
 }
 
 std::shared_ptr<GameObject> Scene::FindGameObjectByName(const std::string& name) {
@@ -170,6 +273,18 @@ std::shared_ptr<GameObject> Scene::FindGameObjectByName(const std::string& name)
     auto it = objectsByName.find(name);
     if (it != objectsByName.end()) {
         return it->second;
+    }
+    return nullptr;
+}
+
+std::shared_ptr<GameObject> Scene::FindGameObjectByPointer(const GameObject* ptr) {
+    if (!ptr) {
+        return nullptr;
+    }
+    for (const auto& obj : gameObjects) {
+        if (obj && obj.get() == ptr) {
+            return obj;
+        }
     }
     return nullptr;
 }
@@ -298,6 +413,8 @@ void Scene::CleanupDestroyedObjects() {
     for (auto it = gameObjects.begin(); it != gameObjects.end();) {
         auto& obj = *it;
         if (obj && obj->IsDestroyed()) {
+            obj->ClearChildrenInternal();
+            obj->ClearParentInternal();
             for (auto& [tag, objects] : objectsByTag) {
                 auto tagIt = std::remove(objects.begin(), objects.end(), obj);
                 objects.erase(tagIt, objects.end());
@@ -343,6 +460,17 @@ void Scene::ClearObjectPool() {
 
 std::string Scene::GenerateUniqueName() {
     return "GameObject_" + std::to_string(++m_unnamedObjectCounter);
+}
+
+std::vector<std::shared_ptr<GameObject>> Scene::GetRootGameObjects() const {
+    std::vector<std::shared_ptr<GameObject>> roots;
+    roots.reserve(gameObjects.size());
+    for (const auto& obj : gameObjects) {
+        if (obj && !obj->IsDestroyed() && !obj->HasParent()) {
+            roots.push_back(obj);
+        }
+    }
+    return roots;
 }
 
 } // namespace gm

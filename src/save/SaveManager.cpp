@@ -31,13 +31,28 @@ nlohmann::json ToJson(const SaveGameData& data) {
     };
 
     if (data.terrainResolution > 0 && !data.terrainHeights.empty()) {
-        json["terrain"] = {
+        nlohmann::json terrainJson = {
             {"resolution", data.terrainResolution},
             {"size", data.terrainSize},
             {"minHeight", data.terrainMinHeight},
             {"maxHeight", data.terrainMaxHeight},
-            {"heights", data.terrainHeights}
+            {"heights", data.terrainHeights},
+            {"textureTiling", data.terrainTextureTiling},
+            {"baseTextureGuid", data.terrainBaseTextureGuid},
+            {"activePaintLayer", data.terrainActivePaintLayer}
         };
+
+        nlohmann::json paintLayers = nlohmann::json::array();
+        for (const auto& layer : data.terrainPaintLayers) {
+            nlohmann::json layerJson;
+            layerJson["guid"] = layer.guid;
+            layerJson["enabled"] = layer.enabled;
+            layerJson["weights"] = layer.weights;
+            paintLayers.push_back(std::move(layerJson));
+        }
+        terrainJson["paintLayers"] = std::move(paintLayers);
+
+        json["terrain"] = std::move(terrainJson);
     }
 
     return json;
@@ -80,6 +95,9 @@ std::optional<SaveGameData> FromJson(const nlohmann::json& json, std::string& ou
             data.terrainSize = terrain.value("size", data.terrainSize);
             data.terrainMinHeight = terrain.value("minHeight", data.terrainMinHeight);
             data.terrainMaxHeight = terrain.value("maxHeight", data.terrainMaxHeight);
+            data.terrainTextureTiling = terrain.value("textureTiling", data.terrainTextureTiling);
+            data.terrainBaseTextureGuid = terrain.value("baseTextureGuid", data.terrainBaseTextureGuid);
+            data.terrainActivePaintLayer = terrain.value("activePaintLayer", data.terrainActivePaintLayer);
 
             if (terrain.contains("heights") && terrain["heights"].is_array()) {
                 const auto& heights = terrain["heights"];
@@ -87,6 +105,25 @@ std::optional<SaveGameData> FromJson(const nlohmann::json& json, std::string& ou
                 data.terrainHeights.reserve(heights.size());
                 for (const auto& value : heights) {
                     data.terrainHeights.push_back(value.get<float>());
+                }
+            }
+
+            data.terrainPaintLayers.clear();
+            if (terrain.contains("paintLayers") && terrain["paintLayers"].is_array()) {
+                const auto& layers = terrain["paintLayers"];
+                data.terrainPaintLayers.reserve(layers.size());
+                for (const auto& layerJson : layers) {
+                    SaveGameData::TerrainPaintLayerData layerData;
+                    layerData.guid = layerJson.value("guid", std::string());
+                    layerData.enabled = layerJson.value("enabled", true);
+                    if (layerJson.contains("weights") && layerJson["weights"].is_array()) {
+                        const auto& weights = layerJson["weights"];
+                        layerData.weights.reserve(weights.size());
+                        for (const auto& weight : weights) {
+                            layerData.weights.push_back(weight.get<float>());
+                        }
+                    }
+                    data.terrainPaintLayers.push_back(std::move(layerData));
                 }
             }
         }

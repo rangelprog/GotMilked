@@ -69,7 +69,24 @@ scene->DestroyGameObjectByName("Enemy_01");
 - Destruction is deferred until `Scene::CleanupDestroyedObjects` runs at the end of the frame.
 - This avoids iterator invalidation during updates.
 
-### 3.3 Tags and Layers
+### 3.3 Parent / Child Hierarchies
+
+Game objects can now form transform hierarchies:
+
+```cpp
+auto parent = scene->SpawnGameObject("Barn");
+auto child  = scene->SpawnGameObject("BarnDoor");
+
+scene->SetParent(child, parent);   // attaches child to parent
+scene->SetParent(child, nullptr);  // detaches and makes child a root
+```
+
+- `Scene::SetParent(child, parent)` keeps world position/rotation/scale stable while recomputing the local transform.
+- `GameObject::GetParent()` and `GameObject::GetChildren()` expose current relationships, while `Scene::GetRootGameObjects()` returns all hierarchy roots.
+- Local transform setters (`TransformComponent::SetLocalPosition/Rotation/Scale`) edit values relative to the parent; global setters (`SetPosition/Rotation/Scale`) operate in world space and will update the underlying local values automatically.
+- The engine prevents cross-scene parenting and cyclic graphs. Attempting either logs a descriptive warning and leaves the existing hierarchy unchanged.
+
+### 3.4 Tags and Layers
 
 ```cpp
 scene->TagGameObject(player, "player");
@@ -92,8 +109,9 @@ auto light = player->GetComponent<LightComponent>();
 
 - `EnsureTransform` returns the existing transform or creates one if absent.
 - Components are cached by type, so repeated `GetComponent` lookups are fast.
+- When working with hierarchies, call `transform->GetMatrix()` for world matrices and `transform->GetLocalPosition()` (plus the other `GetLocal*` helpers) for parent-relative editing.
 
-### 3.5 Component Lifecycle Hooks
+### 3.6 Component Lifecycle Hooks
 
 Components inherit the `gm::Component` base class, which exposes four virtual hooks:
 
@@ -140,6 +158,7 @@ scene->LoadFromFile("assets/scenes/tutorial.json");
     {
       "name": "Player",
       "active": true,
+      "parent": "Barn",
       "tags": ["player", "ally"],
       "components": [
         {
@@ -161,7 +180,7 @@ scene->LoadFromFile("assets/scenes/tutorial.json");
 
 | Component             | Serialized Fields                                           |
 |-----------------------|-------------------------------------------------------------|
-| TransformComponent    | `position`, `rotation`, `scale`                             |
+| TransformComponent    | `position`, `rotation`, `scale` (stored in world space)     |
 | MaterialComponent     | `name`, `diffuseColor`, `specularColor`, `shininess`, `emissionColor` |
 | LightComponent        | `type`, `color`, `intensity`, `enabled`, `direction`, `attenuation`, `innerConeAngle`, `outerConeAngle` |
 
@@ -420,6 +439,7 @@ sceneManager.Shutdown();
 | Game object missing after load | Duplicate name during creation | Check logs for `[Scene] Warning: GameObject with name ... already exists` |
 | Tags not restored | Tag added directly on `GameObject` instead of via `Scene::TagGameObject` | Always tag through the scene or rely on serializer |
 | Component inactive after load | Component serialized with `"active": false` | Set to `true` in JSON or enable manually after loading |
+| Child appears at origin after load | Parent not found or renamed without updating references | Keep parent names unique or reparent via tooling after renames |
 | Lights behave differently after load | Cone angles stored in JSON are too small/large | JSON values are degrees; verify they match expected spotlight cone in degrees |
 | Scene merge required instead of replace | `SceneSerializer` currently clears the scene before loading | Implement a custom merge routine (future extension) |
 

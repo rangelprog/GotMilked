@@ -42,8 +42,22 @@ When disabled, all HUD sources are removed from the target and the macro `GM_DEB
 | `DebugConsole` | Live log view that subscribes to `gm::core::Logger`. |
 | `EditableTerrainComponent` | Terrain sculpting panel and in-view editing logic. Resolution changes now resample the existing heightmap rather than resetting it. |
 | `gm::tooling::Overlay` | Global tooling panel (hot reload controls, quick save/load, diagnostics). |
+| Grid Overlay | Toggleable world-space grid (press `G` while the HUD is visible). Useful for positioning assets in debug builds. |
 
 All of these live under the `gm::debug` namespace (or `gm::tooling` for the overlay) and are guarded by `GM_DEBUG_TOOLS`.
+
+---
+
+## Scene Explorer Enhancements
+
+The Scene Explorer window is the primary way to inspect and edit game objects at runtime:
+
+* A hierarchical tree shows parent/child relationships. Drag a node onto another to reparent while preserving world transforms.
+* Drop a node onto the blank area at the bottom of the list to unparent it and make it a root.
+* The inspector displays both world and local transform values. Adjust local position/rotation/scale to work relative to the current parent.
+* Parent metadata is surfaced in the inspector, with quick actions to focus the camera on the parent or unparent the selection.
+
+When a text filter is active the hierarchy flattens into a list, but drag-and-drop parenting still works in the filtered view.
 
 ---
 

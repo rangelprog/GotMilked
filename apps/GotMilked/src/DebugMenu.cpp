@@ -81,6 +81,10 @@ void DebugMenu::Render(bool& menuVisible) {
         RenderPrefabBrowser();
     }
 
+    if (m_showContentBrowser) {
+        RenderContentBrowser();
+    }
+
     RenderGameObjectOverlay();
 
     if (m_showDebugConsole && m_debugConsole) {

@@ -5,8 +5,10 @@
 #include "gm/scene/Component.hpp"
 #include "GameConstants.hpp"
 
+#include <array>
 #include <functional>
 #include <memory>
+#include <string>
 #include <vector>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
@@ -17,6 +19,7 @@ namespace gm {
 class Mesh;
 class Shader;
 class Material;
+class Texture;
 class Camera;
 class TransformComponent;
 }
@@ -25,6 +28,13 @@ namespace gm::debug {
 
 class EditableTerrainComponent : public gm::Component {
 public:
+    enum class BrushMode {
+        Sculpt = 0,
+        Paint
+    };
+
+    static constexpr int kMaxPaintLayers = 4;
+
     EditableTerrainComponent();
 
     void Init() override;
@@ -41,6 +51,8 @@ public:
 
     bool IsEditingEnabled() const { return m_editingEnabled; }
     void SetEditingEnabled(bool enabled) { m_editingEnabled = enabled; }
+    BrushMode GetBrushMode() const { return m_brushMode; }
+    void SetBrushMode(BrushMode mode) { m_brushMode = mode; }
     void SetEditorWindowVisible(bool visible) { m_editorWindowVisible = visible; }
     bool IsEditorWindowVisible() const { return m_editorWindowVisible; }
 
@@ -62,15 +74,64 @@ public:
                        float maxHeight,
                        const std::vector<float>& heights);
 
+    void SetTextureTiling(float tiling);
+    float GetTextureTiling() const { return m_textureTiling; }
+
+    void SetBaseTexture(const std::string& guid, gm::Texture* texture);
+    void ClearBaseTexture();
+    const std::string& GetBaseTextureGuid() const { return m_baseTextureGuid; }
+    gm::Texture* GetBaseTexture() const { return m_baseTexture; }
+    void SetBaseTextureGuidFromSave(const std::string& guid);
+    void BindBaseTexture(gm::Texture* texture);
+
+    int GetPaintLayerCount() const { return m_paintLayerCount; }
+    int GetActivePaintLayerIndex() const { return m_activePaintLayer; }
+    void SetActivePaintLayerIndex(int index);
+    bool CanAddPaintLayer() const { return m_paintLayerCount < kMaxPaintLayers; }
+    bool AddPaintLayer();
+    void SetPaintLayerCount(int count);
+
+    void SetPaintTexture(const std::string& guid, gm::Texture* texture);
+    void ClearPaintTexture();
+    const std::string& GetPaintTextureGuid() const;
+    gm::Texture* GetPaintTexture() const;
+    const std::string& GetPaintTextureGuid(int layer) const;
+    gm::Texture* GetPaintTexture(int layer) const;
+    bool PaintLayerHasTexture(int layer) const;
+    bool PaintLayerHasPaint(int layer) const;
+    const std::vector<float>& GetPaintLayerWeights(int layer) const;
+
+    bool IsPaintLayerEnabled(int layer) const;
+    void SetPaintLayerEnabled(int layer, bool enabled);
+    bool RemovePaintLayer(int layer);
+    void BindPaintTexture(int layer, gm::Texture* texture);
+    void SetPaintLayerData(int layer, const std::string& guid, bool enabled, const std::vector<float>& weights);
+
+    void FillPaintLayer(float weight);
+
     // Force mesh rebuild (useful after loading scenes)
     void MarkMeshDirty() { m_meshDirty = true; }
 
 private:
+    struct PaintLayer {
+        std::string guid;
+        gm::Texture* texture = nullptr;
+        std::vector<float> weights;
+        bool hasPaint = false;
+        bool enabled = true;
+    };
+
     void InitializeHeightmap();
     void ResampleHeightmap(int newResolution);
+    void ResamplePaintLayers(int oldResolution, int newResolution,
+                             const std::array<std::vector<float>, kMaxPaintLayers>& oldWeights);
     bool RebuildMesh();
     void BuildIndexBuffer();
-    void ApplyBrush(const glm::vec2& localXZ, float deltaTime, float direction);
+    void ApplyHeightBrush(const glm::vec2& localXZ, float deltaTime, float direction);
+    void ApplyTextureBrush(const glm::vec2& localXZ, float deltaTime, float direction);
+    void UpdatePaintLayerState();
+    void EnsureLayerWeightsSize(std::vector<float>& weights);
+    void ClearAllPaintWeights();
     bool ComputeTerrainHit(glm::vec3& outWorldPos, glm::vec2& outLocalXZ) const;
 
     GLFWwindow* m_window = nullptr;
@@ -78,6 +139,8 @@ private:
     gm::Shader* m_shader = nullptr;
     std::shared_ptr<gm::Material> m_material;
     std::unique_ptr<gm::Mesh> m_mesh;
+    gm::Texture* m_baseTexture = nullptr;
+    std::string m_baseTextureGuid;
 
     int m_resolution = gotmilked::GameConstants::Terrain::DefaultResolution;
     float m_size = gotmilked::GameConstants::Terrain::DefaultSize;
@@ -85,13 +148,19 @@ private:
     float m_maxHeight = gotmilked::GameConstants::Terrain::DefaultMaxHeight;
     float m_brushRadius = gotmilked::GameConstants::Terrain::DefaultBrushRadius;
     float m_brushStrength = gotmilked::GameConstants::Terrain::DefaultBrushStrength;
+    float m_textureTiling = 1.0f;
 
     bool m_editingEnabled = false;
     bool m_editorWindowVisible = false;
     bool m_meshDirty = false;
+    BrushMode m_brushMode = BrushMode::Sculpt;
 
     std::vector<float> m_heights;
     std::vector<unsigned int> m_indices;
+
+    std::array<PaintLayer, kMaxPaintLayers> m_paintLayers{};
+    int m_paintLayerCount = 1;
+    int m_activePaintLayer = 0;
 
     std::function<float()> m_fovProvider;
 };

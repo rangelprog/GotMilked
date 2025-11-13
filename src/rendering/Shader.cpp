@@ -99,10 +99,17 @@ bool Shader::loadFromFiles(const std::string& vertPath, const std::string& fragP
     if (!readFile(vertPath, vsCode) || !readFile(fragPath, fsCode))
         return false;
 
-    GLuint vs = compile(GL_VERTEX_SHADER, vsCode.c_str());
+    return loadFromSource(vsCode, fsCode);
+}
+
+bool Shader::loadFromSource(std::string_view vertexSrc, std::string_view fragmentSrc) {
+    std::string vertex(vertexSrc);
+    std::string fragment(fragmentSrc);
+
+    GLuint vs = compile(GL_VERTEX_SHADER, vertex.c_str());
     if (!vs)
         return false;
-    GLuint fs = compile(GL_FRAGMENT_SHADER, fsCode.c_str());
+    GLuint fs = compile(GL_FRAGMENT_SHADER, fragment.c_str());
     if (!fs) {
         glDeleteShader(vs);
         return false;
@@ -119,10 +126,9 @@ bool Shader::loadFromFiles(const std::string& vertPath, const std::string& fragP
         glDeleteProgram(m_id);
     }
     m_id = prog;
-    
-    // Clear uniform cache when shader is reloaded
+
     ClearUniformCache();
-    
+
     return true;
 }
 

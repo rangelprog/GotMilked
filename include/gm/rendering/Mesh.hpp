@@ -16,7 +16,8 @@ public:
 
     static Mesh fromPositions(const std::vector<float>& positions);
     static Mesh fromIndexed(const std::vector<float>& vertexData,
-                          const std::vector<unsigned int>& indices);
+                          const std::vector<unsigned int>& indices,
+                          int componentsPerVertex = 0);
 
     void Draw() const;
     void DrawInstanced(unsigned int instanceCount) const;

@@ -15,6 +15,8 @@ class Scene;
 class GameObject;
 }
 
+class GameResources;
+
 namespace gm::scene {
 class PrefabLibrary;
 }
@@ -23,8 +25,9 @@ namespace gm::save {
 class SaveManager;
 }
 
-namespace gm::debug {
+struct ImGuiPayload;
 
+namespace gm::debug {
 class DebugConsole;
 class EditableTerrainComponent;
 
@@ -58,6 +61,7 @@ public:
     void SetWindowHandle(void* hwnd) { m_windowHandle = hwnd; }
     void SetDebugConsole(DebugConsole* console) { m_debugConsole = console; }
     void SetPrefabLibrary(gm::scene::PrefabLibrary* library) { m_prefabLibrary = library; }
+    void SetGameResources(::GameResources* resources) { m_gameResources = resources; }
     void SetConsoleVisible(bool visible);
     bool IsConsoleVisible() const;
     void SetOverlayToggleCallbacks(std::function<bool()> getter, std::function<void(bool)> setter);
@@ -86,10 +90,16 @@ private:
     void RenderSaveAsDialog();
     void RenderLoadDialog();
     void RenderSceneHierarchy();
+    void RenderSceneHierarchyTree(const std::vector<std::shared_ptr<gm::GameObject>>& roots, const std::string& filter);
+    void RenderSceneHierarchyNode(const std::shared_ptr<gm::GameObject>& gameObject, const std::string& filter);
+    void RenderSceneHierarchyFiltered(const std::vector<std::shared_ptr<gm::GameObject>>& objects, const std::string& filter);
+    void RenderSceneHierarchyRootDropTarget();
+    std::shared_ptr<gm::GameObject> ResolvePayloadGameObject(const ImGuiPayload* payload);
     void RenderInspector();
     void RenderSceneExplorerWindow();
     void RenderSceneInfo();
     void RenderPrefabBrowser();
+    void RenderContentBrowser();
     void RenderTransformGizmo();
     void RenderGameObjectOverlay();
     void RenderDockspace();
@@ -114,6 +124,7 @@ private:
     bool m_showSceneInfo = false;
     bool m_showDebugConsole = false;
     bool m_showPrefabBrowser = false;
+    bool m_showContentBrowser = false;
 
     // Layout control
     bool m_resetDockLayout = false;
@@ -151,6 +162,9 @@ private:
     bool m_sceneReloadPendingResume = false;
     int m_sceneReloadFramesToSkip = 0;
     std::uint64_t m_lastSeenSceneVersion = 0;
+    ::GameResources* m_gameResources = nullptr;
+
+    std::string m_pendingContentBrowserFocusPath;
 };
 
 } // namespace gm::debug

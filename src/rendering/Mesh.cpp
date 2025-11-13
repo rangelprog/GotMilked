@@ -74,7 +74,8 @@ Mesh Mesh::fromPositions(const std::vector<float>& positions) {
 }
 
 Mesh Mesh::fromIndexed(const std::vector<float>& vertexData,
-                      const std::vector<unsigned int>& indices) {
+                      const std::vector<unsigned int>& indices,
+                      int componentsPerVertex) {
     Mesh m;
     glGenVertexArrays(1, &m.VAO);
     glBindVertexArray(m.VAO);
@@ -88,9 +89,24 @@ Mesh Mesh::fromIndexed(const std::vector<float>& vertexData,
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int),
                  indices.data(), GL_STATIC_DRAW);
 
-    // Determine stride (supports position-only or position/normal/uv data)
-    const std::size_t componentStrideFloats =
-        (vertexData.size() % 8 == 0) ? 8 : 3;
+    std::size_t componentStrideFloats = 0;
+    if (componentsPerVertex > 0) {
+        componentStrideFloats = static_cast<std::size_t>(componentsPerVertex);
+    } else {
+        if (!vertexData.empty() && indices.size() % 3 == 0) {
+            if (vertexData.size() % 12 == 0) {
+                componentStrideFloats = 12;
+            } else if (vertexData.size() % 8 == 0) {
+                componentStrideFloats = 8;
+            } else if (vertexData.size() % 9 == 0) {
+                componentStrideFloats = 9;
+            } else {
+                componentStrideFloats = 3;
+            }
+        } else {
+            componentStrideFloats = 3;
+        }
+    }
     const GLsizei stride = static_cast<GLsizei>(componentStrideFloats * sizeof(float));
 
     glEnableVertexAttribArray(0);
@@ -103,6 +119,13 @@ Mesh Mesh::fromIndexed(const std::vector<float>& vertexData,
     if (componentStrideFloats >= 8) {
         glEnableVertexAttribArray(2);
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+    }
+    if (componentStrideFloats >= 12) {
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, (void*)(8 * sizeof(float)));
+    } else if (componentStrideFloats >= 9) {
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, stride, (void*)(8 * sizeof(float)));
     }
 
     glBindVertexArray(0);

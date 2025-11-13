@@ -31,6 +31,15 @@ struct SaveGameData {
     float terrainMinHeight = 0.0f;
     float terrainMaxHeight = 0.0f;
     std::vector<float> terrainHeights;
+    float terrainTextureTiling = 1.0f;
+    std::string terrainBaseTextureGuid;
+    int terrainActivePaintLayer = 0;
+    struct TerrainPaintLayerData {
+        std::string guid;
+        bool enabled = true;
+        std::vector<float> weights;
+    };
+    std::vector<TerrainPaintLayerData> terrainPaintLayers;
 };
 
 struct SaveLoadResult {

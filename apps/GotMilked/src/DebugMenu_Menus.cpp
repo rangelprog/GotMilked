@@ -109,12 +109,14 @@ void DebugMenu::RenderMenuBar() {
 
         ImGui::Checkbox("Scene Info", &m_showSceneInfo);
         ImGui::Checkbox("Prefab Browser", &m_showPrefabBrowser);
+        ImGui::Checkbox("Content Browser", &m_showContentBrowser);
 #if defined(IMGUI_HAS_DOCK)
         if (ImGui::MenuItem("Reset Layout")) {
             m_resetDockLayout = true;
             m_showSceneExplorer = true;
             m_showSceneInfo = true;
             m_showPrefabBrowser = true;
+            m_showContentBrowser = true;
         }
 #endif
 

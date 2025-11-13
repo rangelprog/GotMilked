@@ -60,6 +60,10 @@ void PopulateInitialScene(
         terrainComponent->SetFovProvider(std::move(fovProvider));
     }
     terrainComponent->SetTerrainSize(GameConstants::Terrain::InitialSize);
+    if (!resources.GetTextureGuid().empty() && resources.GetTexture()) {
+        terrainComponent->SetBaseTexture(resources.GetTextureGuid(), resources.GetTexture());
+    }
+    terrainComponent->FillPaintLayer(0.0f);
 #else
     (void)resources;
     (void)window;

@@ -18,6 +18,7 @@ public:
     Shader& operator=(Shader&& other) noexcept;
 
     bool loadFromFiles(const std::string& vertPath, const std::string& fragPath);
+    bool loadFromSource(std::string_view vertexSrc, std::string_view fragmentSrc);
 
     void Use() const;
     GLuint Id() const { return m_id; }

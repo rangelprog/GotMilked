@@ -919,7 +919,6 @@ namespace gm::utils {
     struct AppConfig {
         WindowConfig window;
         PathsConfig paths;
-        ResourcePathConfig resources;
         std::filesystem::path configDirectory;
         HotReloadConfig hotReload;
     };

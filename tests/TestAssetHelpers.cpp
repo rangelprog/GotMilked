@@ -6,6 +6,7 @@
 #include "gm/rendering/Material.hpp"
 #include "gm/prototypes/Primitives.hpp"
 #include "gm/utils/ObjLoader.hpp"
+#include "gm/utils/ResourceManifest.hpp"
 #include "gm/utils/ResourceRegistry.hpp"
 #include "gm/utils/ResourceManager.hpp"
 
@@ -79,26 +80,34 @@ TestAssetBundle CreateMeshSpinnerTestAssets() {
 }
 
 void PopulateGameResourcesFromTestAssets(const TestAssetBundle& bundle, GameResources& resources) {
-    // Friend function - can access private members
-    // Use ResourceManager for loading to maintain consistency with production code
-    resources.m_shaderGuid = "test_shader_" + bundle.root.filename().string();
-    resources.m_textureGuid = "test_texture_" + bundle.root.filename().string();
-    resources.m_meshGuid = "test_mesh_" + bundle.root.filename().string();
-    resources.m_shaderVertPath = bundle.vertPath;
-    resources.m_shaderFragPath = bundle.fragPath;
-    resources.m_texturePath = bundle.textureTag;
-    resources.m_meshPath = bundle.meshPath;
+    resources.Release();
+    resources.m_lastError.reset();
+    resources.m_assetsDir = bundle.root;
 
-    // Load shader through ResourceManager
-    resources.m_shader = gm::ResourceManager::LoadShader(resources.m_shaderGuid, bundle.vertPath, bundle.fragPath);
-    if (!resources.m_shader) {
+    auto& registry = gm::ResourceRegistry::Instance();
+
+    const std::string shaderGuid = "test_shader_" + bundle.root.filename().string();
+    gm::ResourceManager::ShaderDescriptor shaderDescriptor{
+        shaderGuid,
+        bundle.vertPath,
+        bundle.fragPath
+    };
+    auto shaderHandle = gm::ResourceManager::LoadShader(shaderDescriptor);
+    auto shader = shaderHandle.Lock();
+    if (!shader) {
         throw std::runtime_error("Failed to load shader from test assets");
     }
-    resources.m_shader->Use();
-    resources.m_shader->SetInt("uTex", 0);
+    shader->Use();
+    shader->SetInt("uTex", 0);
 
-    // Create procedural texture (not from file, so we create it directly)
-    // For file-based textures, we'd use ResourceManager::LoadTexture
+    resources.m_shaders[shaderGuid] = shader;
+    resources.m_shaderSources[shaderGuid] = GameResources::ShaderSources{bundle.vertPath, bundle.fragPath};
+    resources.m_defaultShaderGuid = shaderGuid;
+    resources.m_defaultShaderVertPath = bundle.vertPath;
+    resources.m_defaultShaderFragPath = bundle.fragPath;
+    registry.RegisterShader(shaderGuid, bundle.vertPath, bundle.fragPath);
+
+    const std::string textureGuid = "test_texture_" + bundle.root.filename().string();
     auto texture = std::make_shared<gm::Texture>();
     std::vector<std::uint8_t> pixels = {
         255, 0, 0, 255,
@@ -109,23 +118,67 @@ void PopulateGameResourcesFromTestAssets(const TestAssetBundle& bundle, GameReso
     if (!texture->createRGBA8(2, 2, pixels, false)) {
         throw std::runtime_error("Failed to create procedural texture");
     }
-    resources.m_texture = texture;
 
-    // Load mesh through ResourceManager
-    resources.m_mesh = gm::ResourceManager::LoadMesh(resources.m_meshGuid, bundle.meshPath);
-    if (!resources.m_mesh) {
+    gm::utils::ResourceManifest::TextureEntry textureEntry;
+    textureEntry.guid = textureGuid;
+    textureEntry.path = bundle.textureTag;
+
+    resources.m_textures[textureGuid] = texture;
+    resources.m_textureSources[textureGuid] = textureEntry;
+    resources.m_defaultTextureGuid = textureGuid;
+    resources.m_defaultTexturePath = textureEntry.path;
+    registry.RegisterTexture(textureGuid, textureEntry.path);
+
+    const std::string meshGuid = "test_mesh_" + bundle.root.filename().string();
+    gm::ResourceManager::MeshDescriptor meshDescriptor{
+        meshGuid,
+        bundle.meshPath
+    };
+    auto meshHandle = gm::ResourceManager::LoadMesh(meshDescriptor);
+    auto mesh = meshHandle.Lock();
+    if (!mesh) {
         throw std::runtime_error("Failed to load mesh from test assets");
     }
 
-    // Create terrain material for tests
-    resources.m_terrainMaterial = std::make_shared<gm::Material>(gm::Material::CreatePhong(glm::vec3(0.4f, 0.7f, 0.4f),
-                                                                                       glm::vec3(0.2f), 16.0f));
-    resources.m_terrainMaterial->SetDiffuseTexture(resources.m_texture.get());
+    gm::utils::ResourceManifest::MeshEntry meshEntry;
+    meshEntry.guid = meshGuid;
+    meshEntry.path = bundle.meshPath;
 
-    // Register with ResourceRegistry for GUID tracking
-    auto& registry = gm::ResourceRegistry::Instance();
-    registry.RegisterShader(resources.m_shaderGuid, resources.m_shaderVertPath, resources.m_shaderFragPath);
-    registry.RegisterTexture(resources.m_textureGuid, resources.m_texturePath);
-    registry.RegisterMesh(resources.m_meshGuid, resources.m_meshPath);
+    resources.m_meshes[meshGuid] = mesh;
+    resources.m_meshSources[meshGuid] = meshEntry;
+    resources.m_defaultMeshGuid = meshGuid;
+    resources.m_defaultMeshPath = bundle.meshPath;
+    registry.RegisterMesh(meshGuid, bundle.meshPath);
+
+    const std::string materialGuid = "test_terrain_material_" + bundle.root.filename().string();
+    gm::utils::ResourceManifest::MaterialEntry materialEntry;
+    materialEntry.guid = materialGuid;
+    materialEntry.name = "Test Terrain Material";
+    materialEntry.diffuseColor = glm::vec3(0.4f, 0.7f, 0.4f);
+    materialEntry.specularColor = glm::vec3(0.2f);
+    materialEntry.emissionColor = glm::vec3(0.0f);
+    materialEntry.shininess = 16.0f;
+    materialEntry.diffuseTextureGuid = textureGuid;
+
+    auto material = std::make_shared<gm::Material>(gm::Material::CreatePhong(materialEntry.diffuseColor,
+                                                                             materialEntry.specularColor,
+                                                                             materialEntry.shininess));
+    material->SetName(materialEntry.name);
+    material->SetDiffuseTexture(texture.get());
+
+    resources.m_materials[materialGuid] = material;
+    resources.m_materialSources[materialGuid] = materialEntry;
+    resources.m_defaultTerrainMaterialGuid = materialGuid;
+    registry.RegisterMaterial(materialGuid, gm::ResourceRegistry::MaterialData{
+        materialEntry.name,
+        materialEntry.diffuseColor,
+        materialEntry.specularColor,
+        materialEntry.emissionColor,
+        materialEntry.shininess,
+        materialEntry.diffuseTextureGuid,
+        materialEntry.specularTextureGuid,
+        materialEntry.normalTextureGuid,
+        materialEntry.emissionTextureGuid
+    });
 }
 

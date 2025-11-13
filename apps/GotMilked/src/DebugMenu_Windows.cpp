@@ -3,6 +3,7 @@
 #include "DebugMenu.hpp"
 #include "EditableTerrainComponent.hpp"
 #include "GameConstants.hpp"
+#include "GameResources.hpp"
 #include "gm/scene/PrefabLibrary.hpp"
 
 #include "gm/scene/Scene.hpp"
@@ -12,6 +13,8 @@
 #include "gm/scene/LightComponent.hpp"
 #include "gm/physics/RigidBodyComponent.hpp"
 #include "gm/core/Logger.hpp"
+#include "gm/assets/AssetCatalog.hpp"
+#include "gm/utils/ResourceManager.hpp"
 
 #include <cstdint>
 
@@ -28,6 +31,10 @@
 #include <cmath>
 #include <filesystem>
 #include <unordered_map>
+#include <vector>
+#include <functional>
+#include <cctype>
+#include <fmt/format.h>
 
 namespace {
 ImVec2 operator-(const ImVec2& lhs, const ImVec2& rhs) {
@@ -206,6 +213,8 @@ void DebugMenu::RenderGameObjectOverlay() {
         return;
     }
 
+    // Grid overlay has been disabled for now to avoid appearing on top of all objects.
+
     ImDrawList* drawList = ImGui::GetWindowDrawList();
     const glm::mat4 viewProj = proj * view;
 
@@ -293,6 +302,10 @@ void DebugMenu::RenderGameObjectOverlay() {
     ImGui::PopStyleVar(3);
 }
 
+namespace {
+constexpr const char* kSceneHierarchyPayload = "GM_SCENE_GAMEOBJECT";
+}
+
 void DebugMenu::RenderSceneHierarchy() {
     auto scene = m_scene.lock();
     if (!scene) {
@@ -309,14 +322,124 @@ void DebugMenu::RenderSceneHierarchy() {
     ImGui::InputText("Search", searchFilter, sizeof(searchFilter));
     ImGui::Separator();
 
-    auto allObjects = scene->GetAllGameObjects();
     std::string filterStr(searchFilter);
-    std::transform(filterStr.begin(), filterStr.end(), filterStr.begin(),
+    std::string lowerFilter = filterStr;
+    std::transform(lowerFilter.begin(), lowerFilter.end(), lowerFilter.begin(),
                    [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
 
+    auto allObjects = scene->GetAllGameObjects();
+
+    if (lowerFilter.empty()) {
+        auto roots = scene->GetRootGameObjects();
+        RenderSceneHierarchyTree(roots, lowerFilter);
+        RenderSceneHierarchyRootDropTarget();
+        if (roots.empty()) {
+            ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No GameObjects in scene");
+        }
+    } else {
+        RenderSceneHierarchyFiltered(allObjects, lowerFilter);
+        RenderSceneHierarchyRootDropTarget();
+    }
+}
+
+void DebugMenu::RenderSceneHierarchyTree(const std::vector<std::shared_ptr<gm::GameObject>>& roots, const std::string& filter) {
+    (void)filter;
+    for (const auto& root : roots) {
+        RenderSceneHierarchyNode(root, filter);
+    }
+}
+
+void DebugMenu::RenderSceneHierarchyNode(const std::shared_ptr<gm::GameObject>& gameObject, const std::string& filter) {
+    (void)filter;
+    if (!gameObject || gameObject->IsDestroyed()) {
+        return;
+    }
+
+    std::string name = gameObject->GetName();
+    if (name.empty()) {
+        name = "Unnamed GameObject";
+    }
+    std::string displayName = name;
+    if (!gameObject->IsActive()) {
+        displayName += " [Inactive]";
+    }
+
+    auto children = gameObject->GetChildren();
+    children.erase(std::remove_if(children.begin(), children.end(),
+                                  [](const std::shared_ptr<gm::GameObject>& child) {
+                                      return !child || child->IsDestroyed();
+                                  }),
+                   children.end());
+
+    ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
+    if (children.empty()) {
+        flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+    }
+
+    auto selected = m_selectedGameObject.lock();
+    if (selected && selected == gameObject) {
+        flags |= ImGuiTreeNodeFlags_Selected;
+    }
+
+    ImGui::PushID(gameObject.get());
+    bool open = ImGui::TreeNodeEx(displayName.c_str(), flags);
+    if (ImGui::IsItemClicked()) {
+        m_selectedGameObject = gameObject;
+        EnsureSelectionWindowsVisible();
+    }
+    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+        EnsureSelectionWindowsVisible();
+        FocusCameraOnGameObject(gameObject);
+    }
+
+    if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+        gm::GameObject* raw = gameObject.get();
+        ImGui::SetDragDropPayload(kSceneHierarchyPayload, &raw, sizeof(gm::GameObject*));
+        ImGui::TextUnformatted(displayName.c_str());
+        ImGui::EndDragDropSource();
+    }
+
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kSceneHierarchyPayload)) {
+            if (auto dragged = ResolvePayloadGameObject(payload)) {
+                if (dragged != gameObject) {
+                    if (auto scenePtr = m_scene.lock()) {
+                        scenePtr->SetParent(dragged, gameObject);
+                    }
+                }
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    if (ImGui::BeginPopupContextItem()) {
+        if (ImGui::MenuItem("Unparent", nullptr, false, gameObject->HasParent())) {
+            if (auto scenePtr = m_scene.lock()) {
+                scenePtr->SetParent(gameObject, std::shared_ptr<gm::GameObject>());
+            }
+        }
+        if (ImGui::MenuItem("Focus Camera")) {
+            FocusCameraOnGameObject(gameObject);
+        }
+        ImGui::EndPopup();
+    }
+
+    if (open && !(flags & ImGuiTreeNodeFlags_NoTreePushOnOpen)) {
+        for (const auto& child : children) {
+            RenderSceneHierarchyNode(child, filter);
+        }
+        ImGui::TreePop();
+    }
+
+    ImGui::PopID();
+}
+
+void DebugMenu::RenderSceneHierarchyFiltered(const std::vector<std::shared_ptr<gm::GameObject>>& objects, const std::string& filter) {
+    auto scene = m_scene.lock();
+    auto selected = m_selectedGameObject.lock();
     int visibleCount = 0;
-    int loopIndex = 0;
-    for (const auto& gameObject : allObjects) {
+
+    for (const auto& gameObject : objects) {
         if (!gameObject || gameObject->IsDestroyed()) {
             continue;
         }
@@ -326,22 +449,11 @@ void DebugMenu::RenderSceneHierarchy() {
             name = "Unnamed GameObject";
         }
 
-        if (!filterStr.empty()) {
-            std::string lowerName = name;
-            std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
-                           [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
-            if (lowerName.find(filterStr) == std::string::npos) {
-                continue;
-            }
-        }
-
-        visibleCount++;
-
-        auto selected = m_selectedGameObject.lock();
-        bool isSelected = (selected && selected == gameObject);
-
-        if (isSelected) {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
+        std::string lowerName = name;
+        std::transform(lowerName.begin(), lowerName.end(), lowerName.begin(),
+                       [](char c) { return static_cast<char>(std::tolower(static_cast<unsigned char>(c))); });
+        if (lowerName.find(filter) == std::string::npos) {
+            continue;
         }
 
         std::string displayName = name;
@@ -349,9 +461,10 @@ void DebugMenu::RenderSceneHierarchy() {
             displayName += " [Inactive]";
         }
 
+        bool isSelected = (selected && selected == gameObject);
+
         ImGui::PushID(gameObject.get());
-        bool itemActivated = ImGui::Selectable(displayName.c_str(), isSelected);
-        if (itemActivated) {
+        if (ImGui::Selectable(displayName.c_str(), isSelected)) {
             m_selectedGameObject = gameObject;
             EnsureSelectionWindowsVisible();
         }
@@ -360,20 +473,78 @@ void DebugMenu::RenderSceneHierarchy() {
             EnsureSelectionWindowsVisible();
             FocusCameraOnGameObject(gameObject);
         }
-        ImGui::PopID();
 
-        if (isSelected) {
-            ImGui::PopStyleColor();
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+            gm::GameObject* raw = gameObject.get();
+            ImGui::SetDragDropPayload(kSceneHierarchyPayload, &raw, sizeof(gm::GameObject*));
+            ImGui::TextUnformatted(displayName.c_str());
+            ImGui::EndDragDropSource();
         }
 
-        ++loopIndex;
+        if (ImGui::BeginDragDropTarget()) {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kSceneHierarchyPayload)) {
+                if (auto dragged = ResolvePayloadGameObject(payload)) {
+                    if (dragged != gameObject && scene) {
+                        scene->SetParent(dragged, gameObject);
+                    }
+                }
+            }
+            ImGui::EndDragDropTarget();
+        }
+
+        if (ImGui::BeginPopupContextItem()) {
+            if (ImGui::MenuItem("Unparent", nullptr, false, gameObject->HasParent())) {
+                if (scene) {
+                    scene->SetParent(gameObject, std::shared_ptr<gm::GameObject>());
+                }
+            }
+            if (ImGui::MenuItem("Focus Camera")) {
+                FocusCameraOnGameObject(gameObject);
+            }
+            ImGui::EndPopup();
+        }
+
+        ImGui::PopID();
+        ++visibleCount;
     }
 
-    if (visibleCount == 0 && !filterStr.empty()) {
+    if (visibleCount == 0) {
         ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No GameObjects match filter");
-    } else if (visibleCount == 0) {
-        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No GameObjects in scene");
     }
+}
+
+void DebugMenu::RenderSceneHierarchyRootDropTarget() {
+    ImVec2 dropSize = ImGui::GetContentRegionAvail();
+    dropSize.y = std::max(dropSize.y, 24.0f);
+    ImGui::InvisibleButton("##SceneHierarchyRootDrop", ImVec2(dropSize.x, std::min(dropSize.y, 32.0f)));
+    if (ImGui::BeginDragDropTarget()) {
+        if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kSceneHierarchyPayload)) {
+            if (auto dragged = ResolvePayloadGameObject(payload)) {
+                if (auto scenePtr = m_scene.lock()) {
+                    scenePtr->SetParent(dragged, std::shared_ptr<gm::GameObject>());
+                }
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
+        ImGui::SetTooltip("Drop here to unparent");
+    }
+}
+
+std::shared_ptr<gm::GameObject> DebugMenu::ResolvePayloadGameObject(const ImGuiPayload* payload) {
+    if (!payload || payload->DataSize != sizeof(gm::GameObject*)) {
+        return nullptr;
+    }
+    auto scene = m_scene.lock();
+    if (!scene) {
+        return nullptr;
+    }
+    auto rawPtr = *static_cast<gm::GameObject* const*>(payload->Data);
+    if (!rawPtr) {
+        return nullptr;
+    }
+    return scene->FindGameObjectByPointer(rawPtr);
 }
 
 void DebugMenu::RenderInspector() {
@@ -400,6 +571,23 @@ void DebugMenu::RenderInspector() {
         if (scene) {
             scene->MarkActiveListsDirty();
         }
+    }
+
+    auto parent = selected->GetParent();
+    if (parent) {
+        ImGui::Text("Parent: %s", parent->GetName().c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Focus Parent")) {
+            FocusCameraOnGameObject(parent);
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Unparent")) {
+            if (scene) {
+                scene->SetParent(selected, std::shared_ptr<gm::GameObject>());
+            }
+        }
+    } else {
+        ImGui::TextUnformatted("Parent: <None>");
     }
 
     ImGui::Separator();
@@ -429,6 +617,24 @@ void DebugMenu::RenderInspector() {
                 if (scene) {
                     scene->MarkActiveListsDirty();
                 }
+            }
+
+            if (ImGui::TreeNodeEx("Local Transform", ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth)) {
+                glm::vec3 localPos = transform->GetLocalPosition();
+                if (ImGui::DragFloat3("Local Position", glm::value_ptr(localPos), 0.1f)) {
+                    transform->SetLocalPosition(localPos);
+                }
+
+                glm::vec3 localRot = transform->GetLocalRotation();
+                if (ImGui::DragFloat3("Local Rotation", glm::value_ptr(localRot), 1.0f)) {
+                    transform->SetLocalRotation(localRot);
+                }
+
+                glm::vec3 localScale = transform->GetLocalScale();
+                if (ImGui::DragFloat3("Local Scale", glm::value_ptr(localScale), 0.01f)) {
+                    transform->SetLocalScale(localScale);
+                }
+                ImGui::TreePop();
             }
 
             ImGui::Separator();
@@ -464,6 +670,91 @@ void DebugMenu::RenderInspector() {
                 ImGui::Text("Has Mesh: %s", meshComp->GetMesh() ? "Yes" : "No");
                 ImGui::Text("Has Shader: %s", meshComp->GetShader() ? "Yes" : "No");
                 ImGui::Text("Has Material: %s", meshComp->GetMaterial() ? "Yes" : "No");
+
+                if (m_gameResources) {
+                    ImGui::Separator();
+                    ImGui::TextUnformatted("Assign Resources");
+
+                    auto buildSortedList = [](const auto& map) {
+                        std::vector<std::string> guids;
+                        guids.reserve(map.size());
+                        for (const auto& [guid, _] : map) {
+                            guids.push_back(guid);
+                        }
+                        std::sort(guids.begin(), guids.end());
+                        return guids;
+                    };
+
+                    const auto meshGuids = buildSortedList(m_gameResources->GetMeshMap());
+                    const auto shaderGuids = buildSortedList(m_gameResources->GetShaderMap());
+                    const auto materialGuids = buildSortedList(m_gameResources->GetMaterialMap());
+
+                    const auto drawCombo = [](const char* label, const std::vector<std::string>& guids, const std::string& currentGuid,
+                                              const std::function<void(const std::string&)>& onSelect) {
+                        const char* preview = currentGuid.empty() ? "None" : currentGuid.c_str();
+                        if (ImGui::BeginCombo(label, preview)) {
+                            for (const auto& guid : guids) {
+                                bool selected = (guid == currentGuid);
+                                if (ImGui::Selectable(guid.c_str(), selected)) {
+                                    onSelect(guid);
+                                }
+                                if (selected) {
+                                    ImGui::SetItemDefaultFocus();
+                                }
+                            }
+                            ImGui::EndCombo();
+                        }
+                    };
+
+                    if (!meshGuids.empty()) {
+                        drawCombo("Mesh Asset", meshGuids, meshComp->GetMeshGuid(), [this, &meshComp](const std::string& guid) {
+                            if (auto* mesh = m_gameResources->GetMesh(guid)) {
+                                meshComp->SetMesh(mesh, guid);
+                            } else {
+                                gm::core::Logger::Warning("[DebugMenu] Mesh '{}' not available in GameResources", guid);
+                            }
+                        });
+                        if (ImGui::Button("Clear Mesh")) {
+                            meshComp->SetMesh(nullptr, "");
+                        }
+                        if (auto path = m_gameResources->GetMeshSource(meshComp->GetMeshGuid())) {
+                            ImGui::TextWrapped("Path: %s", path->c_str());
+                        }
+                    }
+
+                    if (!shaderGuids.empty()) {
+                        drawCombo("Shader Asset", shaderGuids, meshComp->GetShaderGuid(), [this, &meshComp](const std::string& guid) {
+                            if (auto* shader = m_gameResources->GetShader(guid)) {
+                                meshComp->SetShader(shader, guid);
+                                shader->Use();
+                                shader->SetInt("uTex", 0);
+                            } else {
+                                gm::core::Logger::Warning("[DebugMenu] Shader '{}' not available in GameResources", guid);
+                            }
+                        });
+                        if (ImGui::Button("Clear Shader")) {
+                            meshComp->SetShader(nullptr, "");
+                        }
+                        if (auto shaderSource = m_gameResources->GetShaderSource(meshComp->GetShaderGuid())) {
+                            ImGui::TextWrapped("Vert: %s", shaderSource->vertexPath.c_str());
+                            ImGui::TextWrapped("Frag: %s", shaderSource->fragmentPath.c_str());
+                        }
+                    }
+
+                    if (!materialGuids.empty()) {
+                        drawCombo("Material Asset", materialGuids, meshComp->GetMaterialGuid(), [this, &meshComp](const std::string& guid) {
+                            auto material = m_gameResources->GetMaterial(guid);
+                            if (material) {
+                                meshComp->SetMaterial(std::move(material), guid);
+                            } else {
+                                gm::core::Logger::Warning("[DebugMenu] Material '{}' not available in GameResources", guid);
+                            }
+                        });
+                        if (ImGui::Button("Clear Material")) {
+                            meshComp->SetMaterial(nullptr, "");
+                        }
+                    }
+                }
             } else if (auto rigidBody = std::dynamic_pointer_cast<gm::physics::RigidBodyComponent>(component)) {
                 const char* bodyTypeNames[] = { "Static", "Dynamic" };
                 int bodyType = static_cast<int>(rigidBody->GetBodyType());
@@ -554,8 +845,23 @@ void DebugMenu::RenderInspector() {
                     terrain->SetEditingEnabled(editingEnabled);
                 }
                 ImGui::Separator();
-                ImGui::TextUnformatted("Hold LMB to raise terrain.");
-                ImGui::TextUnformatted("Hold RMB to lower terrain.");
+                const bool isPaintMode = terrain->GetBrushMode() == EditableTerrainComponent::BrushMode::Paint;
+                if (isPaintMode) {
+                    ImGui::TextUnformatted("Paint Mode: Hold LMB to apply texture, RMB to erase.");
+                } else {
+                    ImGui::TextUnformatted("Sculpt Mode: Hold LMB to raise terrain, RMB to lower.");
+                }
+                ImGui::Separator();
+
+                int brushMode = static_cast<int>(terrain->GetBrushMode());
+                if (ImGui::RadioButton("Sculpt Height", brushMode == 0)) {
+                    terrain->SetBrushMode(EditableTerrainComponent::BrushMode::Sculpt);
+                }
+                ImGui::SameLine();
+                if (ImGui::RadioButton("Paint Texture", brushMode == 1)) {
+                    terrain->SetBrushMode(EditableTerrainComponent::BrushMode::Paint);
+                }
+                brushMode = static_cast<int>(terrain->GetBrushMode());
                 ImGui::Separator();
 
                 float brushRadius = terrain->GetBrushRadius();
@@ -594,6 +900,181 @@ void DebugMenu::RenderInspector() {
                     terrain->MarkMeshDirty();
                 }
                 ImGui::Text("Size: %.2f", terrain->GetTerrainSize());
+
+                ImGui::Separator();
+                ImGui::TextUnformatted("Base Texture");
+                const auto* resources = m_gameResources;
+                auto getTextureLabel = [&](const std::string& guid) -> std::string {
+                    if (guid.empty()) {
+                        return "None";
+                    }
+                    if (resources) {
+                        if (auto source = resources->GetTextureSource(guid)) {
+                            if (!source->empty()) {
+                                return std::filesystem::path(*source).filename().string();
+                            }
+                        }
+                    }
+                    if (auto descriptor = gm::assets::AssetCatalog::Instance().FindByGuid(guid)) {
+                        if (!descriptor->relativePath.empty()) {
+                            return std::filesystem::path(descriptor->relativePath).filename().string();
+                        }
+                    }
+                    if (resources && resources->GetTexture(guid)) {
+                        return guid;
+                    }
+                    if (auto textureShared = gm::ResourceManager::GetTexture(guid)) {
+                        (void)textureShared;
+                        return guid;
+                    }
+                    return "None";
+                };
+
+                std::string basePreview = getTextureLabel(terrain->GetBaseTextureGuid());
+                if (ImGui::BeginCombo("##TerrainBaseTexture", basePreview.c_str())) {
+                    if (ImGui::Selectable("None", terrain->GetBaseTextureGuid().empty())) {
+                        terrain->ClearBaseTexture();
+                    }
+                    if (ImGui::Selectable("Add Texture...", false)) {
+                        m_showContentBrowser = true;
+                        m_pendingContentBrowserFocusPath = "textures";
+                    }
+                    ImGui::Separator();
+                    if (resources) {
+                        for (const auto& [guid, texture] : resources->GetTextureMap()) {
+                            const bool isBaseSelected = guid == terrain->GetBaseTextureGuid();
+                            std::string label = getTextureLabel(guid);
+                            if (ImGui::Selectable(label.c_str(), isBaseSelected)) {
+                                if (m_gameResources) {
+                                    m_gameResources->EnsureTextureRegistered(guid, texture);
+                                }
+                                terrain->SetBaseTexture(guid, texture.get());
+                            }
+                            if (isBaseSelected) {
+                                ImGui::SetItemDefaultFocus();
+                            }
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                if (ImGui::Button("Clear Base Texture")) {
+                    terrain->ClearBaseTexture();
+                }
+
+                float textureTiling = terrain->GetTextureTiling();
+                if (ImGui::SliderFloat("Texture Tiling", &textureTiling, 0.1f, 32.0f, "%.2f")) {
+                    terrain->SetTextureTiling(textureTiling);
+                }
+                ImGui::TextDisabled("Base texture shows wherever the paint layer is 0.");
+
+                ImGui::Separator();
+                ImGui::TextUnformatted("Paint Layers");
+                int layerCount = terrain->GetPaintLayerCount();
+                int activeLayer = terrain->GetActivePaintLayerIndex();
+                int pendingDelete = -1;
+                if (ImGui::BeginTable("PaintLayerTable", 4, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV)) {
+                    ImGui::TableSetupColumn("Enabled", ImGuiTableColumnFlags_WidthFixed, 0.0f);
+                    ImGui::TableSetupColumn("Layer", ImGuiTableColumnFlags_WidthStretch);
+                    ImGui::TableSetupColumn("State", ImGuiTableColumnFlags_WidthFixed, 0.0f);
+                    ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 0.0f);
+                    for (int layerIdx = 0; layerIdx < layerCount; ++layerIdx) {
+                        ImGui::PushID(layerIdx);
+                        ImGui::TableNextRow();
+
+                        bool isLayerActive = (layerIdx == activeLayer);
+                        bool enabled = terrain->IsPaintLayerEnabled(layerIdx);
+                        std::string label = fmt::format("Layer {}: {}", layerIdx + 1,
+                            getTextureLabel(terrain->GetPaintTextureGuid(layerIdx)));
+
+                        ImGui::TableNextColumn();
+                        if (ImGui::Checkbox("##LayerEnabled", &enabled)) {
+                            terrain->SetPaintLayerEnabled(layerIdx, enabled);
+                        }
+
+                        ImGui::TableNextColumn();
+                        if (ImGui::Selectable(label.c_str(), isLayerActive, ImGuiSelectableFlags_DontClosePopups)) {
+                            terrain->SetActivePaintLayerIndex(layerIdx);
+                            activeLayer = terrain->GetActivePaintLayerIndex();
+                        }
+                        ImGui::SetItemAllowOverlap();
+
+                        ImGui::TableNextColumn();
+                        if (terrain->PaintLayerHasPaint(layerIdx)) {
+                            ImGui::TextDisabled("painted");
+                        } else {
+                            ImGui::TextUnformatted(" ");
+                        }
+
+                        ImGui::TableNextColumn();
+                        ImGui::BeginDisabled(layerCount <= 1);
+                        std::string deleteLabel = fmt::format("Delete##{}", layerIdx);
+                        if (ImGui::Button(deleteLabel.c_str())) {
+                            pendingDelete = layerIdx;
+                        }
+                        ImGui::EndDisabled();
+
+                        ImGui::PopID();
+                    }
+                    ImGui::EndTable();
+                }
+                if (pendingDelete >= 0) {
+                    if (terrain->RemovePaintLayer(pendingDelete)) {
+                        layerCount = terrain->GetPaintLayerCount();
+                        activeLayer = terrain->GetActivePaintLayerIndex();
+                    } else {
+                    }
+                }
+                if (terrain->CanAddPaintLayer()) {
+                    if (ImGui::Button("+ Add Layer")) {
+                        if (terrain->AddPaintLayer()) {
+                            activeLayer = terrain->GetActivePaintLayerIndex();
+                            layerCount = terrain->GetPaintLayerCount();
+                        } else {
+                        }
+                    }
+                }
+
+                layerCount = terrain->GetPaintLayerCount();
+                activeLayer = terrain->GetActivePaintLayerIndex();
+
+                std::string paintPreview = getTextureLabel(terrain->GetPaintTextureGuid(activeLayer));
+                if (ImGui::BeginCombo("Layer Texture", paintPreview.c_str())) {
+                    if (ImGui::Selectable("None", terrain->GetPaintTextureGuid(activeLayer).empty())) {
+                        terrain->ClearPaintTexture();
+                    }
+                    if (ImGui::Selectable("Add Texture...", false)) {
+                        m_showContentBrowser = true;
+                        m_pendingContentBrowserFocusPath = "textures";
+                    }
+                    ImGui::Separator();
+                    if (resources) {
+                        for (const auto& [guid, texture] : resources->GetTextureMap()) {
+                            const bool isPaintSelected = guid == terrain->GetPaintTextureGuid(activeLayer);
+                            std::string label = getTextureLabel(guid);
+                            if (ImGui::Selectable(label.c_str(), isPaintSelected)) {
+                                if (m_gameResources) {
+                                    m_gameResources->EnsureTextureRegistered(guid, texture);
+                                }
+                                terrain->SetPaintTexture(guid, texture.get());
+                            }
+                            if (isPaintSelected) {
+                                ImGui::SetItemDefaultFocus();
+                            }
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+
+                const bool hasActivePaintTexture = terrain->PaintLayerHasTexture(activeLayer);
+                ImGui::BeginDisabled(!hasActivePaintTexture);
+                if (ImGui::Button("Fill Layer With Texture")) {
+                    terrain->FillPaintLayer(1.0f);
+                }
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                if (ImGui::Button("Clear Layer (Show Base)")) {
+                    terrain->FillPaintLayer(0.0f);
+                }
             }
         }
         ImGui::PopID();
@@ -716,6 +1197,446 @@ void DebugMenu::RenderPrefabBrowser() {
             }
         }
     }
+
+    ImGui::End();
+}
+
+void DebugMenu::RenderContentBrowser() {
+    if (!m_gameResources) {
+        m_showContentBrowser = false;
+        return;
+    }
+
+    if (!ImGui::Begin("Content Browser", &m_showContentBrowser)) {
+        ImGui::End();
+        return;
+    }
+
+    auto selectedObject = m_selectedGameObject.lock();
+    std::shared_ptr<gm::scene::StaticMeshComponent> selectedMeshComp;
+    std::shared_ptr<EditableTerrainComponent> selectedTerrainComp;
+    if (selectedObject) {
+        selectedMeshComp = selectedObject->GetComponent<gm::scene::StaticMeshComponent>();
+        selectedTerrainComp = selectedObject->GetComponent<EditableTerrainComponent>();
+    }
+
+    if (selectedMeshComp || selectedTerrainComp) {
+        ImGui::Text("Assigning to: %s", selectedObject ? selectedObject->GetName().c_str() : "Selection");
+        ImGui::SameLine();
+        if (selectedTerrainComp && !selectedMeshComp) {
+            ImGui::TextDisabled("(double-click textures; hold Shift for base)");
+        } else if (selectedTerrainComp && selectedMeshComp) {
+            ImGui::TextDisabled("(double-click; Shift+double-click textures for terrain base)");
+        } else {
+            ImGui::TextDisabled("(double-click to assign)");
+        }
+    } else {
+        ImGui::TextDisabled("Select a GameObject with a StaticMeshComponent or EditableTerrainComponent to assign resources.");
+    }
+
+    static char filterBuffer[256] = {0};
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputTextWithHint("##ContentBrowserFilter", "Filter by name, GUID, or path", filterBuffer, sizeof(filterBuffer));
+    std::string filter(filterBuffer);
+    std::transform(filter.begin(), filter.end(), filter.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    auto matchesString = [&filter](const std::string& value) {
+        if (filter.empty()) {
+            return true;
+        }
+        std::string lowerValue = value;
+        std::transform(lowerValue.begin(), lowerValue.end(), lowerValue.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return lowerValue.find(filter) != std::string::npos;
+    };
+
+    auto matchesAsset = [&matchesString](const std::string& guid,
+                                         const std::string& name,
+                                         const std::string& path) {
+        return matchesString(guid) || matchesString(name) ||
+               (!path.empty() && matchesString(path));
+    };
+
+    // Get assets from catalog, filtered to models, prefabs, shaders, textures, and materials folders
+    auto& catalog = gm::assets::AssetCatalog::Instance();
+    const auto allAssets = catalog.GetAllAssets();
+
+    std::vector<gm::assets::AssetDescriptor> filteredAssets;
+    for (const auto& asset : allAssets) {
+        const auto& path = asset.relativePath;
+        if (path.rfind("models/", 0) == 0 ||
+            path.rfind("prefabs/", 0) == 0 ||
+            path.rfind("shaders/", 0) == 0 ||
+            path.rfind("textures/", 0) == 0 ||
+            path.rfind("materials/", 0) == 0) {
+            filteredAssets.push_back(asset);
+        }
+    }
+
+    // Build folder tree structure
+    struct FolderNode {
+        std::string name;
+        std::string fullPath;
+        std::vector<FolderNode> children;
+        std::vector<gm::assets::AssetDescriptor> assets;
+    };
+
+    FolderNode root;
+    root.name = "Assets";
+    root.fullPath = "";
+
+    auto ensurePath = [&root](const std::filesystem::path& relativePath) -> FolderNode* {
+        FolderNode* current = &root;
+        for (const auto& part : relativePath) {
+            if (part == "." || part.empty()) {
+                continue;
+            }
+            std::string partStr = part.string();
+            auto it = std::find_if(current->children.begin(), current->children.end(),
+                                    [&partStr](const FolderNode& node) { return node.name == partStr; });
+            if (it == current->children.end()) {
+                FolderNode newFolder;
+                newFolder.name = partStr;
+                newFolder.fullPath = current->fullPath.empty() ? partStr : (current->fullPath + "/" + partStr);
+                current->children.push_back(newFolder);
+                current = &current->children.back();
+            } else {
+                current = &*it;
+            }
+        }
+        return current;
+    };
+
+    for (const auto& asset : filteredAssets) {
+        std::filesystem::path assetPath(asset.relativePath);
+        auto parentPath = assetPath.parent_path();
+        FolderNode* folder = ensurePath(parentPath);
+        folder->assets.push_back(asset);
+    }
+
+    // Sort folders and assets
+    std::function<void(FolderNode&)> sortNode = [&sortNode](FolderNode& node) {
+        std::sort(node.children.begin(), node.children.end(),
+                  [](const FolderNode& a, const FolderNode& b) { return a.name < b.name; });
+        std::sort(node.assets.begin(), node.assets.end(),
+                  [](const gm::assets::AssetDescriptor& a, const gm::assets::AssetDescriptor& b) {
+                      return a.relativePath < b.relativePath;
+                  });
+        for (auto& child : node.children) {
+            sortNode(child);
+        }
+    };
+    sortNode(root);
+
+    auto assetTypeToString = [](const gm::assets::AssetDescriptor& asset) -> const char* {
+        const std::string& path = asset.relativePath;
+        if (asset.type == gm::assets::AssetType::Mesh || path.rfind("models/", 0) == 0) return "Mesh";
+        if (asset.type == gm::assets::AssetType::Shader || path.rfind("shaders/", 0) == 0) return "Shader";
+        if (asset.type == gm::assets::AssetType::Texture || path.rfind("textures/", 0) == 0) return "Texture";
+        if (asset.type == gm::assets::AssetType::Material || path.rfind("materials/", 0) == 0) return "Material";
+        if (asset.type == gm::assets::AssetType::Prefab || path.rfind("prefabs/", 0) == 0) return "Prefab";
+        if (asset.type == gm::assets::AssetType::Scene) return "Scene";
+        if (asset.type == gm::assets::AssetType::Audio) return "Audio";
+        if (asset.type == gm::assets::AssetType::Script) return "Script";
+        return "Asset";
+    };
+
+    // Helper to get or load assets on-demand
+    auto getOrLoadMesh = [this](const gm::assets::AssetDescriptor& asset) -> gm::Mesh* {
+        // First check if already loaded in GameResources
+        if (auto* mesh = m_gameResources->GetMesh(asset.guid)) {
+            return mesh;
+        }
+        
+        // Try ResourceManager directly (it may have been loaded globally)
+        if (auto mesh = gm::ResourceManager::GetMesh(asset.guid)) {
+            return mesh.get();
+        }
+        
+        // Try to load on-demand
+        try {
+            auto& catalog = gm::assets::AssetCatalog::Instance();
+            const auto assetRoot = catalog.GetAssetRoot();
+            auto path = (assetRoot / asset.relativePath).lexically_normal();
+            gm::ResourceManager::MeshDescriptor desc{asset.guid, path.string()};
+            auto handle = gm::ResourceManager::LoadMesh(desc);
+            if (handle.IsLoaded()) {
+                auto mesh = handle.Lock();
+                gm::core::Logger::Info("[ContentBrowser] Loaded mesh '{}' on-demand", asset.guid);
+                return mesh.get();
+            }
+        } catch (const std::exception& ex) {
+            gm::core::Logger::Warning("[ContentBrowser] Failed to load mesh '{}' on-demand: {}", asset.guid, ex.what());
+        }
+        
+        return nullptr;
+    };
+
+    auto getOrLoadTexture = [this](const gm::assets::AssetDescriptor& asset) -> std::shared_ptr<gm::Texture> {
+        if (auto texture = gm::ResourceManager::GetTexture(asset.guid)) {
+            return texture;
+        }
+
+        if (m_gameResources->GetTexture(asset.guid)) {
+            if (auto texture = gm::ResourceManager::GetTexture(asset.guid)) {
+                return texture;
+            }
+        }
+
+        try {
+            auto& catalog = gm::assets::AssetCatalog::Instance();
+            const auto assetRoot = catalog.GetAssetRoot();
+            auto path = (assetRoot / asset.relativePath).lexically_normal();
+            gm::ResourceManager::TextureDescriptor desc{
+                asset.guid,
+                path.string(),
+                true,
+                true,
+                true
+            };
+            auto handle = gm::ResourceManager::LoadTexture(desc);
+            if (handle.IsLoaded()) {
+                auto texture = handle.Lock();
+                gm::core::Logger::Info("[ContentBrowser] Loaded texture '{}' on-demand", asset.guid);
+                return texture;
+            }
+        } catch (const std::exception& ex) {
+            gm::core::Logger::Warning("[ContentBrowser] Failed to load texture '{}' on-demand: {}", asset.guid, ex.what());
+        }
+
+        return {};
+    };
+
+    // Render folder tree
+    const std::string focusPath = m_pendingContentBrowserFocusPath;
+    bool focusHandled = false;
+
+    std::function<void(const FolderNode&, int)> renderFolder = [&](const FolderNode& folder, int depth) {
+        // Skip empty folders (except root which we'll handle specially)
+        if (folder.children.empty() && folder.assets.empty() && folder.name != "Assets") {
+            return;
+        }
+
+        ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+        if (folder.children.empty() && folder.assets.empty()) {
+            flags |= ImGuiTreeNodeFlags_Leaf;
+        }
+        
+        // For root "Assets", use default open state; for others, start collapsed
+        if (folder.name == "Assets") {
+            flags |= ImGuiTreeNodeFlags_DefaultOpen;
+        }
+
+        if (!focusPath.empty()) {
+            if (folder.fullPath == focusPath ||
+                (!folder.fullPath.empty() && focusPath.rfind(folder.fullPath + "/", 0) == 0)) {
+                ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+            }
+        }
+
+        bool isOpen = ImGui::TreeNodeEx(folder.name.c_str(), flags);
+        
+        if (isOpen) {
+            // Render child folders
+            for (const auto& child : folder.children) {
+                renderFolder(child, depth + 1);
+            }
+
+            // Render assets in this folder
+            for (const auto& asset : folder.assets) {
+                if (!focusHandled && !focusPath.empty() && folder.fullPath == focusPath) {
+                    ImGui::SetScrollHereY();
+                    focusHandled = true;
+                }
+                const std::string fileName = std::filesystem::path(asset.relativePath).filename().string();
+                if (!matchesAsset(asset.guid, fileName, asset.relativePath)) {
+                    continue;
+                }
+
+                ImGui::PushID(asset.guid.c_str());
+                
+                // TODO: Add icon/preview support here
+                // For now, use a simple text label
+                const char* icon = "📄";
+                const bool isMeshAsset = asset.type == gm::assets::AssetType::Mesh || asset.relativePath.rfind("models/", 0) == 0;
+                const bool isShaderAsset = asset.type == gm::assets::AssetType::Shader || asset.relativePath.rfind("shaders/", 0) == 0;
+                const bool isTextureAsset = asset.type == gm::assets::AssetType::Texture || asset.relativePath.rfind("textures/", 0) == 0;
+                const bool isMaterialAsset = asset.type == gm::assets::AssetType::Material || asset.relativePath.rfind("materials/", 0) == 0;
+                const bool isPrefabAsset = asset.type == gm::assets::AssetType::Prefab || asset.relativePath.rfind("prefabs/", 0) == 0;
+
+                if (isMeshAsset) {
+                    icon = "📦";
+                } else if (isShaderAsset) {
+                    icon = "🔧";
+                } else if (isPrefabAsset) {
+                    icon = "🎯";
+                } else if (isTextureAsset) {
+                    icon = "🖼️";
+                } else if (isMaterialAsset) {
+                    icon = "🧪";
+                }
+
+                bool isSelected = false;
+                if (selectedMeshComp) {
+                    if (isMeshAsset) {
+                        isSelected = selectedMeshComp->GetMeshGuid() == asset.guid;
+                    } else if (isShaderAsset) {
+                        isSelected = selectedMeshComp->GetShaderGuid() == asset.guid;
+                    } else if (isMaterialAsset) {
+                        isSelected = selectedMeshComp->GetMaterialGuid() == asset.guid;
+                    } else if (isTextureAsset) {
+                        if (auto material = selectedMeshComp->GetMaterial()) {
+                            if (auto* tex = m_gameResources->GetTexture(asset.guid)) {
+                                isSelected = material->GetDiffuseTexture() == tex;
+                            } else if (auto texPtr = gm::ResourceManager::GetTexture(asset.guid)) {
+                                isSelected = material->GetDiffuseTexture() == texPtr.get();
+                            }
+                        }
+                    }
+                }
+                if (!isSelected && selectedTerrainComp && isTextureAsset) {
+                    const bool matchesBase = asset.guid == selectedTerrainComp->GetBaseTextureGuid();
+                    bool matchesPaint = false;
+                    for (int layerIdx = 0; layerIdx < selectedTerrainComp->GetPaintLayerCount(); ++layerIdx) {
+                        if (asset.guid == selectedTerrainComp->GetPaintTextureGuid(layerIdx)) {
+                            matchesPaint = true;
+                            break;
+                        }
+                    }
+                    isSelected = matchesBase || matchesPaint;
+                }
+
+                if (isSelected) {
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.0f, 1.0f));
+                }
+
+                ImGui::Selectable((std::string(icon) + " " + fileName).c_str(), isSelected, 
+                                  ImGuiSelectableFlags_AllowDoubleClick);
+
+                if (isSelected) {
+                    ImGui::PopStyleColor();
+                }
+
+                if (ImGui::IsItemHovered()) {
+                    ImGui::BeginTooltip();
+                    ImGui::Text("GUID: %s", asset.guid.c_str());
+                    ImGui::Text("Path: %s", asset.relativePath.c_str());
+                    ImGui::Text("Type: %s", assetTypeToString(asset));
+                    if (selectedTerrainComp && isTextureAsset) {
+                        const bool isBase = asset.guid == selectedTerrainComp->GetBaseTextureGuid();
+                        if (isBase) {
+                            ImGui::TextUnformatted("Status: Base Texture");
+                        }
+                        std::vector<int> matchingLayers;
+                        for (int layerIdx = 0; layerIdx < selectedTerrainComp->GetPaintLayerCount(); ++layerIdx) {
+                            if (asset.guid == selectedTerrainComp->GetPaintTextureGuid(layerIdx)) {
+                                matchingLayers.push_back(layerIdx);
+                            }
+                        }
+                        if (!matchingLayers.empty()) {
+                            std::string layerText = "Status: Paint Layer ";
+                            for (std::size_t i = 0; i < matchingLayers.size(); ++i) {
+                                layerText += std::to_string(matchingLayers[i] + 1);
+                                if (i + 1 < matchingLayers.size()) {
+                                    layerText += ", ";
+                                }
+                            }
+                            ImGui::TextUnformatted(layerText.c_str());
+                        }
+                        ImGui::TextUnformatted("Tip: Double-click to assign paint; hold Shift for base.");
+                    }
+                    ImGui::EndTooltip();
+                }
+
+                // Double-click to assign
+                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+                    (selectedMeshComp || selectedTerrainComp)) {
+                    bool assigned = false;
+                    
+                    if (selectedMeshComp && isMeshAsset) {
+                        auto* mesh = getOrLoadMesh(asset);
+                        if (mesh) {
+                            selectedMeshComp->SetMesh(mesh, asset.guid);
+                            assigned = true;
+                            gm::core::Logger::Info("[ContentBrowser] Assigned mesh '{}' to '{}'", 
+                                asset.guid, selectedObject ? selectedObject->GetName().c_str() : "(none)");
+                        }
+                    } else if (selectedMeshComp && isShaderAsset) {
+                        auto* shader = m_gameResources->GetShader(asset.guid);
+                        if (shader) {
+                            selectedMeshComp->SetShader(shader, asset.guid);
+                            shader->Use();
+                            shader->SetInt("uTex", 0);
+                            assigned = true;
+                            gm::core::Logger::Info("[ContentBrowser] Assigned shader '{}' to '{}'", 
+                                asset.guid, selectedObject ? selectedObject->GetName().c_str() : "(none)");
+                        }
+                    } else if (selectedMeshComp && isTextureAsset) {
+                        if (auto material = selectedMeshComp->GetMaterial()) {
+                            if (auto texture = getOrLoadTexture(asset)) {
+                                m_gameResources->EnsureTextureRegistered(asset.guid, texture);
+                                material->SetDiffuseTexture(texture.get());
+                                assigned = true;
+                                gm::core::Logger::Info("[ContentBrowser] Assigned texture '{}' to material '{}' on '{}'",
+                                    asset.guid,
+                                    material->GetName().c_str(),
+                                    selectedObject ? selectedObject->GetName().c_str() : "(none)");
+                            }
+                        }
+                    } else if (selectedMeshComp && isMaterialAsset) {
+                        if (auto material = m_gameResources->GetMaterial(asset.guid)) {
+                            selectedMeshComp->SetMaterial(material, asset.guid);
+                            assigned = true;
+                            gm::core::Logger::Info("[ContentBrowser] Assigned material '{}' to '{}'",
+                                asset.guid,
+                                selectedObject ? selectedObject->GetName().c_str() : "(none)");
+                        }
+                    }
+
+                    if (!assigned && selectedTerrainComp && isTextureAsset) {
+                        if (auto texture = getOrLoadTexture(asset)) {
+                            ImGuiIO& io = ImGui::GetIO();
+                            const bool assignAsBase = (io.KeyMods & ImGuiMod_Shift) != 0;
+                            if (assignAsBase) {
+                                m_gameResources->EnsureTextureRegistered(asset.guid, texture);
+                                selectedTerrainComp->SetBaseTexture(asset.guid, texture.get());
+                                gm::core::Logger::Info("[ContentBrowser] Assigned base texture '{}' to '{}'",
+                                    asset.guid,
+                                    selectedObject ? selectedObject->GetName().c_str() : "(none)");
+                            } else {
+                                m_gameResources->EnsureTextureRegistered(asset.guid, texture);
+                                selectedTerrainComp->SetPaintTexture(asset.guid, texture.get());
+                                gm::core::Logger::Info("[ContentBrowser] Assigned paint texture '{}' to '{}'",
+                                    asset.guid,
+                                    selectedObject ? selectedObject->GetName().c_str() : "(none)");
+                            }
+                            assigned = true;
+                        }
+                    }
+
+                    const bool relevantToTerrain = selectedTerrainComp && isTextureAsset;
+                    const bool relevantToMesh = static_cast<bool>(selectedMeshComp);
+                    if (!assigned && (relevantToMesh || relevantToTerrain)) {
+                        gm::core::Logger::Warning("[ContentBrowser] Failed to assign asset '%s' (not loaded)", asset.guid.c_str());
+                    }
+                }
+
+                ImGui::PopID();
+            }
+
+            ImGui::TreePop();
+        }
+    };
+
+    if (filteredAssets.empty()) {
+        ImGui::TextDisabled("No assets found in models/, prefabs/, shaders/, textures/, or materials/ folders.");
+    } else {
+        ImGui::BeginChild("ContentBrowserTree", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+        renderFolder(root, 0);
+        ImGui::EndChild();
+    }
+
+    m_pendingContentBrowserFocusPath.clear();
 
     ImGui::End();
 }

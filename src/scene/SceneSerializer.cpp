@@ -199,10 +199,30 @@ bool SceneSerializer::Deserialize(Scene& scene, const std::string& jsonString) {
         scene.Cleanup();
         
         // Deserialize GameObjects
+        std::vector<std::pair<std::string, std::string>> pendingParentLinks;
+
         if (sceneJson.contains("gameObjects") && sceneJson["gameObjects"].is_array()) {
             for (const auto& objJson : sceneJson["gameObjects"]) {
-                SceneSerializer::DeserializeGameObject(scene, objJson);
+                auto obj = SceneSerializer::DeserializeGameObject(scene, objJson);
+                if (obj && objJson.contains("parent") && objJson["parent"].is_string()) {
+                    std::string parentName = objJson["parent"].get<std::string>();
+                    pendingParentLinks.emplace_back(obj->GetName(), parentName);
+                }
             }
+        }
+
+        for (const auto& [childName, parentName] : pendingParentLinks) {
+            auto child = scene.FindGameObjectByName(childName);
+            auto parent = scene.FindGameObjectByName(parentName);
+            if (!child) {
+                core::Logger::Warning("[SceneSerializer] Unable to resolve child '{}' for reparenting", childName);
+                continue;
+            }
+            if (!parent) {
+                core::Logger::Warning("[SceneSerializer] Unable to resolve parent '{}' for child '{}'", parentName, childName);
+                continue;
+            }
+            scene.SetParent(child, parent);
         }
         
         // Set scene properties
@@ -247,6 +267,9 @@ json SceneSerializer::SerializeGameObject(const std::shared_ptr<GameObject>& obj
     
     objJson["name"] = obj->GetName();
     objJson["active"] = obj->IsActive();
+    if (auto parent = obj->GetParent()) {
+        objJson["parent"] = parent->GetName();
+    }
     
     // Serialize tags
     const auto& tags = obj->GetTags();

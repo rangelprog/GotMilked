@@ -14,37 +14,49 @@ namespace gm {
 class TransformComponent : public Component {
 private:
     Transform transform;
-    mutable bool matrixDirty = true;
-    mutable glm::mat4 cachedMatrix{1.0f};
+    mutable bool m_localMatrixDirty = true;
+    mutable bool m_worldMatrixDirty = true;
+    mutable glm::mat4 m_cachedLocalMatrix{1.0f};
+    mutable glm::mat4 m_cachedWorldMatrix{1.0f};
 
 public:
     TransformComponent();
     virtual ~TransformComponent() = default;
 
     // Position
-    const glm::vec3& GetPosition() const { return transform.position; }
+    glm::vec3 GetPosition() const;
     void SetPosition(const glm::vec3& pos);
     void SetPosition(float x, float y, float z);
     void Translate(const glm::vec3& delta);
     void Translate(float x, float y, float z);
 
+    const glm::vec3& GetLocalPosition() const { return transform.position; }
+    void SetLocalPosition(const glm::vec3& pos);
+
     // Rotation (Euler angles in degrees)
-    const glm::vec3& GetRotation() const { return transform.rotation; }
+    glm::vec3 GetRotation() const;
     void SetRotation(const glm::vec3& rot);
     void SetRotation(float x, float y, float z);
     void Rotate(const glm::vec3& delta);
     void Rotate(float x, float y, float z);
 
+    const glm::vec3& GetLocalRotation() const { return transform.rotation; }
+    void SetLocalRotation(const glm::vec3& rot) { transform.rotation = rot; MarkLocalDirty(); }
+
     // Scale
-    const glm::vec3& GetScale() const { return transform.scale; }
+    glm::vec3 GetScale() const;
     void SetScale(const glm::vec3& scl);
     void SetScale(float x, float y, float z);
     void SetScale(float uniformScale);
     void Scale(const glm::vec3& delta);
     void Scale(float x, float y, float z);
 
+    const glm::vec3& GetLocalScale() const { return transform.scale; }
+    void SetLocalScale(const glm::vec3& scl) { transform.scale = scl; MarkLocalDirty(); }
+
     // Transform matrix
     const glm::mat4& GetMatrix() const;
+    const glm::mat4& GetLocalMatrix() const;
     const Transform& GetTransform() const { return transform; }
     void SetTransform(const Transform& t);
 
@@ -55,6 +67,9 @@ public:
 
     // Reset to identity
     void Reset();
+
+    void MarkLocalDirty();
+    void MarkWorldDirty();
 };
 
 } // namespace gm

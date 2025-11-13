@@ -12,13 +12,6 @@
     "assets": "assets",
     "saves": "saves"
   },
-  "resources": {
-    "shaderVert": "shaders/simple.vert.glsl",
-    "shaderFrag": "shaders/simple.frag.glsl",
-    "textureGround": "textures/ground.png",
-    "textureCow": "textures/cow.png",
-    "meshPlaceholder": "models/placeholder.obj"
-  },
   "hotReload": {
     "enable": true,
     "pollIntervalSeconds": 0.5

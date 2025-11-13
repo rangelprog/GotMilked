@@ -75,53 +75,61 @@ TEST_CASE("ResourceManager caches and reloads shaders and meshes", "[resources]"
     TempDir assets(bundle.root);
     ResourceManagerGuard guard;
 
-    auto shader = gm::ResourceManager::LoadShader("test_shader",
-                                                  bundle.vertPath,
-                                                  bundle.fragPath);
-    REQUIRE(shader);
+    gm::ResourceManager::ShaderDescriptor shaderDesc{
+        "test_shader",
+        bundle.vertPath,
+        bundle.fragPath
+    };
+    auto shaderHandle = gm::ResourceManager::LoadShader(shaderDesc);
+    auto shader = shaderHandle.Lock();
+    REQUIRE(shader != nullptr);
     REQUIRE(gm::ResourceManager::HasShader("test_shader"));
 
-    auto shaderAgain = gm::ResourceManager::LoadShader("test_shader",
-                                                       bundle.vertPath,
-                                                       bundle.fragPath);
-    REQUIRE(shaderAgain);
+    auto shaderAgainHandle = gm::ResourceManager::LoadShader(shaderDesc);
+    auto shaderAgain = shaderAgainHandle.Lock();
+    REQUIRE(shaderAgain != nullptr);
     REQUIRE(shaderAgain == shader);
 
-    auto shaderReload = gm::ResourceManager::ReloadShader("test_shader",
-                                                          bundle.vertPath,
-                                                          bundle.fragPath);
-    REQUIRE(shaderReload);
+    auto shaderReloadHandle = gm::ResourceManager::ReloadShader(shaderDesc);
+    auto shaderReload = shaderReloadHandle.Lock();
+    REQUIRE(shaderReload != nullptr);
     REQUIRE(gm::ResourceManager::GetShader("test_shader") == shaderReload);
 
-    auto mesh = gm::ResourceManager::LoadMesh("test_mesh", bundle.meshPath);
-    REQUIRE(mesh);
+    gm::ResourceManager::MeshDescriptor meshDesc{
+        "test_mesh",
+        bundle.meshPath
+    };
+    auto meshHandle = gm::ResourceManager::LoadMesh(meshDesc);
+    auto mesh = meshHandle.Lock();
+    REQUIRE(mesh != nullptr);
     REQUIRE(gm::ResourceManager::HasMesh("test_mesh"));
 
-    auto meshAgain = gm::ResourceManager::LoadMesh("test_mesh", bundle.meshPath);
+    auto meshAgainHandle = gm::ResourceManager::LoadMesh(meshDesc);
+    auto meshAgain = meshAgainHandle.Lock();
     REQUIRE(meshAgain == mesh);
 
-    auto meshReload = gm::ResourceManager::ReloadMesh("test_mesh", bundle.meshPath);
-    REQUIRE(meshReload);
+    auto meshReloadHandle = gm::ResourceManager::ReloadMesh(meshDesc);
+    auto meshReload = meshReloadHandle.Lock();
+    REQUIRE(meshReload != nullptr);
     REQUIRE(gm::ResourceManager::GetMesh("test_mesh") == meshReload);
 }
 
-TEST_CASE("ResourceManager supports string_view lookups", "[resources]") {
+TEST_CASE("ResourceManager retrieves cached shader by GUID", "[resources]") {
     GlfwContext glContext;
     TestAssetBundle bundle = CreateMeshSpinnerTestAssets();
     TempDir assets(bundle.root);
     ResourceManagerGuard guard;
 
-    std::string name = "dynamic_shader";
-    auto shader = gm::ResourceManager::LoadShader(name, bundle.vertPath, bundle.fragPath);
-    REQUIRE(shader);
+    gm::ResourceManager::ShaderDescriptor shaderDesc{
+        "dynamic_shader",
+        bundle.vertPath,
+        bundle.fragPath
+    };
 
-    std::string lookupName = name;  // copy to ensure independent storage
-    name[0] = 'x';  // mutate original string to prove ResourceManager does not depend on caller storage
+    auto shaderHandle = gm::ResourceManager::LoadShader(shaderDesc);
+    auto shader = shaderHandle.Lock();
+    REQUIRE(shader != nullptr);
 
-    std::string_view viewLookup(lookupName);
-    auto viaView = gm::ResourceManager::GetShader(viewLookup);
-    REQUIRE(viaView == shader);
-
-    auto viaCStr = gm::ResourceManager::GetShader(lookupName.c_str());
-    REQUIRE(viaCStr == shader);
+    auto viaGuid = gm::ResourceManager::GetShader("dynamic_shader");
+    REQUIRE(viaGuid == shader);
 }

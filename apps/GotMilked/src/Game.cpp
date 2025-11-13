@@ -16,7 +16,11 @@
 
 #include <filesystem>
 #include <optional>
+#include <algorithm>
+#include <vector>
+#include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <nlohmann/json.hpp>
 #include <typeinfo>
 
@@ -43,10 +47,17 @@
 #include "DebugMenu.hpp"
 #include "gm/tooling/DebugConsole.hpp"
 #include "DebugHudController.hpp"
+#include "gm/debug/GridRenderer.hpp"
 
 using gm::debug::EditableTerrainComponent;
 #endif
 #include <imgui.h>
+#include <glad/glad.h>
+#include <vector>
+#include <glm/gtc/type_ptr.hpp>
+#include <glad/glad.h>
+#include <vector>
+#include <glm/gtc/type_ptr.hpp>
 
 
 Game::Game(const gm::utils::AppConfig& config)
@@ -75,7 +86,6 @@ bool Game::Init(GLFWwindow* window) {
     if (!SetupRendering()) {
         return false;
     }
-
     SetupInput();
     SetupScene();
     ApplyResourcesToScene();
@@ -144,10 +154,11 @@ bool Game::SetupPhysics() {
 }
 
 bool Game::SetupRendering() {
-    if (!m_resources.Load(m_assetsDir, m_config.resources)) {
+    if (!m_resources.Load(m_assetsDir)) {
         gm::core::Logger::Error("[Game] Failed to load resources from {}", m_assetsDir.string());
         return false;
     }
+    m_assetsDir = m_resources.GetAssetsDirectory();
 
     gm::SceneSerializerExtensions::RegisterSerializers();
     m_camera = std::make_unique<gm::Camera>();
@@ -233,6 +244,12 @@ bool Game::SetupDebugTools() {
                 });
         }
         m_debugHud->SetHudVisible(false);
+    }
+
+    m_gridRenderer = std::make_unique<gm::debug::GridRenderer>();
+    if (m_gridRenderer && !m_gridRenderer->Initialize()) {
+        gm::core::Logger::Warning("[Game] Failed to initialize debug grid; disabling grid overlay");
+        m_gridRenderer.reset();
     }
 #endif
 
@@ -340,6 +357,7 @@ void Game::SetupDebugMenu() {
     m_debugMenu->SetSaveManager(m_saveManager.get());
     m_debugMenu->SetScene(m_gameScene);
     m_debugMenu->SetPrefabLibrary(m_prefabLibrary.get());
+    m_debugMenu->SetGameResources(&m_resources);
     
     // Set window handle for file dialogs
 #ifdef _WIN32
@@ -367,6 +385,10 @@ void Game::SetupDebugMenu() {
 }
 #endif
 
+namespace {
+constexpr const char* kStarterSceneFilename = "starter.scene.json";
+}
+
 void Game::SetupScene() {
     auto& sceneManager = gm::SceneManager::Instance();
 
@@ -376,16 +398,61 @@ void Game::SetupScene() {
         return;
     }
 
-    m_gameScene->SetParallelGameObjectUpdates(true);
-    gm::core::Logger::Info("[Game] Game scene initialized successfully");
+    std::filesystem::path starterRoot = m_config.paths.saves;
+    if (starterRoot.empty()) {
+        starterRoot = m_assetsDir / "saves";
+    }
+    std::error_code canonicalSavesEc;
+    auto canonicalSaves = std::filesystem::weakly_canonical(starterRoot, canonicalSavesEc);
+    if (canonicalSavesEc) {
+        canonicalSaves = std::filesystem::absolute(starterRoot);
+    }
+    const auto starterScenePath = (canonicalSaves / kStarterSceneFilename).lexically_normal();
 
-    // Populate initial scene if empty
-    if (m_gameScene->GetAllGameObjects().empty()) {
+    bool loadedFromDisk = false;
+    std::error_code existsEc;
+    if (std::filesystem::exists(starterScenePath, existsEc)) {
+        gm::core::Logger::Info("[Game] Loading starter scene from '{}'", starterScenePath.string());
+        if (gm::SceneSerializer::LoadFromFile(*m_gameScene, starterScenePath.string())) {
+            loadedFromDisk = true;
+        } else {
+            gm::core::Logger::Warning("[Game] Failed to load starter scene from '{}'; rebuilding default scene", starterScenePath.string());
+            m_gameScene->Cleanup();
+        }
+    } else if (existsEc) {
+        gm::core::Logger::Warning("[Game] Could not check starter scene at '{}': {}", starterScenePath.string(), existsEc.message());
+    }
+
+    m_gameScene->SetParallelGameObjectUpdates(true);
+
+    if (loadedFromDisk && m_gameScene->GetAllGameObjects().empty()) {
+        gm::core::Logger::Warning("[Game] Starter scene file '{}' was empty; rebuilding default scene", starterScenePath.string());
+        loadedFromDisk = false;
+    }
+
+    if (!loadedFromDisk) {
+        m_gameScene->Cleanup();
+
         auto fovProvider = [this]() -> float {
             return m_gameplay ? m_gameplay->GetFovDegrees() : 60.0f;
         };
         gotmilked::PopulateInitialScene(*m_gameScene, *m_camera, m_resources, m_window, fovProvider);
+
+        std::error_code dirEc;
+        std::filesystem::create_directories(canonicalSaves, dirEc);
+        if (dirEc) {
+            gm::core::Logger::Warning("[Game] Failed to create saves directory '{}': {}", canonicalSaves.string(), dirEc.message());
+        } else if (gm::SceneSerializer::SaveToFile(*m_gameScene, starterScenePath.string())) {
+            gm::core::Logger::Info("[Game] Generated starter scene at '{}'", starterScenePath.string());
+        } else {
+            gm::core::Logger::Warning("[Game] Failed to save generated starter scene to '{}'", starterScenePath.string());
+        }
+    } else {
+        gm::core::Logger::Info("[Game] Starter scene loaded successfully");
     }
+
+    gm::core::Logger::Info("[Game] Game scene initialized successfully");
+
     ApplyResourcesToScene();
 
     if (m_gameplay) {
@@ -395,6 +462,21 @@ void Game::SetupScene() {
 
 void Game::Update(float dt) {
     if (!m_window) return;
+
+    if (auto catalogUpdate = m_resources.ProcessCatalogEvents(); catalogUpdate) {
+        if (catalogUpdate.reloadSucceeded) {
+            ApplyResourcesToScene();
+        }
+
+        if (catalogUpdate.reloadSucceeded && catalogUpdate.prefabsChanged && m_prefabLibrary) {
+            std::filesystem::path prefabRoot = m_assetsDir / "prefabs";
+            if (!m_prefabLibrary->LoadDirectory(prefabRoot)) {
+                gm::core::Logger::Info("[Game] Prefab library refreshed; no prefabs found in {}", prefabRoot.string());
+            } else {
+                gm::core::Logger::Info("[Game] Prefab library refreshed after catalog change");
+            }
+        }
+    }
 
     auto& physics = gm::physics::PhysicsWorld::Instance();
     if (physics.IsInitialized()) {
@@ -421,7 +503,6 @@ void Game::Update(float dt) {
             gm::core::Logger::Info("[Game] VSync {}", m_vsyncEnabled ? "enabled" : "disabled");
         }
     }
-
     if (input.IsActionJustPressed("Exit")) {
         bool shouldExit = true;
 #if GM_DEBUG_TOOLS
@@ -461,6 +542,29 @@ void Game::Update(float dt) {
             }
         }
     }
+
+#if GM_DEBUG_TOOLS
+    if (m_gridRenderer) {
+        bool imguiWantsKeyboard = false;
+        if (m_imgui && m_imgui->IsInitialized()) {
+            ImGuiIO& io = ImGui::GetIO();
+            imguiWantsKeyboard = io.WantCaptureKeyboard;
+        }
+
+        bool debugModeActive = false;
+        if (m_debugHud) {
+            debugModeActive = m_debugHud->IsHudVisible();
+        } else {
+            debugModeActive = m_overlayVisible;
+        }
+
+        if (!debugModeActive) {
+            m_gridVisible = false;
+        } else if (!imguiWantsKeyboard && input.IsActionJustPressed("ToggleGrid")) {
+            m_gridVisible = !m_gridVisible;
+        }
+    }
+#endif
 
 #if GM_DEBUG_TOOLS
     // Handle Ctrl+S (Save Scene As) and Ctrl+O (Load Scene From) shortcuts
@@ -541,11 +645,24 @@ void Game::Render() {
         m_imgui->NewFrame();
     }
 
+#if GM_DEBUG_TOOLS
+    if (m_gridRenderer) {
+        bool debugModeActive = false;
+        if (m_debugHud) {
+            debugModeActive = m_debugHud->IsHudVisible();
+        } else {
+            debugModeActive = m_overlayVisible;
+        }
+        if (debugModeActive && m_gridVisible) {
+            m_gridRenderer->Render(view, proj);
+        }
+    }
+#endif
+
     // Render the game scene with all its GameObjects
     if (m_gameScene && m_camera) {
         m_gameScene->Draw(*m_resources.GetShader(), *m_camera, fbw, fbh, fov);
     }
-    
     if (m_imgui && m_imgui->IsInitialized()) {
 #if GM_DEBUG_TOOLS
         if (m_debugHud) {
@@ -582,7 +699,7 @@ void Game::Render() {
 void Game::Shutdown() {
     // Clean up scene and scene manager
     m_gameScene.reset();
-
+ 
     gm::SceneSerializerExtensions::UnregisterSerializers();
     m_resources.Release();
     
@@ -797,29 +914,18 @@ void Game::ApplyResourcesToStaticMeshComponents() {
 
     // Create resolver functions that map GUIDs to resource objects
     auto meshResolver = [this](const std::string& guid) -> gm::Mesh* {
-        if (guid == m_resources.GetMeshGuid()) {
-            return m_resources.GetMesh();
-        }
-        // Could add more mesh GUID mappings here
-        return nullptr;
+        return m_resources.GetMesh(guid);
     };
 
     auto shaderResolver = [this](const std::string& guid) -> gm::Shader* {
-        if (guid == m_resources.GetShaderGuid()) {
-            return m_resources.GetShader();
-        }
-        // Could add more shader GUID mappings here
-        return nullptr;
+        return m_resources.GetShader(guid);
     };
 
-    auto materialResolver = [this](const std::string& /*guid*/) -> std::shared_ptr<gm::Material> {
-        // For now, materials don't have GUIDs in GameResources
-        // This could be extended later to support material GUIDs
-        // For now, return nullptr and let components use default materials
-        return nullptr;
+    auto materialResolver = [this](const std::string& guid) -> std::shared_ptr<gm::Material> {
+        return m_resources.GetMaterial(guid);
     };
 
-    // Find all StaticMeshComponents and restore their resources
+    // Find all StaticMeshComponents and refresh their resources
     for (const auto& gameObject : m_gameScene->GetAllGameObjects()) {
         if (!gameObject || !gameObject->IsActive()) {
             continue;
@@ -827,18 +933,67 @@ void Game::ApplyResourcesToStaticMeshComponents() {
 
         auto meshComp = gameObject->GetComponent<gm::scene::StaticMeshComponent>();
         if (meshComp) {
-            // Only restore if component has GUIDs but no resources
-            if ((!meshComp->GetMeshGuid().empty() && !meshComp->GetMesh()) ||
-                (!meshComp->GetShaderGuid().empty() && !meshComp->GetShader())) {
-                meshComp->RestoreResources(meshResolver, shaderResolver, materialResolver);
-                gm::core::Logger::Info("[Game] Restored resources for StaticMeshComponent on GameObject '{}'",
+            bool updatedAny = false;
+
+            const std::string& meshGuid = meshComp->GetMeshGuid();
+            if (!meshGuid.empty()) {
+                gm::Mesh* resolvedMesh = meshResolver(meshGuid);
+                if (resolvedMesh) {
+                    if (resolvedMesh != meshComp->GetMesh()) {
+                        meshComp->SetMesh(resolvedMesh, meshGuid);
+                        updatedAny = true;
+                    }
+                } else {
+                    meshComp->SetMesh(nullptr, std::string());
+                    gm::core::Logger::Warning(
+                        "[Game] StaticMeshComponent on '{}' references missing mesh GUID '{}'",
+                        gameObject->GetName(), meshGuid);
+                }
+            }
+
+            const std::string& shaderGuid = meshComp->GetShaderGuid();
+            if (!shaderGuid.empty()) {
+                gm::Shader* resolvedShader = shaderResolver(shaderGuid);
+                if (resolvedShader) {
+                    if (resolvedShader != meshComp->GetShader()) {
+                        meshComp->SetShader(resolvedShader, shaderGuid);
+                        resolvedShader->Use();
+                        resolvedShader->SetInt("uTex", 0);
+                        updatedAny = true;
+                    }
+                } else {
+                    meshComp->SetShader(nullptr, std::string());
+                    gm::core::Logger::Warning(
+                        "[Game] StaticMeshComponent on '{}' references missing shader GUID '{}'",
+                        gameObject->GetName(), shaderGuid);
+                }
+            }
+
+            const std::string& materialGuid = meshComp->GetMaterialGuid();
+            if (!materialGuid.empty()) {
+                auto resolvedMaterial = materialResolver(materialGuid);
+                if (resolvedMaterial) {
+                    auto currentMaterial = meshComp->GetMaterial();
+                    if (!currentMaterial || currentMaterial.get() != resolvedMaterial.get()) {
+                        meshComp->SetMaterial(std::move(resolvedMaterial), materialGuid);
+                        updatedAny = true;
+                    }
+                } else {
+                    meshComp->SetMaterial(nullptr, std::string());
+                    gm::core::Logger::Warning(
+                        "[Game] StaticMeshComponent on '{}' references missing material GUID '{}'",
+                        gameObject->GetName(), materialGuid);
+                }
+            }
+
+            if (updatedAny) {
+                gm::core::Logger::Info("[Game] Updated resources for StaticMeshComponent on GameObject '{}'",
                     gameObject->GetName());
             }
         }
     }
 }
 
-#if GM_DEBUG_TOOLS
 #if GM_DEBUG_TOOLS
 void Game::ApplyResourcesToTerrain() {
     if (!m_gameScene) {
@@ -868,6 +1023,36 @@ void Game::ApplyResourcesToTerrain() {
         });
     }
 
+    const auto& textureMap = m_resources.GetTextureMap();
+    const std::string& baseTextureGuid = terrain->GetBaseTextureGuid();
+    if (!baseTextureGuid.empty()) {
+        std::shared_ptr<gm::Texture> textureShared;
+        if (auto it = textureMap.find(baseTextureGuid); it != textureMap.end() && it->second) {
+            textureShared = it->second;
+        } else {
+            textureShared = m_resources.EnsureTextureAvailable(baseTextureGuid);
+        }
+        if (textureShared) {
+            terrain->BindBaseTexture(textureShared.get());
+        }
+    }
+
+    for (int layer = 0; layer < terrain->GetPaintLayerCount(); ++layer) {
+        const std::string& layerGuid = terrain->GetPaintTextureGuid(layer);
+        if (layerGuid.empty()) {
+            continue;
+        }
+        std::shared_ptr<gm::Texture> textureShared;
+        if (auto it = textureMap.find(layerGuid); it != textureMap.end() && it->second) {
+            textureShared = it->second;
+        } else {
+            textureShared = m_resources.EnsureTextureAvailable(layerGuid);
+        }
+        if (textureShared) {
+            terrain->BindPaintTexture(layer, textureShared.get());
+        }
+    }
+
     // Initialize terrain and mark mesh dirty to ensure it rebuilds
     terrainObject->Init();
     terrain->Init();
@@ -877,7 +1062,7 @@ void Game::ApplyResourcesToTerrain() {
         m_debugHud->RegisterTerrain(terrain.get());
     }
 }
-#endif
+
 #endif
 
 void Game::PerformQuickSave() {
@@ -904,6 +1089,20 @@ void Game::PerformQuickSave() {
                 data.terrainMinHeight = terrain->GetMinHeight();
                 data.terrainMaxHeight = terrain->GetMaxHeight();
                 data.terrainHeights = terrain->GetHeights();
+                data.terrainTextureTiling = terrain->GetTextureTiling();
+                data.terrainBaseTextureGuid = terrain->GetBaseTextureGuid();
+                data.terrainActivePaintLayer = terrain->GetActivePaintLayerIndex();
+                data.terrainPaintLayers.clear();
+                const int paintLayerCount = terrain->GetPaintLayerCount();
+                data.terrainPaintLayers.reserve(paintLayerCount);
+                for (int layer = 0; layer < paintLayerCount; ++layer) {
+                    gm::save::SaveGameData::TerrainPaintLayerData layerData;
+                    layerData.guid = terrain->GetPaintTextureGuid(layer);
+                    layerData.enabled = terrain->IsPaintLayerEnabled(layer);
+                    const auto& weights = terrain->GetPaintLayerWeights(layer);
+                    layerData.weights.assign(weights.begin(), weights.end());
+                    data.terrainPaintLayers.push_back(std::move(layerData));
+                }
             }
         }
     }
@@ -925,13 +1124,28 @@ void Game::PerformQuickSave() {
     };
     
     if (data.terrainResolution > 0 && !data.terrainHeights.empty()) {
-        saveJson["terrain"] = {
+        nlohmann::json terrainJson = {
             {"resolution", data.terrainResolution},
             {"size", data.terrainSize},
             {"minHeight", data.terrainMinHeight},
             {"maxHeight", data.terrainMaxHeight},
-            {"heights", data.terrainHeights}
+            {"heights", data.terrainHeights},
+            {"textureTiling", data.terrainTextureTiling},
+            {"baseTextureGuid", data.terrainBaseTextureGuid},
+            {"activePaintLayer", data.terrainActivePaintLayer}
         };
+
+        nlohmann::json paintLayers = nlohmann::json::array();
+        for (const auto& layer : data.terrainPaintLayers) {
+            nlohmann::json layerJson;
+            layerJson["guid"] = layer.guid;
+            layerJson["enabled"] = layer.enabled;
+            layerJson["weights"] = layer.weights;
+            paintLayers.push_back(std::move(layerJson));
+        }
+        terrainJson["paintLayers"] = std::move(paintLayers);
+
+        saveJson["terrain"] = std::move(terrainJson);
     }
     
     // Merge scene data with save data (scene data takes precedence for gameObjects)
@@ -1102,8 +1316,16 @@ void Game::PerformQuickLoad() {
                     if (!ok) {
                         gm::core::Logger::Warning("[Game] Failed to apply terrain data from save");
                     } else {
-                        // SetHeightData already marks mesh as dirty, but ensure it's marked
-                        terrain->MarkMeshDirty();
+                        terrain->SetTextureTiling(data.terrainTextureTiling);
+                        terrain->SetBaseTextureGuidFromSave(data.terrainBaseTextureGuid);
+
+                        const auto& layers = data.terrainPaintLayers;
+                        terrain->SetPaintLayerCount(std::max(1, static_cast<int>(layers.size())));
+                        for (std::size_t i = 0; i < layers.size() && i < static_cast<std::size_t>(gm::debug::EditableTerrainComponent::kMaxPaintLayers); ++i) {
+                            const auto& layer = layers[i];
+                            terrain->SetPaintLayerData(static_cast<int>(i), layer.guid, layer.enabled, layer.weights);
+                        }
+                        terrain->SetActivePaintLayerIndex(data.terrainActivePaintLayer);
                     }
                 }
             }

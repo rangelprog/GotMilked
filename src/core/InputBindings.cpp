@@ -27,6 +27,10 @@ void SetupDefaultBindings(InputManager& inputManager) {
     BindMouseButtonAction(inputManager, "MouseCapture", MouseButton::Right, InputTriggerType::OnPress);
     BindMouseButtonAction(inputManager, "MouseRelease", MouseButton::Right, InputTriggerType::OnRelease);
 
+#if GM_DEBUG_TOOLS
+    BindKeyboardAction(inputManager, "ToggleGrid", GLFW_KEY_G, InputTriggerType::OnPress);
+#endif
+
     // Modifier actions
     BindKeyboardAction(inputManager, "Sprint", GLFW_KEY_LEFT_SHIFT, InputTriggerType::WhilePressed);
     BindKeyboardAction(inputManager, "QuickSave", GLFW_KEY_F5, InputTriggerType::OnPress);

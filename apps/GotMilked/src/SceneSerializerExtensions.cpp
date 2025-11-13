@@ -12,6 +12,8 @@
 #include "gm/core/Logger.hpp"
 #include <nlohmann/json.hpp>
 #include <glm/vec3.hpp>
+#include <algorithm>
+#include <vector>
 
 namespace gm {
 namespace SceneSerializerExtensions {
@@ -50,6 +52,9 @@ void RegisterSerializers() {
             data["maxHeight"] = terrain->GetMaxHeight();
             data["editorWindowVisible"] = terrain->IsEditorWindowVisible();
             data["editingEnabled"] = terrain->IsEditingEnabled();
+            data["textureTiling"] = terrain->GetTextureTiling();
+            data["baseTextureGuid"] = terrain->GetBaseTextureGuid();
+            data["activePaintLayer"] = terrain->GetActivePaintLayerIndex();
             
             // Serialize height array
             const auto& heights = terrain->GetHeights();
@@ -57,6 +62,18 @@ void RegisterSerializers() {
             for (float height : heights) {
                 data["heights"].push_back(height);
             }
+
+            nlohmann::json paintLayers = nlohmann::json::array();
+            const int paintLayerCount = terrain->GetPaintLayerCount();
+            for (int i = 0; i < paintLayerCount; ++i) {
+                nlohmann::json layerJson;
+                layerJson["guid"] = terrain->GetPaintTextureGuid(i);
+                layerJson["enabled"] = terrain->IsPaintLayerEnabled(i);
+                const auto& weights = terrain->GetPaintLayerWeights(i);
+                layerJson["weights"] = weights;
+                paintLayers.push_back(std::move(layerJson));
+            }
+            data["paintLayers"] = paintLayers;
             
             return data;
         },
@@ -109,6 +126,37 @@ void RegisterSerializers() {
                 // Note: There's no public SetEditingEnabled, so we'll skip this for now
                 // The user can re-enable editing through the UI
             }
+
+            terrain->SetTextureTiling(data.value("textureTiling", terrain->GetTextureTiling()));
+
+            if (data.contains("baseTextureGuid") && data["baseTextureGuid"].is_string()) {
+                terrain->SetBaseTextureGuidFromSave(data["baseTextureGuid"].get<std::string>());
+            }
+
+            int activePaintLayer = data.value("activePaintLayer", 0);
+            if (data.contains("paintLayers") && data["paintLayers"].is_array()) {
+                const auto& layers = data["paintLayers"];
+                terrain->SetPaintLayerCount(std::max(1, static_cast<int>(layers.size())));
+                std::vector<float> weights;
+                for (std::size_t i = 0; i < layers.size() && i < gm::debug::EditableTerrainComponent::kMaxPaintLayers; ++i) {
+                    const auto& layerJson = layers[i];
+                    std::string guid = layerJson.value("guid", std::string());
+                    bool enabled = layerJson.value("enabled", true);
+                    weights.clear();
+                    if (layerJson.contains("weights") && layerJson["weights"].is_array()) {
+                        weights.reserve(layerJson["weights"].size());
+                        for (const auto& value : layerJson["weights"]) {
+                            if (value.is_number()) {
+                                weights.push_back(value.get<float>());
+                            }
+                        }
+                    }
+                    terrain->SetPaintLayerData(static_cast<int>(i), guid, enabled, weights);
+                }
+                terrain->SetActivePaintLayerIndex(activePaintLayer);
+            }
+
+            terrain->MarkMeshDirty();
             
             // Verify component was added to GameObject
             auto verify = obj->GetComponent<EditableTerrainComponent>();

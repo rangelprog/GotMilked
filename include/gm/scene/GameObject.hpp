@@ -25,12 +25,23 @@ private:
     Scene* m_scene = nullptr;
     mutable std::string m_lastKnownName;
     mutable bool m_hasNameSnapshot = false;
+    std::weak_ptr<GameObject> m_parent;
+    std::vector<std::weak_ptr<GameObject>> m_children;
 
     void UpdateComponentMap();  // Update map when components change
     void SetScene(Scene* scene) { m_scene = scene; }
     void ResetForReuse();
     void ValidateNameIntegrity() const;
+    void SetParentInternal(const std::shared_ptr<GameObject>& parent);
+    void ClearParentInternal();
+    void AddChildInternal(const std::shared_ptr<GameObject>& child);
+    void RemoveChildInternal(const std::shared_ptr<GameObject>& child);
+    void ClearChildrenInternal();
+    void PropagateTransformDirty() const;
+    Scene* GetSceneInternal() const { return m_scene; }
     friend class Scene;
+    friend class SceneSerializer;
+    friend class TransformComponent;
 
 public:
     GameObject() = default;
@@ -159,6 +170,14 @@ public:
     // Layers
     int GetLayer() const { return layer; }
     void SetLayer(int newLayer) { layer = newLayer; }
+
+    // Hierarchy
+    bool HasParent() const { return !m_parent.expired(); }
+    std::shared_ptr<GameObject> GetParent() const { return m_parent.lock(); }
+    std::vector<std::shared_ptr<GameObject>> GetChildren() const;
+    bool HasChildren() const;
+    void MarkChildrenTransformsDirty() const;
+    Scene* GetScene() const { return m_scene; }
 
     // Transform helper methods
     std::shared_ptr<TransformComponent> GetTransform() const;

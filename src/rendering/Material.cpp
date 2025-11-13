@@ -17,6 +17,9 @@ void Material::Apply(Shader& shader) const {
         m_cacheDirty = false;
     }
 
+    shader.SetFloat("uTextureTiling", 1.0f);
+    shader.SetInt("uUsePaint", 0);
+
     if (m_diffuseTexture) {
         shader.SetInt("uUseTex", 1);
         m_diffuseTexture->bind(0);

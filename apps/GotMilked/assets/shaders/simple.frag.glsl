@@ -2,10 +2,16 @@
 in vec3 vNormal;
 in vec3 vFragPos;
 in vec2 vUV;
+in vec4 vPaintWeights;
 
 out vec4 FragColor;
 
 uniform vec3 uViewPos;
+uniform float uTextureTiling;
+uniform int uUsePaint;
+uniform int uPaintLayerCount;
+uniform int uPaintLayerEnabled[4];
+uniform sampler2D uPaintLayers[4];
 
 // Material properties
 uniform sampler2D uTex;
@@ -88,11 +94,12 @@ vec3 CalculateLight(Light light, vec3 normal, vec3 fragPos, vec3 viewDir, vec3 a
 }
 
 void main() {
+    vec2 tiledUV = vUV * max(uTextureTiling, 0.0001);
     vec3 N = normalize(vNormal);
     vec3 V = normalize(uViewPos - vFragPos);
 
     if (uMaterial.useNormalTex == 1) {
-        vec3 tangentNormal = texture(uMaterial_normalTex, vUV).xyz * 2.0 - 1.0;
+        vec3 tangentNormal = texture(uMaterial_normalTex, tiledUV).xyz * 2.0 - 1.0;
 
         vec3 dp1 = dFdx(vFragPos);
         vec3 dp2 = dFdy(vFragPos);
@@ -114,31 +121,29 @@ void main() {
         N = normalize(TBN * tangentNormal);
     }
     
-    // Albedo from texture or solid color
-    vec3 albedo = (uUseTex == 1) ? texture(uTex, vUV).rgb : uSolidColor * vec3(1.0, 0.5, 0.5);
+    vec3 baseAlbedo = (uUseTex == 1) ? texture(uTex, tiledUV).rgb : uSolidColor * vec3(1.0, 0.5, 0.5);
+    vec3 blendedAlbedo = vec3(0.0);
+    float paintTotal = 0.0;
+    for (int i = 0; i < uPaintLayerCount && i < 4; ++i) {
+        float weight = clamp(vPaintWeights[i], 0.0, 1.0);
+        if (uPaintLayerEnabled[i] == 1 && weight > 0.0) {
+            vec3 paintAlbedo = texture(uPaintLayers[i], tiledUV).rgb;
+            blendedAlbedo += paintAlbedo * weight;
+            paintTotal += weight;
+        }
+    }
+    paintTotal = clamp(paintTotal, 0.0, 1.0);
+    vec3 albedo = baseAlbedo * (1.0 - paintTotal) + blendedAlbedo;
     
     // Material properties (with fallback)
-    vec3 materialDiffuse = uMaterial.diffuse;
+    vec3 materialDiffuse = albedo;
     vec3 materialSpecular = uMaterial.specular;
     float materialShininess = uMaterial.shininess;
     vec3 materialEmission = uMaterial.emission;
 
     if (uMaterial.useSpecularTex == 1) {
-        materialSpecular *= texture(uMaterial_specularTex, vUV).rgb;
-    }
-    
-    // Combine texture with material diffuse color
-    // If material diffuse is set, multiply texture by it; otherwise use texture directly
-    if (length(materialDiffuse) > 0.001) {
-        // Material diffuse color is set - multiply with texture
-        if (uUseTex == 1) {
-            materialDiffuse = albedo * materialDiffuse;
-        } else {
-            // No texture, use material diffuse directly
-            materialDiffuse = materialDiffuse;
-        }
-    } else {
-        // No material diffuse set, use albedo (texture or solid color)
+        materialSpecular *= texture(uMaterial_specularTex, tiledUV).rgb;
+    } else if (length(materialDiffuse) < 0.001) {
         materialDiffuse = albedo;
     }
     
@@ -157,7 +162,7 @@ void main() {
     
     // Add emission
     if (uMaterial.useEmissionTex == 1) {
-        materialEmission += texture(uMaterial_emissionTex, vUV).rgb;
+        materialEmission += texture(uMaterial_emissionTex, tiledUV).rgb;
     }
     lighting += materialEmission;
     

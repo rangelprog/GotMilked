@@ -29,6 +29,13 @@ void ResourceRegistry::RegisterMesh(const std::string& guid,
     m_meshes[guid] = path;
 }
 
+void ResourceRegistry::RegisterMaterial(const std::string& guid,
+                                        const MaterialData& material) {
+    if (guid.empty())
+        return;
+    m_materials[guid] = material;
+}
+
 std::optional<ResourceRegistry::ShaderPaths> ResourceRegistry::GetShaderPaths(const std::string& guid) const {
     auto it = m_shaders.find(guid);
     if (it != m_shaders.end()) {
@@ -53,6 +60,14 @@ std::optional<std::string> ResourceRegistry::GetMeshPath(const std::string& guid
     return std::nullopt;
 }
 
+std::optional<ResourceRegistry::MaterialData> ResourceRegistry::GetMaterialData(const std::string& guid) const {
+    auto it = m_materials.find(guid);
+    if (it != m_materials.end()) {
+        return it->second;
+    }
+    return std::nullopt;
+}
+
 void ResourceRegistry::UnregisterShader(const std::string& guid) {
     if (guid.empty())
         return;
@@ -71,10 +86,17 @@ void ResourceRegistry::UnregisterMesh(const std::string& guid) {
     m_meshes.erase(guid);
 }
 
+void ResourceRegistry::UnregisterMaterial(const std::string& guid) {
+    if (guid.empty())
+        return;
+    m_materials.erase(guid);
+}
+
 void ResourceRegistry::Clear() {
     m_shaders.clear();
     m_textures.clear();
     m_meshes.clear();
+    m_materials.clear();
 }
 
 } // namespace gm

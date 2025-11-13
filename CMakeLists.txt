@@ -188,6 +188,7 @@ add_library(GotMilkedEngine
     # Utils
     src/utils/ObjLoader.cpp
     src/utils/ResourceManager.cpp
+    src/utils/ResourceManifest.cpp
     src/utils/CoordinateDisplay.cpp
     src/utils/ImGuiManager.cpp
     src/utils/ResourceRegistry.cpp
@@ -210,10 +211,16 @@ add_library(GotMilkedEngine
     src/save/SaveManager.cpp
     src/save/SaveSnapshotHelpers.cpp
     src/tooling/Overlay.cpp
+
+    # Assets
+    src/assets/AssetCatalog.cpp
 )
 
 if(GM_ENABLE_DEBUG_TOOLS)
-    target_sources(GotMilkedEngine PRIVATE src/tooling/DebugConsole.cpp)
+    target_sources(GotMilkedEngine PRIVATE
+        src/tooling/DebugConsole.cpp
+        src/debug/GridRenderer.cpp
+    )
 endif()
 
 target_include_directories(GotMilkedEngine 
@@ -227,7 +234,9 @@ target_include_directories(GotMilkedEngine
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/prototypes
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/gameplay
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/save
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/assets
         ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/tooling
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/debug
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/src/core
@@ -238,7 +247,9 @@ target_include_directories(GotMilkedEngine
         ${CMAKE_CURRENT_SOURCE_DIR}/src/prototypes
         ${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay
         ${CMAKE_CURRENT_SOURCE_DIR}/src/save
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/assets
         ${CMAKE_CURRENT_SOURCE_DIR}/src/tooling
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/debug
 )
 target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm::glm imgui Jolt)
 target_link_libraries(GotMilkedEngine PUBLIC fmt::fmt)

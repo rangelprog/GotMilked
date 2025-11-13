@@ -4,6 +4,8 @@
 #include <string>
 #include <filesystem>
 #include <vector>
+#include <glm/mat4x4.hpp>
+#include <glm/mat4x4.hpp>
 struct GLFWwindow;
 
 namespace gm {
@@ -21,6 +23,7 @@ namespace gm::debug {
     class DebugConsole;
     class DebugMenu;
     class DebugHudController;
+    class GridRenderer;
     class EditableTerrainComponent;
 }
 #endif
@@ -70,10 +73,14 @@ private:
     std::unique_ptr<gm::debug::DebugMenu> m_debugMenu;
     std::unique_ptr<gm::debug::DebugConsole> m_debugConsole;
     std::unique_ptr<gm::debug::DebugHudController> m_debugHud;
+    std::unique_ptr<gm::debug::GridRenderer> m_gridRenderer;
 #endif
     std::shared_ptr<gm::scene::PrefabLibrary> m_prefabLibrary;
     bool m_overlayVisible = false;
     bool m_vsyncEnabled = true;  // Track VSync state
+#if GM_DEBUG_TOOLS
+    bool m_gridVisible = false;
+#endif
     
     void PerformQuickSave();
     void PerformQuickLoad();
