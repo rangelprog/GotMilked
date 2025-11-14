@@ -10,8 +10,13 @@
 #include "gm/scene/GameObject.hpp"
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/scene/StaticMeshComponent.hpp"
+#include "gm/scene/SkinnedMeshComponent.hpp"
+#include "gm/scene/AnimatorComponent.hpp"
 #include "gm/scene/LightComponent.hpp"
 #include "gm/physics/RigidBodyComponent.hpp"
+#include "gm/animation/AnimationClip.hpp"
+#include "gm/animation/AnimationPoseEvaluator.hpp"
+#include "gm/animation/Skeleton.hpp"
 #include "gm/core/Logger.hpp"
 #include "gm/assets/AssetCatalog.hpp"
 #include "gm/utils/ResourceManager.hpp"
@@ -26,20 +31,40 @@
 #include <ImGuizmo.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/euler_angles.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <unordered_map>
 #include <vector>
 #include <functional>
 #include <cctype>
 #include <fmt/format.h>
+#include <limits>
+#include <nlohmann/json.hpp>
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#define WIN32_LEAN_AND_MEAN
+#ifdef APIENTRY
+#undef APIENTRY
+#endif
+#include <windows.h>
+#endif
 
 namespace {
 ImVec2 operator-(const ImVec2& lhs, const ImVec2& rhs) {
     return ImVec2(lhs.x - rhs.x, lhs.y - rhs.y);
 }
+
+ImVec2 operator+(const ImVec2& lhs, const ImVec2& rhs) {
+    return ImVec2(lhs.x + rhs.x, lhs.y + rhs.y);
+}
+
 }
 
 namespace gm::debug {
@@ -228,6 +253,30 @@ void DebugMenu::RenderGameObjectOverlay() {
     ImGuiIO& io = ImGui::GetIO();
     const ImVec2 mousePos = io.MousePos;
 
+    const auto projectToScreen = [&](const glm::vec3& worldPos, ImVec2& outScreenPos) -> bool {
+        glm::vec4 clipPos = viewProj * glm::vec4(worldPos, 1.0f);
+        if (std::abs(clipPos.w) < 1e-6f) {
+            return false;
+        }
+
+        glm::vec3 ndc = glm::vec3(clipPos) / clipPos.w;
+        if (ndc.z < -1.0f || ndc.z > 1.0f ||
+            ndc.x < -1.0f || ndc.x > 1.0f ||
+            ndc.y < -1.0f || ndc.y > 1.0f) {
+            return false;
+        }
+
+        float screenX = (ndc.x + gotmilked::GameConstants::Rendering::NdcOffset) *
+                        gotmilked::GameConstants::Rendering::NdcToScreenScale *
+                        static_cast<float>(viewportWidth);
+        float screenY = (gotmilked::GameConstants::Rendering::NdcOffset - ndc.y) *
+                        gotmilked::GameConstants::Rendering::NdcToScreenScale *
+                        static_cast<float>(viewportHeight);
+
+        outScreenPos = ImVec2(viewport->Pos.x + screenX, viewport->Pos.y + screenY);
+        return true;
+    };
+
     for (const auto& gameObject : scene->GetAllGameObjects()) {
         if (!gameObject || !gameObject->IsActive() || gameObject->IsDestroyed()) {
             continue;
@@ -238,29 +287,10 @@ void DebugMenu::RenderGameObjectOverlay() {
             continue;
         }
 
-        glm::vec3 worldPos = transform->GetPosition();
-        glm::vec4 clipPos = viewProj * glm::vec4(worldPos, 1.0f);
-
-        if (std::abs(clipPos.w) < 1e-6f) {
+        ImVec2 screenPos{};
+        if (!projectToScreen(transform->GetPosition(), screenPos)) {
             continue;
         }
-
-        glm::vec3 ndc = glm::vec3(clipPos) / clipPos.w;
-
-        if (ndc.z < -1.0f || ndc.z > 1.0f ||
-            ndc.x < -1.0f || ndc.x > 1.0f ||
-            ndc.y < -1.0f || ndc.y > 1.0f) {
-            continue;
-        }
-
-        float screenX = (ndc.x + gotmilked::GameConstants::Rendering::NdcOffset) *
-                        gotmilked::GameConstants::Rendering::NdcToScreenScale *
-                        static_cast<float>(viewportWidth);
-        float screenY = (gotmilked::GameConstants::Rendering::NdcOffset - ndc.y) *
-                        gotmilked::GameConstants::Rendering::NdcToScreenScale *
-                        static_cast<float>(viewportHeight);
-
-        ImVec2 screenPos(viewport->Pos.x + screenX, viewport->Pos.y + screenY);
 
         bool isHovered = (io.MousePos.x >= viewport->Pos.x && io.MousePos.x <= viewport->Pos.x + viewport->Size.x &&
                           io.MousePos.y >= viewport->Pos.y && io.MousePos.y <= viewport->Pos.y + viewport->Size.y &&
@@ -295,7 +325,103 @@ void DebugMenu::RenderGameObjectOverlay() {
                                     IM_COL32(0, 0, 0, 180), 3.0f);
             drawList->AddText(textPos, IM_COL32(255, 255, 255, 255), name.c_str());
         }
+    }
 
+    auto drawBonesForObject = [&](const std::shared_ptr<gm::GameObject>& target) {
+        if (!target) {
+            return;
+        }
+
+        auto animator = target->GetComponent<gm::scene::AnimatorComponent>();
+        auto transform = target->GetTransform();
+        if (!animator || !transform) {
+            return;
+        }
+
+        std::vector<glm::mat4> boneMatrices;
+        if (!animator->GetBoneModelMatrices(boneMatrices)) {
+            return;
+        }
+
+        auto skeleton = animator->GetSkeletonAsset();
+        if (!skeleton || boneMatrices.size() != skeleton->bones.size()) {
+            return;
+        }
+
+        const glm::mat4 modelMatrix = transform->GetMatrix();
+        std::vector<ImVec2> screenPositions(boneMatrices.size());
+        std::vector<uint8_t> visible(boneMatrices.size(), 0);
+
+        for (std::size_t i = 0; i < boneMatrices.size(); ++i) {
+            glm::mat4 worldMatrix = modelMatrix * boneMatrices[i];
+            glm::vec3 worldPos(worldMatrix[3]);
+            visible[i] = projectToScreen(worldPos, screenPositions[i]) ? 1 : 0;
+        }
+
+        const ImU32 lineColor = IM_COL32(0, 210, 255, 220);
+        for (std::size_t i = 0; i < boneMatrices.size(); ++i) {
+            if (!visible[i]) {
+                continue;
+            }
+
+            const auto& bone = skeleton->bones[i];
+            if (bone.parentIndex >= 0) {
+                const std::size_t parentIndex = static_cast<std::size_t>(bone.parentIndex);
+                if (parentIndex < visible.size() && visible[parentIndex]) {
+                    drawList->AddLine(screenPositions[parentIndex], screenPositions[i], lineColor, m_boneOverlayLineThickness);
+                }
+            }
+
+            drawList->AddCircleFilled(screenPositions[i], m_boneOverlayNodeRadius, lineColor, 10);
+            if (m_showBoneNames) {
+                const std::string& boneName = bone.name.empty() ? std::to_string(i) : bone.name;
+                drawList->AddText(ImVec2(screenPositions[i].x + 4.0f, screenPositions[i].y),
+                                  IM_COL32(240, 240, 240, 230), boneName.c_str());
+            }
+        }
+    };
+
+    if (m_enableBoneOverlay) {
+        if (m_boneOverlayAllObjects) {
+            for (const auto& object : scene->GetAllGameObjects()) {
+                drawBonesForObject(object);
+            }
+        } else if (selected) {
+            drawBonesForObject(selected);
+        }
+    }
+
+    if (m_showAnimationDebugOverlay && selected) {
+        auto animator = selected->GetComponent<gm::scene::AnimatorComponent>();
+        if (animator) {
+            auto snapshots = animator->GetLayerSnapshots();
+            std::string panelText = fmt::format("Animator: {}\nSkeleton: {}\n",
+                                                selected->GetName(),
+                                                animator->SkeletonGuid().empty() ? "<none>" : animator->SkeletonGuid());
+            if (snapshots.empty()) {
+                panelText += "No layers\n";
+            } else {
+                for (const auto& layer : snapshots) {
+                    panelText += fmt::format("{} | clip={} | w={:.2f} | t={:.2f}s | {}\n",
+                                             layer.slot,
+                                             layer.clipGuid.empty() ? "<none>" : layer.clipGuid,
+                                             layer.weight,
+                                             layer.timeSeconds,
+                                             layer.playing ? "Playing" : "Paused");
+                }
+            }
+
+            ImVec2 panelPos(viewport->Pos.x + 20.0f, viewport->Pos.y + 20.0f);
+            ImVec2 textSize = ImGui::CalcTextSize(panelText.c_str());
+            ImVec2 padding(8.0f, 6.0f);
+            drawList->AddRectFilled(panelPos - padding,
+                                    panelPos + textSize + padding,
+                                    IM_COL32(0, 0, 0, 170), 6.0f);
+            drawList->AddRect(panelPos - padding,
+                              panelPos + textSize + padding,
+                              IM_COL32(0, 200, 255, 220), 6.0f);
+            drawList->AddText(panelPos, IM_COL32(230, 230, 230, 255), panelText.c_str());
+        }
     }
 
     ImGui::End();
@@ -412,6 +538,7 @@ void DebugMenu::RenderSceneHierarchyNode(const std::shared_ptr<gm::GameObject>& 
         ImGui::EndDragDropTarget();
     }
 
+    bool deletedFromContext = false;
     if (ImGui::BeginPopupContextItem()) {
         if (ImGui::MenuItem("Unparent", nullptr, false, gameObject->HasParent())) {
             if (auto scenePtr = m_scene.lock()) {
@@ -421,7 +548,17 @@ void DebugMenu::RenderSceneHierarchyNode(const std::shared_ptr<gm::GameObject>& 
         if (ImGui::MenuItem("Focus Camera")) {
             FocusCameraOnGameObject(gameObject);
         }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Delete")) {
+            DeleteGameObject(gameObject);
+            deletedFromContext = true;
+        }
         ImGui::EndPopup();
+    }
+
+    if (deletedFromContext) {
+        ImGui::PopID();
+        return;
     }
 
     if (open && !(flags & ImGuiTreeNodeFlags_NoTreePushOnOpen)) {
@@ -492,6 +629,7 @@ void DebugMenu::RenderSceneHierarchyFiltered(const std::vector<std::shared_ptr<g
             ImGui::EndDragDropTarget();
         }
 
+        bool deletedFromContext = false;
         if (ImGui::BeginPopupContextItem()) {
             if (ImGui::MenuItem("Unparent", nullptr, false, gameObject->HasParent())) {
                 if (scene) {
@@ -501,7 +639,17 @@ void DebugMenu::RenderSceneHierarchyFiltered(const std::vector<std::shared_ptr<g
             if (ImGui::MenuItem("Focus Camera")) {
                 FocusCameraOnGameObject(gameObject);
             }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Delete")) {
+                DeleteGameObject(gameObject);
+                deletedFromContext = true;
+            }
             ImGui::EndPopup();
+        }
+
+        if (deletedFromContext) {
+            ImGui::PopID();
+            continue;
         }
 
         ImGui::PopID();
@@ -547,6 +695,24 @@ std::shared_ptr<gm::GameObject> DebugMenu::ResolvePayloadGameObject(const ImGuiP
     return scene->FindGameObjectByPointer(rawPtr);
 }
 
+void DebugMenu::DeleteGameObject(const std::shared_ptr<gm::GameObject>& gameObject) {
+    if (!gameObject) {
+        return;
+    }
+
+    auto scene = m_scene.lock();
+    if (!scene) {
+        return;
+    }
+
+    scene->DestroyGameObject(gameObject);
+
+    auto selected = m_selectedGameObject.lock();
+    if (!selected || selected == gameObject || selected->IsDestroyed()) {
+        ClearSelection();
+    }
+}
+
 void DebugMenu::RenderInspector() {
     auto scene = m_scene.lock();
     auto selected = m_selectedGameObject.lock();
@@ -588,6 +754,12 @@ void DebugMenu::RenderInspector() {
         }
     } else {
         ImGui::TextUnformatted("Parent: <None>");
+    }
+
+    ImGui::Separator();
+    if (ImGui::Button("Delete GameObject")) {
+        DeleteGameObject(selected);
+        return;
     }
 
     ImGui::Separator();
@@ -646,6 +818,35 @@ void DebugMenu::RenderInspector() {
         }
     }
 
+    auto buildSortedGuidList = [](const auto& map) {
+        std::vector<std::string> guids;
+        guids.reserve(map.size());
+        for (const auto& entry : map) {
+            guids.push_back(entry.first);
+        }
+        std::sort(guids.begin(), guids.end());
+        return guids;
+    };
+
+    auto drawGuidCombo = [](const char* label,
+                            const std::vector<std::string>& guids,
+                            const std::string& currentGuid,
+                            const std::function<void(const std::string&)>& onSelect) {
+        const char* preview = currentGuid.empty() ? "None" : currentGuid.c_str();
+        if (ImGui::BeginCombo(label, preview)) {
+            for (const auto& guid : guids) {
+                bool selected = (guid == currentGuid);
+                if (ImGui::Selectable(guid.c_str(), selected)) {
+                    onSelect(guid);
+                }
+                if (selected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+    };
+
     auto components = selected->GetComponents();
     int componentIndex = 0;
     for (const auto& component : components) {
@@ -675,39 +876,12 @@ void DebugMenu::RenderInspector() {
                     ImGui::Separator();
                     ImGui::TextUnformatted("Assign Resources");
 
-                    auto buildSortedList = [](const auto& map) {
-                        std::vector<std::string> guids;
-                        guids.reserve(map.size());
-                        for (const auto& [guid, _] : map) {
-                            guids.push_back(guid);
-                        }
-                        std::sort(guids.begin(), guids.end());
-                        return guids;
-                    };
-
-                    const auto meshGuids = buildSortedList(m_gameResources->GetMeshMap());
-                    const auto shaderGuids = buildSortedList(m_gameResources->GetShaderMap());
-                    const auto materialGuids = buildSortedList(m_gameResources->GetMaterialMap());
-
-                    const auto drawCombo = [](const char* label, const std::vector<std::string>& guids, const std::string& currentGuid,
-                                              const std::function<void(const std::string&)>& onSelect) {
-                        const char* preview = currentGuid.empty() ? "None" : currentGuid.c_str();
-                        if (ImGui::BeginCombo(label, preview)) {
-                            for (const auto& guid : guids) {
-                                bool selected = (guid == currentGuid);
-                                if (ImGui::Selectable(guid.c_str(), selected)) {
-                                    onSelect(guid);
-                                }
-                                if (selected) {
-                                    ImGui::SetItemDefaultFocus();
-                                }
-                            }
-                            ImGui::EndCombo();
-                        }
-                    };
+                    const auto meshGuids = buildSortedGuidList(m_gameResources->GetMeshMap());
+                    const auto shaderGuids = buildSortedGuidList(m_gameResources->GetShaderMap());
+                    const auto materialGuids = buildSortedGuidList(m_gameResources->GetMaterialMap());
 
                     if (!meshGuids.empty()) {
-                        drawCombo("Mesh Asset", meshGuids, meshComp->GetMeshGuid(), [this, &meshComp](const std::string& guid) {
+                        drawGuidCombo("Mesh Asset", meshGuids, meshComp->GetMeshGuid(), [this, &meshComp](const std::string& guid) {
                             if (auto* mesh = m_gameResources->GetMesh(guid)) {
                                 meshComp->SetMesh(mesh, guid);
                             } else {
@@ -723,7 +897,7 @@ void DebugMenu::RenderInspector() {
                     }
 
                     if (!shaderGuids.empty()) {
-                        drawCombo("Shader Asset", shaderGuids, meshComp->GetShaderGuid(), [this, &meshComp](const std::string& guid) {
+                        drawGuidCombo("Shader Asset", shaderGuids, meshComp->GetShaderGuid(), [this, &meshComp](const std::string& guid) {
                             if (auto* shader = m_gameResources->GetShader(guid)) {
                                 meshComp->SetShader(shader, guid);
                                 shader->Use();
@@ -742,7 +916,7 @@ void DebugMenu::RenderInspector() {
                     }
 
                     if (!materialGuids.empty()) {
-                        drawCombo("Material Asset", materialGuids, meshComp->GetMaterialGuid(), [this, &meshComp](const std::string& guid) {
+                        drawGuidCombo("Material Asset", materialGuids, meshComp->GetMaterialGuid(), [this, &meshComp](const std::string& guid) {
                             auto material = m_gameResources->GetMaterial(guid);
                             if (material) {
                                 meshComp->SetMaterial(std::move(material), guid);
@@ -755,6 +929,144 @@ void DebugMenu::RenderInspector() {
                         }
                     }
                 }
+            } else if (auto skinned = std::dynamic_pointer_cast<gm::scene::SkinnedMeshComponent>(component)) {
+                ImGui::Text("Skinned Mesh GUID: %s", skinned->MeshGuid().empty() ? "None" : skinned->MeshGuid().c_str());
+                ImGui::Text("Shader GUID: %s", skinned->ShaderGuid().empty() ? "None" : skinned->ShaderGuid().c_str());
+                ImGui::Text("Material GUID: %s", skinned->MaterialGuid().empty() ? "None" : skinned->MaterialGuid().c_str());
+                ImGui::Text("Texture GUID: %s", skinned->TextureGuid().empty() ? "None" : skinned->TextureGuid().c_str());
+                ImGui::Text("Has Mesh: %s", skinned->Mesh() ? "Yes" : "No");
+                ImGui::Text("Has Shader: %s", skinned->GetShader() ? "Yes" : "No");
+                ImGui::Text("Has Material: %s", skinned->GetMaterial() ? "Yes" : "No");
+                ImGui::Text("Has Texture: %s", skinned->GetTexture() ? "Yes" : "No");
+
+                if (ImGui::Button("Open Animation Preview##SkinnedMesh")) {
+                    m_showAnimationDebugger = true;
+                }
+                ImGui::SameLine();
+                ImGui::Checkbox("Bone Overlay##SkinnedMesh", &m_enableBoneOverlay);
+
+                if (m_gameResources) {
+                    ImGui::Separator();
+                    ImGui::TextUnformatted("Assign Resources");
+
+                    const auto meshGuids = buildSortedGuidList(m_gameResources->GetSkinnedMeshSources());
+                    const auto shaderGuids = buildSortedGuidList(m_gameResources->GetShaderMap());
+                    const auto materialGuids = buildSortedGuidList(m_gameResources->GetMaterialMap());
+                    const auto textureGuids = buildSortedGuidList(m_gameResources->GetTextureMap());
+
+                    if (!meshGuids.empty()) {
+                        drawGuidCombo("Skinned Mesh Asset", meshGuids, skinned->MeshGuid(), [this, &skinned](const std::string& guid) {
+                            if (auto path = m_gameResources->GetSkinnedMeshPath(guid)) {
+                                try {
+                                    gm::ResourceManager::SkinnedMeshDescriptor desc{guid, *path};
+                                    auto handle = gm::ResourceManager::LoadSkinnedMesh(desc);
+                                    skinned->SetMesh(std::move(handle));
+                                } catch (const std::exception& ex) {
+                                    gm::core::Logger::Error("[DebugMenu] Failed to load skinned mesh '{}': {}", guid, ex.what());
+                                }
+                            } else {
+                                gm::core::Logger::Warning("[DebugMenu] Skinned mesh '{}' has no registered asset path", guid);
+                            }
+                        });
+                        if (ImGui::Button("Clear Skinned Mesh##Skinned")) {
+                            skinned->SetMesh(std::shared_ptr<gm::animation::SkinnedMeshAsset>{}, "");
+                        }
+                        if (auto path = m_gameResources->GetSkinnedMeshPath(skinned->MeshGuid())) {
+                            ImGui::TextWrapped("Path: %s", path->c_str());
+                        }
+                    }
+
+                    if (!shaderGuids.empty()) {
+                        drawGuidCombo("Shader Asset##Skinned", shaderGuids, skinned->ShaderGuid(), [this, &skinned](const std::string& guid) {
+                            if (auto* shader = m_gameResources->GetShader(guid)) {
+                                skinned->SetShader(shader, guid);
+                                shader->Use();
+                                shader->SetInt("uTex", 0);
+                            } else {
+                                gm::core::Logger::Warning("[DebugMenu] Shader '{}' not available in GameResources", guid);
+                            }
+                        });
+                        if (ImGui::Button("Clear Shader##Skinned")) {
+                            skinned->SetShader(nullptr, "");
+                        }
+                    }
+
+                    if (!materialGuids.empty()) {
+                        drawGuidCombo("Material Asset##Skinned", materialGuids, skinned->MaterialGuid(), [this, &skinned](const std::string& guid) {
+                            auto material = m_gameResources->GetMaterial(guid);
+                            if (material) {
+                                skinned->SetMaterial(std::move(material), guid);
+                            } else {
+                                gm::core::Logger::Warning("[DebugMenu] Material '{}' not available in GameResources", guid);
+                            }
+                        });
+                        if (ImGui::Button("Clear Material##Skinned")) {
+                            skinned->SetMaterial(nullptr, "");
+                        }
+                    }
+
+                    if (!textureGuids.empty()) {
+                        drawGuidCombo("Texture Asset##Skinned", textureGuids, skinned->TextureGuid(), [this, &skinned](const std::string& guid) {
+                            auto texture = m_gameResources->EnsureTextureAvailable(guid);
+                            if (texture) {
+                                skinned->SetTexture(texture.get(), guid);
+                            } else {
+                                gm::core::Logger::Warning("[DebugMenu] Texture '{}' not available in GameResources", guid);
+                            }
+                        });
+                        if (ImGui::Button("Clear Texture##Skinned")) {
+                            skinned->SetTexture(static_cast<gm::Texture*>(nullptr), "");
+                        }
+                    }
+
+                    if (const auto* animset = m_gameResources->GetAnimsetRecordForSkinnedMesh(skinned->MeshGuid())) {
+                        ImGui::Separator();
+                        ImGui::TextUnformatted("GLB Import");
+                        ImGui::TextWrapped("Source: %s", animset->sourceGlb.c_str());
+                        if (ImGui::Button("Re-import GLB##Skinned")) {
+                            TriggerGlbReimport(skinned->MeshGuid());
+                        }
+                    }
+                }
+            } else if (auto animatorComp = std::dynamic_pointer_cast<gm::scene::AnimatorComponent>(component)) {
+                const char* skeletonGuid = animatorComp->SkeletonGuid().empty() ? "None" : animatorComp->SkeletonGuid().c_str();
+                ImGui::Text("Skeleton GUID: %s", skeletonGuid);
+                auto skeletonAsset = animatorComp->GetSkeletonAsset();
+                ImGui::Text("Bones: %zu", skeletonAsset ? skeletonAsset->bones.size() : 0);
+
+                if (ImGui::Button("Animation Preview##AnimatorInspector")) {
+                    m_showAnimationDebugger = true;
+                }
+                ImGui::SameLine();
+                ImGui::Checkbox("Bone Overlay##AnimatorInspector", &m_enableBoneOverlay);
+
+                EnsureAnimationAssetCache();
+                if (!m_animationSkeletonAssets.empty()) {
+                    const char* preview = skeletonGuid;
+                    if (ImGui::BeginCombo("Assign Skeleton", preview)) {
+                        for (const auto& entry : m_animationSkeletonAssets) {
+                            bool selectedSkeleton = (animatorComp->SkeletonGuid() == entry.displayName);
+                            if (ImGui::Selectable(entry.displayName.c_str(), selectedSkeleton)) {
+                                AssignSkeletonFromAsset(*animatorComp, entry);
+                            }
+                            if (selectedSkeleton) {
+                                ImGui::SetItemDefaultFocus();
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+                } else {
+                    ImGui::TextUnformatted("No skeleton assets detected.");
+                }
+
+                if (ImGui::Button("Refresh Animation Assets##Animator")) {
+                    m_animationAssetsDirty = true;
+                    EnsureAnimationAssetCache();
+                }
+
+                ImGui::Separator();
+                ImGui::TextUnformatted("Layers");
+                DrawAnimatorLayerEditor(animatorComp);
             } else if (auto rigidBody = std::dynamic_pointer_cast<gm::physics::RigidBodyComponent>(component)) {
                 const char* bodyTypeNames[] = { "Static", "Dynamic" };
                 int bodyType = static_cast<int>(rigidBody->GetBodyType());
@@ -1173,6 +1485,10 @@ void DebugMenu::RenderPrefabBrowser() {
 
     if (!m_pendingPrefabToSpawn.empty()) {
         ImGui::Separator();
+        if (auto* prefab = m_prefabLibrary->GetPrefab(m_pendingPrefabToSpawn)) {
+            DrawPrefabDetails(*prefab);
+            ImGui::Separator();
+        }
         if (ImGui::Button("Spawn Prefab")) {
             auto scene = m_scene.lock();
             if (scene) {
@@ -1193,6 +1509,9 @@ void DebugMenu::RenderPrefabBrowser() {
                     EnsureSelectionWindowsVisible();
                     FocusCameraOnGameObject(selectedObject);
                     gm::core::Logger::Info("[DebugMenu] Spawned prefab '{}'", m_pendingPrefabToSpawn);
+                    if (m_applyResourcesCallback) {
+                        m_applyResourcesCallback();
+                    }
                 }
             }
         }
@@ -1703,6 +2022,898 @@ void DebugMenu::RenderTransformGizmo() {
         transform->SetScale(scale);
         scene->MarkActiveListsDirty();
     }
+}
+
+void DebugMenu::RenderAnimationDebugger() {
+    if (!ImGui::Begin("Animation Preview", &m_showAnimationDebugger)) {
+        ImGui::End();
+        return;
+    }
+
+    if (!m_gameResources) {
+        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Game resources unavailable.");
+        ImGui::End();
+        return;
+    }
+
+    if (ImGui::Button("Refresh Asset List")) {
+        m_animationAssetsDirty = true;
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Bone Overlay", &m_enableBoneOverlay);
+    ImGui::SameLine();
+    ImGui::Checkbox("Animation HUD", &m_showAnimationDebugOverlay);
+
+    if (ImGui::CollapsingHeader("Stress Tools", ImGuiTreeNodeFlags_DefaultOpen)) {
+        static int herdColumns = 8;
+        static int herdRows = 6;
+        static float herdSpacing = 2.5f;
+        static float herdOriginY = 0.0f;
+
+        ImGui::SliderInt("Columns", &herdColumns, 1, 64);
+        ImGui::SliderInt("Rows", &herdRows, 1, 64);
+        ImGui::SliderFloat("Spacing", &herdSpacing, 0.5f, 10.0f, "%.1f");
+        ImGui::SliderFloat("Ground Offset Y", &herdOriginY, -2.0f, 2.0f, "%.2f");
+
+        if (ImGui::Button("Spawn Cow Herd")) {
+            const float extentX = (std::max(herdColumns - 1, 0) * herdSpacing) * 0.5f;
+            const float extentZ = (std::max(herdRows - 1, 0) * herdSpacing) * 0.5f;
+            glm::vec3 origin(-extentX, herdOriginY, -extentZ);
+            SpawnCowHerd(herdColumns, herdRows, herdSpacing, origin);
+        }
+        ImGui::SameLine();
+        ImGui::TextUnformatted("Instantiates the 'Cow' prefab in a grid.");
+    }
+
+    ImGui::InputTextWithHint("Filter", "substring match", m_animationFilterBuffer.data(), m_animationFilterBuffer.size());
+
+    EnsureAnimationAssetCache();
+
+    std::string filterLower(m_animationFilterBuffer.data());
+    std::transform(filterLower.begin(), filterLower.end(), filterLower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    auto matchesFilter = [&](const std::string& label) {
+        if (filterLower.empty()) {
+            return true;
+        }
+        std::string lowered = label;
+        std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return lowered.find(filterLower) != std::string::npos;
+    };
+
+    ImVec2 tableAvail = ImGui::GetContentRegionAvail();
+    float skeletonColumnWidth = tableAvail.x * 0.45f;
+    skeletonColumnWidth = std::clamp(skeletonColumnWidth, 200.0f, tableAvail.x - 200.0f);
+
+    if (ImGui::BeginChild("SkeletonColumn", ImVec2(skeletonColumnWidth, 0), false, ImGuiWindowFlags_NoScrollbar)) {
+        ImGui::Text("Skeleton Assets (%zu)", m_animationSkeletonAssets.size());
+        ImGui::Separator();
+        ImGui::BeginChild("SkeletonAssetList", ImVec2(0, 220), true, ImGuiWindowFlags_HorizontalScrollbar);
+        for (const auto& entry : m_animationSkeletonAssets) {
+            if (!matchesFilter(entry.displayName)) {
+                continue;
+            }
+            bool selectedEntry = (m_selectedSkeletonAsset == entry.displayName);
+            if (ImGui::Selectable(entry.displayName.c_str(), selectedEntry)) {
+                if (LoadPreviewSkeleton(entry)) {
+                    m_selectedSkeletonAsset = entry.displayName;
+                }
+            }
+        }
+        ImGui::EndChild();
+
+        if (m_previewSkeleton) {
+            ImGui::Separator();
+            ImGui::Text("Bone Count: %zu", m_previewSkeleton->bones.size());
+            const bool skeletonHierarchyOpen = ImGui::BeginChild("SkeletonHierarchy", ImVec2(0, 200), true);
+            if (skeletonHierarchyOpen) {
+                const std::size_t boneCount = m_previewSkeleton->bones.size();
+                std::vector<std::vector<int>> children(boneCount);
+                for (std::size_t i = 0; i < boneCount; ++i) {
+                    int parent = m_previewSkeleton->bones[i].parentIndex;
+                    if (parent >= 0 && static_cast<std::size_t>(parent) < boneCount) {
+                        children[static_cast<std::size_t>(parent)].push_back(static_cast<int>(i));
+                    }
+                }
+                std::function<void(int)> drawNode = [&](int index) {
+                    const auto& bone = m_previewSkeleton->bones[index];
+                    std::string label = fmt::format("{} ({})",
+                                                    bone.name.empty() ? fmt::format("Bone {}", index) : bone.name,
+                                                    index);
+                    if (ImGui::TreeNode(label.c_str())) {
+                        ImGui::Text("Parent: %d", bone.parentIndex);
+                        if (m_previewClip && index < static_cast<int>(m_previewPose.Size())) {
+                            const auto& transform = m_previewPose.LocalTransform(static_cast<std::size_t>(index));
+                            ImGui::Text("Translation: (%.2f, %.2f, %.2f)",
+                                        transform.translation.x, transform.translation.y, transform.translation.z);
+                            ImGui::Text("Scale: (%.2f, %.2f, %.2f)",
+                                        transform.scale.x, transform.scale.y, transform.scale.z);
+                        }
+                        for (int child : children[static_cast<std::size_t>(index)]) {
+                            drawNode(child);
+                        }
+                        ImGui::TreePop();
+                    }
+                };
+                for (std::size_t i = 0; i < boneCount; ++i) {
+                    if (m_previewSkeleton->bones[i].parentIndex < 0) {
+                        drawNode(static_cast<int>(i));
+                    }
+                }
+                if (boneCount == 0) {
+                    ImGui::TextDisabled("No bones in skeleton.");
+                }
+            }
+            ImGui::EndChild();
+        } else {
+            ImGui::Separator();
+            ImGui::TextDisabled("Select a skeleton to view hierarchy.");
+        }
+        ImGui::EndChild();
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::BeginChild("ClipColumn", ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar)) {
+        ImGui::Text("Clip Assets (%zu)", m_animationClipAssets.size());
+        ImGui::Separator();
+        ImGui::BeginChild("ClipAssetList", ImVec2(0, 220), true, ImGuiWindowFlags_HorizontalScrollbar);
+        for (const auto& entry : m_animationClipAssets) {
+            if (!matchesFilter(entry.displayName)) {
+                continue;
+            }
+            bool selectedEntry = (m_selectedClipAsset == entry.displayName);
+            if (ImGui::Selectable(entry.displayName.c_str(), selectedEntry)) {
+                if (LoadPreviewClip(entry)) {
+                    m_selectedClipAsset = entry.displayName;
+                }
+            }
+        }
+        ImGui::EndChild();
+
+        if (m_previewClip) {
+            const double clipDurationSec = (m_previewClip->ticksPerSecond > 0.0)
+                                               ? (m_previewClip->duration / m_previewClip->ticksPerSecond)
+                                               : m_previewClip->duration;
+            ImGui::Separator();
+            ImGui::Text("Duration: %.3fs  Channels: %zu", clipDurationSec, m_previewClip->channels.size());
+            float previewTime = static_cast<float>(m_previewTimeSeconds);
+            if (clipDurationSec > 0.0) {
+                if (ImGui::SliderFloat("Preview Time", &previewTime, 0.0f, static_cast<float>(clipDurationSec))) {
+                    m_previewTimeSeconds = previewTime;
+                    RefreshAnimationPreviewPose();
+                }
+            } else {
+                ImGui::TextDisabled("Clip has zero duration.");
+            }
+
+            if (ImGui::Checkbox("Loop Preview", &m_previewLoop)) {
+                // no-op, flag stored
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(m_previewPlaying ? "Pause" : "Play")) {
+                m_previewPlaying = !m_previewPlaying;
+            }
+
+            if (m_previewPlaying && clipDurationSec > 0.0) {
+                m_previewTimeSeconds += ImGui::GetIO().DeltaTime;
+                if (m_previewLoop) {
+                    m_previewTimeSeconds = std::fmod(m_previewTimeSeconds, clipDurationSec);
+                } else {
+                    m_previewTimeSeconds = std::min(m_previewTimeSeconds, clipDurationSec);
+                }
+                RefreshAnimationPreviewPose();
+            }
+
+            if (m_previewSkeleton) {
+                ImGui::Separator();
+                ImGui::TextUnformatted("Skeleton Preview");
+                ImVec2 canvasSize = ImVec2(ImGui::GetContentRegionAvail().x, 220.0f);
+                if (canvasSize.x < 50.0f) canvasSize.x = 50.0f;
+                if (canvasSize.y < 120.0f) canvasSize.y = 120.0f;
+                ImGui::BeginChild(
+                    "SkeletonPreviewArea", canvasSize, false, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+                ImGui::InvisibleButton("SkeletonPreviewCanvas", canvasSize, ImGuiButtonFlags_MouseButtonLeft);
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetItemUsingMouseWheel();
+                }
+                DrawPreviewSkeleton(canvasSize);
+                ImGui::EndChild();
+
+                const bool previewBonesOpen = ImGui::BeginChild("PreviewBonesList", ImVec2(0, 160), true);
+                if (previewBonesOpen) {
+                    ImGui::Columns(4, "PreviewBoneColumns");
+                    ImGui::TextUnformatted("Bone");
+                    ImGui::NextColumn();
+                    ImGui::TextUnformatted("Translation");
+                    ImGui::NextColumn();
+                    ImGui::TextUnformatted("Rotation");
+                    ImGui::NextColumn();
+                    ImGui::TextUnformatted("Scale");
+                    ImGui::NextColumn();
+                    ImGui::Separator();
+
+                    const std::size_t boneCount = std::min<std::size_t>(m_previewSkeleton->bones.size(), 32);
+                    for (std::size_t i = 0; i < boneCount; ++i) {
+                        const auto& bone = m_previewSkeleton->bones[i];
+                        const auto& transform = m_previewPose.LocalTransform(i);
+                        ImGui::Text("%s (%zu)", bone.name.empty() ? "<unnamed>" : bone.name.c_str(), i);
+                        ImGui::NextColumn();
+                        ImGui::Text("%.2f %.2f %.2f",
+                                    transform.translation.x, transform.translation.y, transform.translation.z);
+                        ImGui::NextColumn();
+                        ImGui::Text("%.2f %.2f %.2f %.2f",
+                                    transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w);
+                        ImGui::NextColumn();
+                        ImGui::Text("%.2f %.2f %.2f",
+                                    transform.scale.x, transform.scale.y, transform.scale.z);
+                        ImGui::NextColumn();
+                    }
+                    if (m_previewSkeleton->bones.size() > boneCount) {
+                        ImGui::TextDisabled("... (%zu more)", m_previewSkeleton->bones.size() - boneCount);
+                    }
+
+                    ImGui::Columns(1);
+                }
+                ImGui::EndChild();
+            } else {
+                ImGui::TextDisabled("Select a skeleton to evaluate clip pose.");
+            }
+        } else {
+            ImGui::Separator();
+            ImGui::TextDisabled("Select an animation clip to preview.");
+        }
+        ImGui::EndChild();
+    }
+
+    ImGui::Separator();
+    ImGui::TextUnformatted("Overlay Settings");
+    ImGui::Checkbox("Show Bone Names", &m_showBoneNames);
+    ImGui::Checkbox("Draw Bones On All Objects", &m_boneOverlayAllObjects);
+    ImGui::SliderFloat("Bone Marker Radius", &m_boneOverlayNodeRadius, 2.0f, 12.0f);
+    ImGui::SliderFloat("Bone Line Thickness", &m_boneOverlayLineThickness, 1.0f, 6.0f);
+
+    ImGui::End();
+}
+
+void DebugMenu::DrawAnimatorLayerEditor(const std::shared_ptr<gm::scene::AnimatorComponent>& animator) {
+    if (!animator) {
+        ImGui::TextDisabled("Animator not available.");
+        return;
+    }
+
+    auto snapshots = animator->GetLayerSnapshots();
+    if (snapshots.empty()) {
+        ImGui::TextDisabled("No animation layers configured.");
+        return;
+    }
+
+    EnsureAnimationAssetCache();
+
+    for (auto& snapshot : snapshots) {
+        ImGui::PushID(snapshot.slot.c_str());
+        if (ImGui::TreeNode(snapshot.slot.c_str())) {
+            bool playing = snapshot.playing;
+            if (ImGui::Checkbox("Playing", &playing)) {
+                snapshot.playing = playing;
+                if (playing) {
+                    animator->Play(snapshot.slot, snapshot.loop);
+                } else {
+                    animator->Stop(snapshot.slot);
+                }
+            }
+
+            bool loop = snapshot.loop;
+            if (ImGui::Checkbox("Loop", &loop)) {
+                snapshot.loop = loop;
+                animator->ApplyLayerSnapshot(snapshot);
+            }
+
+            float weight = snapshot.weight;
+            if (ImGui::SliderFloat("Weight", &weight, 0.0f, 1.0f)) {
+                snapshot.weight = weight;
+                animator->SetWeight(snapshot.slot, weight);
+            }
+
+            float timeSeconds = static_cast<float>(snapshot.timeSeconds);
+            if (ImGui::DragFloat("Time (s)", &timeSeconds, 0.01f, 0.0f, 1000.0f)) {
+                snapshot.timeSeconds = timeSeconds;
+                animator->ApplyLayerSnapshot(snapshot);
+            }
+
+            const char* clipPreview = snapshot.clipGuid.empty() ? "None" : snapshot.clipGuid.c_str();
+            if (!m_animationClipAssets.empty() &&
+                ImGui::BeginCombo("Clip Asset", clipPreview)) {
+                for (const auto& entry : m_animationClipAssets) {
+                    bool clipSelected = (snapshot.clipGuid == entry.displayName);
+                    if (ImGui::Selectable(entry.displayName.c_str(), clipSelected)) {
+                        AssignClipToLayer(*animator, snapshot.slot, entry);
+                        snapshot.clipGuid = entry.displayName;
+                        animator->ApplyLayerSnapshot(snapshot);
+                    }
+                    if (clipSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            } else if (m_animationClipAssets.empty()) {
+                ImGui::TextDisabled("No animation clip assets detected.");
+            }
+
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+    }
+}
+
+void DebugMenu::EnsureAnimationAssetCache() {
+    if (!m_animationAssetsDirty) {
+        return;
+    }
+    m_animationAssetsDirty = false;
+    m_animationSkeletonAssets.clear();
+    m_animationClipAssets.clear();
+
+    if (!m_gameResources) {
+        return;
+    }
+
+    const auto& root = m_gameResources->GetAssetsDirectory();
+    if (root.empty()) {
+        return;
+    }
+
+    std::error_code ec;
+    for (std::filesystem::recursive_directory_iterator it(root, ec), end; it != end && !ec; ++it) {
+        if (!it->is_regular_file()) {
+            continue;
+        }
+        auto ext = it->path().extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        AnimationAssetEntry entry{it->path(), RelativeAssetLabel(it->path())};
+        if (ext == ".gmskel") {
+            m_animationSkeletonAssets.push_back(entry);
+        } else if (ext == ".gmanim") {
+            m_animationClipAssets.push_back(entry);
+        }
+    }
+
+    if (ec) {
+        gm::core::Logger::Warning("[DebugMenu] Animation asset scan error: {}", ec.message());
+    }
+
+    auto sorter = [](const AnimationAssetEntry& a, const AnimationAssetEntry& b) {
+        return a.displayName < b.displayName;
+    };
+    std::sort(m_animationSkeletonAssets.begin(), m_animationSkeletonAssets.end(), sorter);
+    std::sort(m_animationClipAssets.begin(), m_animationClipAssets.end(), sorter);
+}
+
+std::string DebugMenu::RelativeAssetLabel(const std::filesystem::path& absolute) const {
+    if (m_gameResources) {
+        const auto& root = m_gameResources->GetAssetsDirectory();
+        if (!root.empty()) {
+            std::error_code ec;
+            auto relative = std::filesystem::relative(absolute, root, ec);
+            if (!ec) {
+                auto label = relative.generic_string();
+                if (!label.empty()) {
+                    return label;
+                }
+            }
+        }
+    }
+    return absolute.filename().generic_string();
+}
+
+bool DebugMenu::LoadPreviewSkeleton(const AnimationAssetEntry& entry) {
+    try {
+        auto skeletonData = gm::animation::Skeleton::FromFile(entry.absolutePath.string());
+        m_previewSkeleton = std::make_shared<gm::animation::Skeleton>(std::move(skeletonData));
+        m_previewEvaluator = std::make_unique<gm::animation::AnimationPoseEvaluator>(*m_previewSkeleton);
+        m_previewPose.Resize(m_previewSkeleton->bones.size());
+        m_previewTimeSeconds = 0.0;
+        RemapPreviewClip();
+        RefreshAnimationPreviewPose();
+        return true;
+    } catch (const std::exception& ex) {
+        gm::core::Logger::Error("[DebugMenu] Failed to load skeleton '{}': {}", entry.displayName, ex.what());
+    }
+    return false;
+}
+
+bool DebugMenu::LoadPreviewClip(const AnimationAssetEntry& entry) {
+    try {
+        auto clip = std::make_unique<gm::animation::AnimationClip>(gm::animation::AnimationClip::FromFile(entry.absolutePath.string()));
+        m_previewClip = std::move(clip);
+        m_previewTimeSeconds = 0.0;
+        RemapPreviewClip();
+        RefreshAnimationPreviewPose();
+        return true;
+    } catch (const std::exception& ex) {
+        gm::core::Logger::Error("[DebugMenu] Failed to load animation '{}': {}", entry.displayName, ex.what());
+    }
+    return false;
+}
+
+void DebugMenu::RemapPreviewClip() {
+    if (!m_previewSkeleton || !m_previewClip) {
+        return;
+    }
+
+    for (auto& channel : m_previewClip->channels) {
+        channel.boneIndex = m_previewSkeleton->FindBoneIndex(channel.boneName);
+    }
+}
+
+void DebugMenu::RefreshAnimationPreviewPose() {
+    if (!m_previewEvaluator || !m_previewClip || !m_previewSkeleton) {
+        m_previewBoneMatrices.clear();
+        return;
+    }
+
+    const double clipDurationSec = (m_previewClip->ticksPerSecond > 0.0)
+                                       ? (m_previewClip->duration / m_previewClip->ticksPerSecond)
+                                       : m_previewClip->duration;
+    if (clipDurationSec > 0.0) {
+        m_previewTimeSeconds = std::fmod(std::max(0.0, m_previewTimeSeconds), clipDurationSec);
+    } else {
+        m_previewTimeSeconds = 0.0;
+    }
+    m_previewEvaluator->EvaluateClip(*m_previewClip, m_previewTimeSeconds, m_previewPose);
+
+    const std::size_t boneCount = m_previewSkeleton->bones.size();
+    m_previewBoneMatrices.resize(boneCount);
+    m_previewPose.BuildLocalMatrices();
+    const auto& locals = m_previewPose.LocalMatrices();
+    for (std::size_t i = 0; i < boneCount; ++i) {
+        glm::mat4 global = locals[i];
+        const int parent = m_previewSkeleton->bones[i].parentIndex;
+        if (parent >= 0 && static_cast<std::size_t>(parent) < boneCount) {
+            global = m_previewBoneMatrices[static_cast<std::size_t>(parent)] * global;
+        }
+        m_previewBoneMatrices[i] = global;
+    }
+}
+
+void DebugMenu::AssignSkeletonFromAsset(gm::scene::AnimatorComponent& animator, const AnimationAssetEntry& entry) {
+    gm::ResourceManager::SkeletonDescriptor desc;
+    desc.guid = entry.displayName;
+    desc.path = entry.absolutePath.string();
+    auto handle = gm::ResourceManager::LoadSkeleton(desc);
+    animator.SetSkeleton(std::move(handle));
+}
+
+void DebugMenu::AssignClipToLayer(gm::scene::AnimatorComponent& animator,
+                                  const std::string& slot,
+                                  const AnimationAssetEntry& entry) {
+    gm::ResourceManager::AnimationClipDescriptor desc;
+    desc.guid = entry.displayName;
+    desc.path = entry.absolutePath.string();
+    auto handle = gm::ResourceManager::LoadAnimationClip(desc);
+    animator.SetClip(slot, std::move(handle));
+}
+
+void DebugMenu::SpawnCowHerd(int columns, int rows, float spacing, const glm::vec3& origin) {
+    columns = std::max(columns, 1);
+    rows = std::max(rows, 1);
+    spacing = std::max(spacing, 0.1f);
+
+    if (!m_prefabLibrary) {
+        gm::core::Logger::Warning("[DebugMenu] PrefabLibrary unavailable; cannot spawn herd");
+        return;
+    }
+
+    auto scene = m_scene.lock();
+    if (!scene) {
+        gm::core::Logger::Warning("[DebugMenu] Scene unavailable; cannot spawn herd");
+        return;
+    }
+
+    std::size_t spawnedCount = 0;
+    for (int z = 0; z < rows; ++z) {
+        for (int x = 0; x < columns; ++x) {
+            const glm::vec3 offset(static_cast<float>(x) * spacing, 0.0f, static_cast<float>(z) * spacing);
+            const glm::vec3 position = origin + offset;
+            auto instances = m_prefabLibrary->Instantiate("Cow", *scene, position);
+            spawnedCount += instances.size();
+        }
+    }
+
+    gm::core::Logger::Info(
+        "[DebugMenu] Spawned {} Cow prefab instances ({} x {} grid, {:.2f} spacing)",
+        spawnedCount,
+        columns,
+        rows,
+        spacing);
+
+    if (spawnedCount > 0 && m_applyResourcesCallback) {
+        m_applyResourcesCallback();
+    }
+}
+
+void DebugMenu::DrawPrefabDetails(const gm::scene::PrefabDefinition& prefab) {
+    struct MeshAssignment {
+        std::string objectName;
+        std::string componentType;
+        std::string meshGuid;
+        std::string materialGuid;
+        std::string textureGuid;
+    };
+
+    std::vector<MeshAssignment> assignments;
+    std::vector<std::string> warnings;
+
+    for (const auto& objectJson : prefab.objects) {
+        if (!objectJson.is_object()) {
+            continue;
+        }
+        const std::string objectName = objectJson.value("name", "GameObject");
+        if (!objectJson.contains("components") || !objectJson["components"].is_array()) {
+            continue;
+        }
+
+        for (const auto& componentJson : objectJson["components"]) {
+            if (!componentJson.is_object()) {
+                continue;
+            }
+            const std::string type = componentJson.value("type", "");
+            if (type != "StaticMeshComponent" && type != "SkinnedMeshComponent") {
+                continue;
+            }
+            const auto& data = componentJson.contains("data") && componentJson["data"].is_object()
+                                   ? componentJson["data"]
+                                   : nlohmann::json::object();
+            MeshAssignment info;
+            info.objectName = objectName;
+            info.componentType = type;
+            info.meshGuid = data.value("meshGuid", "");
+            info.materialGuid = data.value("materialGuid", "");
+            info.textureGuid = data.value("textureGuid", "");
+            if (!info.meshGuid.empty() && info.materialGuid.empty()) {
+                warnings.push_back(
+                    fmt::format("{} '{}' references mesh '{}' without a material", type, objectName, info.meshGuid));
+            }
+            assignments.push_back(std::move(info));
+        }
+    }
+
+    if (!warnings.empty()) {
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "Prefab Warnings:");
+        for (const auto& warning : warnings) {
+            ImGui::BulletText("%s", warning.c_str());
+        }
+    } else {
+        ImGui::TextUnformatted("Prefab Warnings: None");
+    }
+
+    if (assignments.empty()) {
+        ImGui::TextDisabled("No mesh components in this prefab.");
+        return;
+    }
+
+    if (ImGui::BeginTable("PrefabMeshAssignments", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        ImGui::TableSetupColumn("Object");
+        ImGui::TableSetupColumn("Component");
+        ImGui::TableSetupColumn("Mesh GUID");
+        ImGui::TableSetupColumn("Material GUID");
+        ImGui::TableHeadersRow();
+
+        for (const auto& info : assignments) {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted(info.objectName.c_str());
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextUnformatted(info.componentType.c_str());
+            ImGui::TableSetColumnIndex(2);
+            ImGui::TextUnformatted(info.meshGuid.empty() ? "<none>" : info.meshGuid.c_str());
+            ImGui::TableSetColumnIndex(3);
+            ImGui::TextUnformatted(info.materialGuid.empty() ? "<none>" : info.materialGuid.c_str());
+        }
+
+        ImGui::EndTable();
+    }
+}
+
+std::filesystem::path DebugMenu::ResolveAssimpImporterExecutable() const {
+    std::vector<std::filesystem::path> candidates;
+    std::filesystem::path assetsDir;
+    if (m_gameResources) {
+        assetsDir = m_gameResources->GetAssetsDirectory();
+    }
+    std::filesystem::path exeName =
+#if defined(_WIN32)
+        "AssimpImporter.exe";
+#else
+        "AssimpImporter";
+#endif
+
+    auto addCandidate = [&](const std::filesystem::path& path) {
+        if (!path.empty()) {
+            candidates.push_back(path);
+        }
+    };
+
+    auto addVsBuildCandidates = [&](const std::filesystem::path& buildDir) {
+        addCandidate(buildDir / "Debug" / exeName);
+        addCandidate(buildDir / "Debug" / "AssimpImporter" / exeName);
+        addCandidate(buildDir / "RelWithDebInfo" / exeName);
+        addCandidate(buildDir / "RelWithDebInfo" / "AssimpImporter" / exeName);
+        addCandidate(buildDir / "Release" / exeName);
+        addCandidate(buildDir / "Release" / "AssimpImporter" / exeName);
+    };
+
+    if (!assetsDir.empty()) {
+        auto repoRoot = assetsDir.parent_path().parent_path();
+        if (!repoRoot.empty()) {
+            addVsBuildCandidates(repoRoot / "build");
+            addCandidate(repoRoot / "build" / exeName);
+            addCandidate(repoRoot / "bin" / exeName);
+        }
+    }
+
+    candidates.emplace_back(exeName);
+
+    for (const auto& candidate : candidates) {
+        if (candidate.empty()) {
+            continue;
+        }
+        std::error_code ec;
+        if (std::filesystem::exists(candidate, ec) && !ec) {
+            return candidate;
+        }
+    }
+    return {};
+}
+
+void DebugMenu::TriggerGlbReimport(const std::string& meshGuid) {
+    if (!m_gameResources) {
+        gm::core::Logger::Warning("[DebugMenu] GameResources unavailable; cannot re-import GLB");
+        return;
+    }
+    if (meshGuid.empty()) {
+        gm::core::Logger::Warning("[DebugMenu] Skinned mesh GUID is empty; cannot re-import");
+        return;
+    }
+
+    const auto* record = m_gameResources->GetAnimsetRecordForSkinnedMesh(meshGuid);
+    if (!record) {
+        gm::core::Logger::Warning("[DebugMenu] No animation manifest tracked for skinned mesh '{}'", meshGuid);
+        return;
+    }
+    if (record->sourceGlb.empty()) {
+        gm::core::Logger::Warning("[DebugMenu] Animset for '{}' does not contain a GLB source path", meshGuid);
+        return;
+    }
+
+    auto importer = ResolveAssimpImporterExecutable();
+    if (importer.empty()) {
+        gm::core::Logger::Warning("[DebugMenu] Could not locate AssimpImporter executable");
+        return;
+    }
+
+    std::filesystem::path outputDir = record->outputDir;
+    if (outputDir.empty()) {
+        if (m_gameResources->GetAssetsDirectory().empty()) {
+            gm::core::Logger::Warning("[DebugMenu] Unable to determine output directory for GLB import");
+            return;
+        }
+        outputDir = m_gameResources->GetAssetsDirectory() / "models";
+    }
+    std::error_code ec;
+    std::filesystem::create_directories(outputDir, ec);
+
+    const std::string command = fmt::format("\"{}\" \"{}\" --out \"{}\" --name \"{}\"",
+                                            importer.string(),
+                                            record->sourceGlb,
+                                            outputDir.lexically_normal().string(),
+                                            record->baseName);
+    gm::core::Logger::Info("[DebugMenu] Running {}", command);
+    const int result = std::system(command.c_str());
+    if (result != 0) {
+        gm::core::Logger::Error("[DebugMenu] AssimpImporter returned exit code {}", result);
+        return;
+    }
+
+    gm::core::Logger::Info("[DebugMenu] GLB re-import finished for '{}'", meshGuid);
+    if (m_applyResourcesCallback) {
+        m_applyResourcesCallback();
+    }
+}
+
+void DebugMenu::DrawPreviewSkeleton(const ImVec2& canvasSize) {
+    if (!m_previewSkeleton || m_previewBoneMatrices.empty()) {
+        return;
+    }
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+        m_previewYaw += io.MouseDelta.x * 0.01f;
+        m_previewPitch += io.MouseDelta.y * 0.01f;
+        const float pitchLimit = glm::radians(85.0f);
+        m_previewPitch = glm::clamp(m_previewPitch, -pitchLimit, pitchLimit);
+    }
+    if (ImGui::IsItemHovered()) {
+        const float zoomSpeed = 0.1f;
+        m_previewZoom *= 1.0f - io.MouseWheel * zoomSpeed;
+        m_previewZoom = glm::clamp(m_previewZoom, 0.2f, 5.0f);
+    }
+
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+    const ImVec2 canvasPos = ImGui::GetItemRectMin();
+
+    std::vector<glm::vec3> positions(m_previewBoneMatrices.size());
+    glm::vec3 minBounds(std::numeric_limits<float>::max());
+    glm::vec3 maxBounds(std::numeric_limits<float>::lowest());
+    for (std::size_t i = 0; i < m_previewBoneMatrices.size(); ++i) {
+        positions[i] = glm::vec3(m_previewBoneMatrices[i][3]);
+        minBounds = glm::min(minBounds, positions[i]);
+        maxBounds = glm::max(maxBounds, positions[i]);
+    }
+
+    glm::vec3 center = (minBounds + maxBounds) * 0.5f;
+
+    const glm::mat4 rotMat = glm::yawPitchRoll(m_previewYaw, m_previewPitch, 0.0f);
+    const glm::mat3 rotation = glm::mat3(rotMat);
+
+    float radius = 0.0f;
+    std::vector<glm::vec3> rotated(positions.size());
+    for (std::size_t i = 0; i < positions.size(); ++i) {
+        glm::vec3 relative = positions[i] - center;
+        rotated[i] = rotation * relative;
+        radius = std::max(radius, glm::length(glm::vec2(rotated[i].x, rotated[i].y)));
+    }
+    if (radius < 1e-3f) {
+        radius = 1.0f;
+    }
+
+    const float padding = 16.0f;
+    const float size = std::min(canvasSize.x, canvasSize.y) * 0.5f - padding;
+    const float scale = (size / radius) * m_previewZoom;
+    const ImVec2 centerScreen = canvasPos + ImVec2(canvasSize.x * 0.5f, canvasSize.y * 0.5f);
+
+    auto toScreen = [&](const glm::vec3& pt) -> ImVec2 {
+        return centerScreen + ImVec2(pt.x * scale, -pt.y * scale);
+    };
+
+    const ImU32 lineColor = IM_COL32(0, 190, 255, 255);
+    const ImU32 jointColor = IM_COL32(255, 255, 255, 255);
+    const float jointRadius = 4.0f;
+
+    for (std::size_t i = 0; i < rotated.size(); ++i) {
+        const auto& bone = m_previewSkeleton->bones[i];
+        if (bone.parentIndex >= 0) {
+            const std::size_t parentIndex = static_cast<std::size_t>(bone.parentIndex);
+            if (parentIndex < rotated.size()) {
+                drawList->AddLine(toScreen(rotated[parentIndex]), toScreen(rotated[i]), lineColor, 2.0f);
+            }
+        }
+    }
+
+    for (std::size_t i = 0; i < rotated.size(); ++i) {
+        drawList->AddCircleFilled(toScreen(rotated[i]), jointRadius, jointColor, 12);
+    }
+
+    if (ImGui::IsItemHovered()) {
+        ImVec2 tooltipPos = canvasPos + ImVec2(8.0f, 8.0f);
+        const char* instructions = "LMB drag: orbit  |  Mouse wheel: zoom";
+        drawList->AddText(tooltipPos, IM_COL32(200, 200, 200, 220), instructions);
+    }
+}
+
+void DebugMenu::HandleFileDrop(const std::vector<std::string>& paths) {
+    for (const auto& path : paths) {
+        std::filesystem::path filePath(path);
+        std::string ext = filePath.extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+
+        if (ext == ".glb" || ext == ".gltf") {
+            StartModelImport(filePath);
+            break; // Only import first valid file
+        }
+    }
+}
+
+void DebugMenu::StartModelImport(const std::filesystem::path& filePath) {
+    m_importSettings.inputPath = filePath;
+    m_importSettings.baseName = filePath.stem().string();
+
+    if (m_gameResources) {
+        std::filesystem::path assetsDir = m_gameResources->GetAssetsDirectory();
+        m_importSettings.outputDir = assetsDir / "models" / filePath.stem();
+    } else {
+        m_importSettings.outputDir = filePath.parent_path();
+    }
+
+    m_showImportDialog = true;
+    m_pendingImport = false; // Already showing dialog
+}
+
+bool DebugMenu::ExecuteModelImport(const std::filesystem::path& inputPath,
+                                    const std::filesystem::path& outputDir,
+                                    const std::string& baseName) {
+    std::filesystem::path importerExe = ResolveAssimpImporterExecutable();
+    if (importerExe.empty() || !std::filesystem::exists(importerExe)) {
+        gm::core::Logger::Error("[DebugMenu] AssimpImporter executable not found");
+        m_importStatusMessage = "Error: AssimpImporter executable not found";
+        return false;
+    }
+
+    // Create output directory if it doesn't exist
+    std::error_code ec;
+    std::filesystem::create_directories(outputDir, ec);
+    if (ec) {
+        gm::core::Logger::Error("[DebugMenu] Failed to create output directory: {}", ec.message());
+        m_importStatusMessage = fmt::format("Error: Failed to create output directory: {}", ec.message());
+        return false;
+    }
+
+    // Build command line
+    std::string cmd = fmt::format("\"{}\" \"{}\" --out \"{}\" --name \"{}\"",
+                                  importerExe.string(),
+                                  inputPath.string(),
+                                  outputDir.string(),
+                                  baseName);
+
+    gm::core::Logger::Info("[DebugMenu] Executing import: {}", cmd);
+
+#ifdef _WIN32
+    STARTUPINFOA si = {sizeof(si)};
+    PROCESS_INFORMATION pi = {};
+    si.dwFlags = STARTF_USESTDHANDLES;
+    si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+    si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+
+    std::vector<char> cmdLine(cmd.begin(), cmd.end());
+    cmdLine.push_back('\0');
+
+    BOOL success = CreateProcessA(
+        nullptr,
+        cmdLine.data(),
+        nullptr,
+        nullptr,
+        TRUE,
+        0,
+        nullptr,
+        nullptr,
+        &si,
+        &pi);
+
+    if (!success) {
+        DWORD error = GetLastError();
+        gm::core::Logger::Error("[DebugMenu] Failed to start import process: {}", error);
+        m_importStatusMessage = fmt::format("Error: Failed to start import process (code {})", error);
+        return false;
+    }
+
+    // Wait for process to complete
+    WaitForSingleObject(pi.hProcess, INFINITE);
+
+    DWORD exitCode = 0;
+    GetExitCodeProcess(pi.hProcess, &exitCode);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    if (exitCode != 0) {
+        gm::core::Logger::Error("[DebugMenu] Import process exited with code {}", exitCode);
+        m_importStatusMessage = fmt::format("Error: Import failed (exit code {})", exitCode);
+        return false;
+    }
+#else
+    int result = std::system(cmd.c_str());
+    if (result != 0) {
+        gm::core::Logger::Error("[DebugMenu] Import process exited with code {}", result);
+        m_importStatusMessage = fmt::format("Error: Import failed (exit code {})", result);
+        return false;
+    }
+#endif
+
+    gm::core::Logger::Info("[DebugMenu] Model import completed successfully");
+    return true;
 }
 
 } // namespace gm::debug

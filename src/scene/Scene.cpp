@@ -4,6 +4,7 @@
 #include "gm/scene/SceneSystem.hpp"
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/scene/StaticMeshComponent.hpp"
+#include "gm/scene/AnimationSystem.hpp"
 #include "gm/rendering/Shader.hpp"
 #include "gm/rendering/Camera.hpp"
 #include "gm/rendering/LightManager.hpp"
@@ -43,6 +44,7 @@ Scene::Scene(const std::string& name)
     , m_updateThreadPool(std::max<std::size_t>(1, std::thread::hardware_concurrency())) {
     m_gameObjectPool.Reserve(kInitialObjectPoolCapacity);
     RegisterSystem(std::make_shared<GameObjectUpdateSystem>());
+    RegisterSystem(std::make_shared<scene::AnimationSystem>());
 }
 
 void Scene::Init() {
@@ -389,6 +391,7 @@ void Scene::ClearSystems() {
 
     systems.clear();
     RegisterSystem(std::make_shared<GameObjectUpdateSystem>());
+    RegisterSystem(std::make_shared<scene::AnimationSystem>());
 }
 
 void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovDeg) {
@@ -439,7 +442,7 @@ void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovD
         for (const auto& batch : batches) {
             if (batch.modelMatrices.size() > 1) {
                 // Use instanced rendering for batches with multiple instances
-                RenderInstancedBatch(batch, shader, cam);
+                RenderInstancedBatch(batch, cam, view, proj);
                 for (const auto& obj : batch.gameObjects) {
                     if (obj) {
                         instancedObjects.insert(obj.get());
@@ -657,13 +660,19 @@ void Scene::CollectInstancedBatches(std::vector<InstancedBatch>& batches, const 
     }
 }
 
-void Scene::RenderInstancedBatch(const InstancedBatch& batch, Shader& shader, const Camera& cam) const {
+void Scene::RenderInstancedBatch(const InstancedBatch& batch,
+                                 const Camera& cam,
+                                 const glm::mat4& view,
+                                 const glm::mat4& proj) const {
     if (!batch.mesh || !batch.shader || batch.modelMatrices.empty()) {
         return;
     }
     
     // Use the batch's shader
     batch.shader->Use();
+
+    batch.shader->SetMat4("uView", view);
+    batch.shader->SetMat4("uProj", proj);
     
     // Set camera position
     batch.shader->SetVec3("uViewPos", cam.Position());

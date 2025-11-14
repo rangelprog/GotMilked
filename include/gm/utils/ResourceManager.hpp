@@ -9,9 +9,20 @@
 
 namespace gm {
 
+namespace detail {
+template <typename>
+struct always_false : std::false_type {};
+} // namespace detail
+
 class Shader;
 class Texture;
 class Mesh;
+
+namespace animation {
+struct Skeleton;
+struct AnimationClip;
+struct SkinnedMeshAsset;
+} // namespace animation
 
 class ResourceManager {
 public:
@@ -77,9 +88,27 @@ public:
         std::string path;
     };
 
+    struct SkeletonDescriptor {
+        std::string guid;
+        std::string path;
+    };
+
+    struct AnimationClipDescriptor {
+        std::string guid;
+        std::string path;
+    };
+
+    struct SkinnedMeshDescriptor {
+        std::string guid;
+        std::string path;
+    };
+
     using ShaderHandle = ResourceHandle<Shader>;
     using TextureHandle = ResourceHandle<Texture>;
     using MeshHandle = ResourceHandle<Mesh>;
+    using SkeletonHandle = ResourceHandle<animation::Skeleton>;
+    using AnimationClipHandle = ResourceHandle<animation::AnimationClip>;
+    using SkinnedMeshHandle = ResourceHandle<animation::SkinnedMeshAsset>;
 
     class Registry : public std::enable_shared_from_this<Registry> {
     public:
@@ -101,6 +130,21 @@ public:
         MeshHandle ReloadMesh(const MeshDescriptor& descriptor);
         std::shared_ptr<Mesh> GetMesh(const std::string& guid) const;
         bool HasMesh(const std::string& guid) const;
+
+        SkeletonHandle LoadSkeleton(const SkeletonDescriptor& descriptor);
+        SkeletonHandle ReloadSkeleton(const SkeletonDescriptor& descriptor);
+        std::shared_ptr<animation::Skeleton> GetSkeleton(const std::string& guid) const;
+        bool HasSkeleton(const std::string& guid) const;
+
+        AnimationClipHandle LoadAnimationClip(const AnimationClipDescriptor& descriptor);
+        AnimationClipHandle ReloadAnimationClip(const AnimationClipDescriptor& descriptor);
+        std::shared_ptr<animation::AnimationClip> GetAnimationClip(const std::string& guid) const;
+        bool HasAnimationClip(const std::string& guid) const;
+
+        SkinnedMeshHandle LoadSkinnedMesh(const SkinnedMeshDescriptor& descriptor);
+        SkinnedMeshHandle ReloadSkinnedMesh(const SkinnedMeshDescriptor& descriptor);
+        std::shared_ptr<animation::SkinnedMeshAsset> GetSkinnedMesh(const std::string& guid) const;
+        bool HasSkinnedMesh(const std::string& guid) const;
 
     private:
         template <typename>
@@ -139,6 +183,9 @@ public:
         CacheStore<Shader> m_shaderCache;
         CacheStore<Texture> m_textureCache;
         CacheStore<Mesh> m_meshCache;
+        CacheStore<animation::Skeleton> m_skeletonCache;
+        CacheStore<animation::AnimationClip> m_animationClipCache;
+        CacheStore<animation::SkinnedMeshAsset> m_skinnedMeshCache;
     };
 
     static void Init(std::shared_ptr<Registry> registry = nullptr);
@@ -160,6 +207,21 @@ public:
     static MeshHandle ReloadMesh(const MeshDescriptor& descriptor);
     static std::shared_ptr<Mesh> GetMesh(const std::string& guid);
     static bool HasMesh(const std::string& guid);
+
+    static SkeletonHandle LoadSkeleton(const SkeletonDescriptor& descriptor);
+    static SkeletonHandle ReloadSkeleton(const SkeletonDescriptor& descriptor);
+    static std::shared_ptr<animation::Skeleton> GetSkeleton(const std::string& guid);
+    static bool HasSkeleton(const std::string& guid);
+
+    static AnimationClipHandle LoadAnimationClip(const AnimationClipDescriptor& descriptor);
+    static AnimationClipHandle ReloadAnimationClip(const AnimationClipDescriptor& descriptor);
+    static std::shared_ptr<animation::AnimationClip> GetAnimationClip(const std::string& guid);
+    static bool HasAnimationClip(const std::string& guid);
+
+    static SkinnedMeshHandle LoadSkinnedMesh(const SkinnedMeshDescriptor& descriptor);
+    static SkinnedMeshHandle ReloadSkinnedMesh(const SkinnedMeshDescriptor& descriptor);
+    static std::shared_ptr<animation::SkinnedMeshAsset> GetSkinnedMesh(const std::string& guid);
+    static bool HasSkinnedMesh(const std::string& guid);
 
 private:
     ResourceManager() = delete;
@@ -259,6 +321,12 @@ void ResourceManager::ResourceHandle<T>::Acquire() {
             registry->IncrementRef<Texture>(m_guid, m_slot);
         } else if constexpr (std::is_same_v<T, Mesh>) {
             registry->IncrementRef<Mesh>(m_guid, m_slot);
+        } else if constexpr (std::is_same_v<T, animation::Skeleton>) {
+            registry->IncrementRef<animation::Skeleton>(m_guid, m_slot);
+        } else if constexpr (std::is_same_v<T, animation::AnimationClip>) {
+            registry->IncrementRef<animation::AnimationClip>(m_guid, m_slot);
+        } else if constexpr (std::is_same_v<T, animation::SkinnedMeshAsset>) {
+            registry->IncrementRef<animation::SkinnedMeshAsset>(m_guid, m_slot);
         }
     } else {
         m_slot->refCount.fetch_add(1, std::memory_order_relaxed);
@@ -277,6 +345,12 @@ void ResourceManager::ResourceHandle<T>::Release() {
             registry->DecrementRef<Texture>(m_guid, m_slot);
         } else if constexpr (std::is_same_v<T, Mesh>) {
             registry->DecrementRef<Mesh>(m_guid, m_slot);
+        } else if constexpr (std::is_same_v<T, animation::Skeleton>) {
+            registry->DecrementRef<animation::Skeleton>(m_guid, m_slot);
+        } else if constexpr (std::is_same_v<T, animation::AnimationClip>) {
+            registry->DecrementRef<animation::AnimationClip>(m_guid, m_slot);
+        } else if constexpr (std::is_same_v<T, animation::SkinnedMeshAsset>) {
+            registry->DecrementRef<animation::SkinnedMeshAsset>(m_guid, m_slot);
         }
     } else {
         m_slot->refCount.fetch_sub(1, std::memory_order_relaxed);
@@ -295,9 +369,17 @@ ResourceManager::Registry::Cache() {
         return m_shaderCache;
     } else if constexpr (std::is_same_v<T, Texture>) {
         return m_textureCache;
-    } else {
-        static_assert(std::is_same_v<T, Mesh>, "Unsupported resource type");
+    } else if constexpr (std::is_same_v<T, Mesh>) {
         return m_meshCache;
+    } else if constexpr (std::is_same_v<T, animation::Skeleton>) {
+        return m_skeletonCache;
+    } else if constexpr (std::is_same_v<T, animation::AnimationClip>) {
+        return m_animationClipCache;
+    } else if constexpr (std::is_same_v<T, animation::SkinnedMeshAsset>) {
+        return m_skinnedMeshCache;
+    } else {
+        static_assert(detail::always_false<T>::value, "Unsupported resource type");
+        return m_shaderCache;
     }
 }
 
@@ -308,9 +390,17 @@ ResourceManager::Registry::Cache() const {
         return m_shaderCache;
     } else if constexpr (std::is_same_v<T, Texture>) {
         return m_textureCache;
-    } else {
-        static_assert(std::is_same_v<T, Mesh>, "Unsupported resource type");
+    } else if constexpr (std::is_same_v<T, Mesh>) {
         return m_meshCache;
+    } else if constexpr (std::is_same_v<T, animation::Skeleton>) {
+        return m_skeletonCache;
+    } else if constexpr (std::is_same_v<T, animation::AnimationClip>) {
+        return m_animationClipCache;
+    } else if constexpr (std::is_same_v<T, animation::SkinnedMeshAsset>) {
+        return m_skinnedMeshCache;
+    } else {
+        static_assert(detail::always_false<T>::value, "Unsupported resource type");
+        return m_shaderCache;
     }
 }
 

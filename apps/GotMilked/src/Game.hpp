@@ -34,6 +34,7 @@ namespace gm::debug {
 #include "gm/scene/SceneManager.hpp"
 #include "gm/utils/Config.hpp"
 #include "GameResources.hpp"
+#include "GameConstants.hpp"
 #include "gm/gameplay/CameraRigSystem.hpp"
 #include "gm/gameplay/QuestTriggerSystem.hpp"
 #include "gm/utils/HotReloader.hpp"
@@ -56,6 +57,12 @@ class ToolingFacade;
 class EventRouter;
 class GameLoopController;
 
+#if GM_DEBUG_TOOLS
+namespace gm::gameplay {
+class FlyCameraController;
+}
+#endif
+
 class Game {
 public:
     Game(const gm::utils::AppConfig& config);
@@ -66,6 +73,13 @@ public:
     void Render();
     void Shutdown();
     ToolingFacade* GetToolingFacade() const { return m_toolingFacade.get(); }
+    gm::Camera* GetRenderCamera() const;
+    float GetRenderCameraFov() const;
+#if GM_DEBUG_TOOLS
+    void SetDebugViewportCameraActive(bool enabled);
+    bool IsDebugViewportCameraActive() const;
+    void UpdateViewportCamera(float deltaTime, bool inputSuppressed);
+#endif
 
 private:
     gm::utils::AppConfig m_config;
@@ -140,4 +154,14 @@ private:
     friend class GameShutdownController;
     friend class ToolingFacade;
     friend class GameLoopController;
+
+#if GM_DEBUG_TOOLS
+    std::unique_ptr<gm::Camera> m_viewportCamera;
+    std::unique_ptr<gm::gameplay::FlyCameraController> m_viewportCameraController;
+    bool m_viewportCameraActive = false;
+    bool m_viewportCameraHasSavedPose = false;
+    glm::vec3 m_viewportSavedPosition{0.0f};
+    glm::vec3 m_viewportSavedForward{0.0f, 0.0f, -1.0f};
+    float m_viewportSavedFov = gotmilked::GameConstants::Camera::DefaultFovDegrees;
+#endif
 };

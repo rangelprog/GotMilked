@@ -6,6 +6,16 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <glad/glad.h>
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#define WIN32_LEAN_AND_MEAN
+#ifdef APIENTRY
+#undef APIENTRY
+#endif
+#include <windows.h>
+#endif
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -81,6 +91,10 @@ std::filesystem::path SetupBasicAssets(const TestAssetBundle& bundle) {
                                std::filesystem::copy_options::overwrite_existing);
     std::filesystem::copy_file(bundle.fragPath,
                                assetsDir / "shaders" / "simple.frag.glsl",
+                               std::filesystem::copy_options::overwrite_existing);
+    const std::filesystem::path shaderDir = std::filesystem::path(GM_GAME_SHADER_DIR);
+    std::filesystem::copy_file(shaderDir / "simple_skinned.vert.glsl",
+                               assetsDir / "shaders" / "simple_skinned.vert.glsl",
                                std::filesystem::copy_options::overwrite_existing);
     std::filesystem::copy_file(bundle.meshPath,
                                assetsDir / "models" / "cow.obj",

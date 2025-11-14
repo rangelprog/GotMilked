@@ -50,6 +50,7 @@ std::shared_ptr<GameObject> Scene::GameObjectPool::Acquire(Scene& owner, const s
 }
 
 void Scene::GameObjectPool::Release(Scene& owner, std::shared_ptr<GameObject> gameObject) {
+    (void)owner;
     if (!gameObject) {
         return;
     }
@@ -86,21 +87,26 @@ void Scene::RemoveFromActiveLists(const std::shared_ptr<GameObject>& gameObject)
 
 std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string& name) {
     std::string finalName = name;
+    EnsureNameLookup();
+
     if (finalName.empty()) {
         finalName = GenerateUniqueName();
         core::Logger::Warning("[Scene] Creating GameObject with empty name. Assigned '{}'", finalName);
-    }
-
-    EnsureNameLookup();
-
-    if (!finalName.empty()) {
-        auto existingIt = objectsByName.find(finalName);
-        if (existingIt != objectsByName.end() && existingIt->second) {
-            core::Logger::Warning("[Scene] GameObject with name '{}' already exists, returning existing object",
-                                  finalName);
-            return existingIt->second;
+    } else {
+        const std::string baseName = finalName;
+        std::size_t suffix = 1;
+        while (true) {
+            auto existingIt = objectsByName.find(finalName);
+            if (existingIt == objectsByName.end() || !existingIt->second || existingIt->second->IsDestroyed()) {
+                break;
+            }
+            finalName = baseName + " (" + std::to_string(suffix++) + ")";
+        }
+        if (finalName != baseName) {
+            core::Logger::Info("[Scene] Renamed duplicated GameObject '{}' to '{}'", baseName, finalName);
         }
     }
+
     auto gameObject = AcquireGameObject(finalName);
     gameObjects.push_back(gameObject);
     MarkNameLookupDirty();

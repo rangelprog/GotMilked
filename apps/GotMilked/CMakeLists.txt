@@ -12,6 +12,7 @@ set(GOTMILKED_SOURCES
   src/SceneSerializerExtensions.cpp
   src/GameResources.cpp
   src/GameSceneHelpers.cpp
+  src/CowAnimationController.cpp
 )
 
 if(GM_ENABLE_DEBUG_TOOLS)

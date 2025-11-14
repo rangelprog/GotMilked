@@ -6,8 +6,11 @@ set(GOTMILKED_TEST_SOURCES
     SceneDrawSmokeTest.cpp
     GameResourcesTests.cpp
     PhysicsWorldTests.cpp
+    AnimationPipelineTests.cpp
     TestAssetHelpers.cpp
     LoggerTests.cpp
+    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/CowAnimationController.cpp
+    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/SceneSerializerExtensions.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameResources.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameSceneHelpers.cpp
     TestMain.cpp
@@ -37,6 +40,10 @@ target_include_directories(GotMilkedTests PRIVATE
 set(GM_GAME_SHADER_DIR "${CMAKE_SOURCE_DIR}/apps/GotMilked/assets/shaders")
 string(REPLACE "\\" "/" GM_GAME_SHADER_DIR "${GM_GAME_SHADER_DIR}")
 target_compile_definitions(GotMilkedTests PRIVATE "GM_GAME_SHADER_DIR=\"${GM_GAME_SHADER_DIR}\"")
+
+set(GM_ASSETS_DIR "${CMAKE_SOURCE_DIR}/apps/GotMilked/assets")
+string(REPLACE "\\" "/" GM_ASSETS_DIR "${GM_ASSETS_DIR}")
+target_compile_definitions(GotMilkedTests PRIVATE "GM_ASSETS_DIR=\"${GM_ASSETS_DIR}\"")
 
 gm_apply_warnings(GotMilkedTests)
 

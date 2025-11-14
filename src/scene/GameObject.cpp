@@ -107,11 +107,18 @@ void GameObject::SetName(const std::string& newName) {
 }
 
 void GameObject::ResetForReuse() {
+    const bool alreadyDestroyed = isDestroyed;
+
     for (auto& component : components) {
-        if (component) {
-            component->OnReset();
+        if (!component) {
+            continue;
+        }
+
+        if (!alreadyDestroyed) {
             component->OnDestroy();
         }
+
+        component->OnReset();
     }
     components.clear();
     m_componentMap.clear();

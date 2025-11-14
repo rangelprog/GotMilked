@@ -20,11 +20,24 @@
 #include "gm/debug/GridRenderer.hpp"
 #endif
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#define WIN32_LEAN_AND_MEAN
+#ifdef APIENTRY
+#undef APIENTRY
+#endif
+#include <windows.h>
+#endif
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <unordered_map>
+#include <vector>
+#include <string>
 #ifdef _WIN32
 #ifdef APIENTRY
 #undef APIENTRY
@@ -54,16 +67,22 @@ bool DebugToolingController::Initialize() {
         m_game.m_tooling->SetCallbacks(std::move(callbacks));
         m_game.m_tooling->SetSaveManager(m_game.m_saveManager.get());
         m_game.m_tooling->SetHotReloader(&m_game.m_hotReloader);
-        m_game.m_tooling->SetCamera(m_game.m_camera.get());
+        m_game.m_tooling->SetCamera(m_game.GetRenderCamera());
         m_game.m_tooling->SetScene(m_game.m_gameScene);
         m_game.m_tooling->SetPhysicsWorld(&gm::physics::PhysicsWorld::Instance());
         m_game.m_tooling->SetWorldInfoProvider([this]() -> std::optional<gm::tooling::Overlay::WorldInfo> {
-            if (!m_game.m_cameraRigSystem || !m_game.m_camera) return std::nullopt;
+            if (!m_game.m_cameraRigSystem) {
+                return std::nullopt;
+            }
+            auto* activeCam = m_game.GetRenderCamera();
+            if (!activeCam) {
+                return std::nullopt;
+            }
             gm::tooling::Overlay::WorldInfo info;
             info.sceneName = m_game.m_cameraRigSystem->GetActiveSceneName();
             info.worldTimeSeconds = m_game.m_cameraRigSystem->GetWorldTimeSeconds();
-            info.cameraPosition = m_game.m_camera->Position();
-            info.cameraDirection = m_game.m_camera->Front();
+            info.cameraPosition = activeCam->Position();
+            info.cameraDirection = activeCam->Front();
             return info;
         });
         m_game.m_tooling->AddNotification("Tooling overlay ready");
@@ -73,6 +92,13 @@ bool DebugToolingController::Initialize() {
     if (m_game.m_debugHud && m_game.m_tooling) {
         m_game.m_debugHud->SetOverlay(m_game.m_tooling.get());
         m_game.m_debugHud->SetOverlayVisible(m_game.m_overlayVisible);
+    }
+
+    if (m_game.m_tooling) {
+        m_game.m_overlayVisible = true;
+        if (m_game.m_debugHud) {
+            m_game.m_debugHud->SetOverlayVisible(true);
+        }
     }
 
     m_game.m_debugMenu = std::make_unique<gm::debug::DebugMenu>();
@@ -180,10 +206,11 @@ void DebugToolingController::ConfigureDebugMenu() {
             return m_game.m_cameraRigSystem ? m_game.m_cameraRigSystem->GetWorldTimeSeconds() : 0.0;
         },
         [this]() -> glm::mat4 {
-            return m_game.m_camera ? m_game.m_camera->View() : glm::mat4(1.0f);
+            auto* cam = m_game.GetRenderCamera();
+            return cam ? cam->View() : glm::mat4(1.0f);
         },
         [this]() -> glm::mat4 {
-            if (!m_game.m_window || !m_game.m_cameraRigSystem) {
+            if (!m_game.m_window) {
                 return glm::mat4(1.0f);
             }
             int fbw, fbh;
@@ -192,8 +219,7 @@ void DebugToolingController::ConfigureDebugMenu() {
                 return glm::mat4(1.0f);
             }
             float aspect = static_cast<float>(fbw) / static_cast<float>(fbh);
-            float fov = m_game.m_cameraRigSystem ? m_game.m_cameraRigSystem->GetFovDegrees()
-                                                 : gotmilked::GameConstants::Camera::DefaultFovDegrees;
+            float fov = m_game.GetRenderCameraFov();
             return glm::perspective(glm::radians(fov),
                                     aspect,
                                     gotmilked::GameConstants::Camera::NearPlane,
@@ -213,6 +239,9 @@ void DebugToolingController::ConfigureDebugMenu() {
     m_game.m_debugMenu->SetScene(m_game.m_gameScene);
     m_game.m_debugMenu->SetPrefabLibrary(m_game.m_prefabLibrary.get());
     m_game.m_debugMenu->SetGameResources(&m_game.m_resources);
+    m_game.m_debugMenu->SetApplyResourcesCallback([this]() {
+        m_game.ApplyResourcesToScene();
+    });
 
 #ifdef _WIN32
     if (m_game.m_window) {
@@ -220,6 +249,27 @@ void DebugToolingController::ConfigureDebugMenu() {
         m_game.m_debugMenu->SetWindowHandle(hwnd);
     }
 #endif
+
+    // Set up drag-and-drop callback for model import
+    if (m_game.m_window && m_game.m_debugMenu) {
+        m_game.m_debugMenu->SetGLFWWindow(m_game.m_window);
+        
+        // Use static map to associate windows with DebugMenu instances
+        static std::unordered_map<GLFWwindow*, gm::debug::DebugMenu*> windowToMenu;
+        windowToMenu[m_game.m_window] = m_game.m_debugMenu.get();
+        
+        glfwSetDropCallback(m_game.m_window, [](GLFWwindow* window, int count, const char** paths) {
+            auto it = windowToMenu.find(window);
+            if (it != windowToMenu.end() && it->second) {
+                std::vector<std::string> pathVec;
+                pathVec.reserve(count);
+                for (int i = 0; i < count; ++i) {
+                    pathVec.push_back(paths[i]);
+                }
+                it->second->HandleFileDrop(pathVec);
+            }
+        });
+    }
 
     if (m_game.m_gameScene) {
         auto terrainObject = m_game.m_gameScene->FindGameObjectByName("Terrain");

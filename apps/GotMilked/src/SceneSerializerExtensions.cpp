@@ -2,7 +2,10 @@
 #include "GameConstants.hpp"
 #include "gm/scene/ComponentFactory.hpp"
 #include "gm/scene/StaticMeshComponent.hpp"
+#include "gm/scene/SkinnedMeshComponent.hpp"
+#include "gm/scene/AnimatorComponent.hpp"
 #include "gm/physics/RigidBodyComponent.hpp"
+#include "CowAnimationController.hpp"
 #if GM_DEBUG_TOOLS
 #include "EditableTerrainComponent.hpp"
 #endif
@@ -39,6 +42,15 @@ void RegisterSerializers() {
     #endif
     if (!factory.Register<gm::scene::StaticMeshComponent>("StaticMeshComponent")) {
         gm::core::Logger::Warning("[SceneSerializerExtensions] StaticMeshComponent already registered in factory");
+    }
+    if (!factory.Register<gm::scene::SkinnedMeshComponent>("SkinnedMeshComponent")) {
+        gm::core::Logger::Warning("[SceneSerializerExtensions] SkinnedMeshComponent already registered in factory");
+    }
+    if (!factory.Register<gm::scene::AnimatorComponent>("AnimatorComponent")) {
+        gm::core::Logger::Warning("[SceneSerializerExtensions] AnimatorComponent already registered in factory");
+    }
+    if (!factory.Register<gotmilked::CowAnimationController>("CowAnimationController")) {
+        gm::core::Logger::Warning("[SceneSerializerExtensions] CowAnimationController already registered in factory");
     }
     if (!factory.Register<gm::physics::RigidBodyComponent>("RigidBodyComponent")) {
         gm::core::Logger::Warning("[SceneSerializerExtensions] RigidBodyComponent already registered in factory");
@@ -464,6 +476,211 @@ void RegisterSerializers() {
         }
     );
 
+    gm::SceneSerializer::RegisterComponentSerializer(
+        "SkinnedMeshComponent",
+        [](gm::Component* component) -> nlohmann::json {
+            auto* skinned = dynamic_cast<gm::scene::SkinnedMeshComponent*>(component);
+            if (!skinned) {
+                gm::core::Logger::Warning("[SceneSerializer] SkinnedMeshComponent serialization: component is null");
+                return nlohmann::json();
+            }
+
+            nlohmann::json data;
+            data["version"] = 1;
+
+            if (!skinned->MeshGuid().empty()) {
+                data["meshGuid"] = skinned->MeshGuid();
+            }
+            if (!skinned->ShaderGuid().empty()) {
+                data["shaderGuid"] = skinned->ShaderGuid();
+            }
+            if (!skinned->TextureGuid().empty()) {
+                data["textureGuid"] = skinned->TextureGuid();
+            }
+            if (!skinned->MaterialGuid().empty()) {
+                data["materialGuid"] = skinned->MaterialGuid();
+            }
+
+            return data;
+        },
+        [](gm::GameObject* obj, const nlohmann::json& data) -> gm::Component* {
+            if (!data.is_object() || !obj) {
+                gm::core::Logger::Error("[SceneSerializer] SkinnedMeshComponent deserialization received invalid input");
+                return nullptr;
+            }
+
+            auto& factory = gm::scene::ComponentFactory::Instance();
+            auto component = std::dynamic_pointer_cast<gm::scene::SkinnedMeshComponent>(
+                factory.Create("SkinnedMeshComponent", obj));
+            if (!component) {
+                gm::core::Logger::Error(
+                    "[SceneSerializer] Failed to create SkinnedMeshComponent for GameObject '{}'",
+                    obj->GetName().c_str());
+                return nullptr;
+            }
+
+            const int version = data.value("version", 1);
+            if (version > 1) {
+                gm::core::Logger::Warning(
+                    "[SceneSerializer] SkinnedMeshComponent version {} is newer than supported (1)", version);
+            }
+
+            if (auto it = data.find("meshGuid"); it != data.end() && it->is_string()) {
+                const std::string guid = it->get<std::string>();
+                if (!guid.empty()) {
+                    component->SetMesh(nullptr, guid);
+                }
+            }
+            if (auto it = data.find("shaderGuid"); it != data.end() && it->is_string()) {
+                const std::string guid = it->get<std::string>();
+                component->SetShader(nullptr, guid);
+            }
+            if (auto it = data.find("textureGuid"); it != data.end() && it->is_string()) {
+                const std::string guid = it->get<std::string>();
+                component->SetTexture(static_cast<gm::Texture*>(nullptr), guid);
+            }
+            if (auto it = data.find("materialGuid"); it != data.end() && it->is_string()) {
+                component->SetMaterialGuid(it->get<std::string>());
+            }
+
+            return component.get();
+        }
+    );
+
+    gm::SceneSerializer::RegisterComponentSerializer(
+        "AnimatorComponent",
+        [](gm::Component* component) -> nlohmann::json {
+            auto* animator = dynamic_cast<gm::scene::AnimatorComponent*>(component);
+            if (!animator) {
+                gm::core::Logger::Warning("[SceneSerializer] AnimatorComponent serialization: component is null");
+                return nlohmann::json();
+            }
+
+            nlohmann::json data;
+            data["version"] = 1;
+
+            if (!animator->SkeletonGuid().empty()) {
+                data["skeletonGuid"] = animator->SkeletonGuid();
+            }
+
+            nlohmann::json layers = nlohmann::json::array();
+            for (const auto& snapshot : animator->GetLayerSnapshots()) {
+                nlohmann::json layerJson;
+                layerJson["slot"] = snapshot.slot;
+                layerJson["clipGuid"] = snapshot.clipGuid;
+                layerJson["weight"] = snapshot.weight;
+                layerJson["playing"] = snapshot.playing;
+                layerJson["loop"] = snapshot.loop;
+                layerJson["timeSeconds"] = snapshot.timeSeconds;
+                layers.push_back(std::move(layerJson));
+            }
+            data["layers"] = std::move(layers);
+
+            return data;
+        },
+        [](gm::GameObject* obj, const nlohmann::json& data) -> gm::Component* {
+            if (!data.is_object() || !obj) {
+                gm::core::Logger::Error("[SceneSerializer] AnimatorComponent deserialization received invalid input");
+                return nullptr;
+            }
+
+            auto& factory = gm::scene::ComponentFactory::Instance();
+            auto component = std::dynamic_pointer_cast<gm::scene::AnimatorComponent>(
+                factory.Create("AnimatorComponent", obj));
+            if (!component) {
+                gm::core::Logger::Error(
+                    "[SceneSerializer] Failed to create AnimatorComponent for GameObject '{}'",
+                    obj->GetName().c_str());
+                return nullptr;
+            }
+
+            const int version = data.value("version", 1);
+            if (version > 1) {
+                gm::core::Logger::Warning(
+                    "[SceneSerializer] AnimatorComponent version {} is newer than supported (1)", version);
+            }
+
+            if (auto it = data.find("skeletonGuid"); it != data.end() && it->is_string()) {
+                const std::string guid = it->get<std::string>();
+                component->SetSkeleton(std::shared_ptr<gm::animation::Skeleton>(), guid);
+            }
+
+            if (auto layersIt = data.find("layers"); layersIt != data.end() && layersIt->is_array()) {
+                for (const auto& entry : *layersIt) {
+                    if (!entry.is_object()) {
+                        continue;
+                    }
+                    gm::scene::AnimatorComponent::LayerSnapshot snapshot;
+                    snapshot.slot = entry.value("slot", std::string{});
+                    snapshot.clipGuid = entry.value("clipGuid", std::string{});
+                    snapshot.weight = entry.value("weight", 1.0f);
+                    snapshot.playing = entry.value("playing", false);
+                    snapshot.loop = entry.value("loop", true);
+                    snapshot.timeSeconds = entry.value("timeSeconds", 0.0);
+                    if (!snapshot.slot.empty()) {
+                        component->ApplyLayerSnapshot(snapshot);
+                    }
+                }
+            }
+
+            return component.get();
+        }
+    );
+
+    gm::SceneSerializer::RegisterComponentSerializer(
+        "CowAnimationController",
+        [](gm::Component* component) -> nlohmann::json {
+            auto* controller = dynamic_cast<gotmilked::CowAnimationController*>(component);
+            if (!controller) {
+                return nlohmann::json();
+            }
+
+            nlohmann::json data;
+            data["version"] = 1;
+            data["speedThreshold"] = controller->SpeedThreshold();
+            data["blendRate"] = controller->BlendRate();
+            data["idleSlot"] = controller->IdleSlot();
+            data["walkSlot"] = controller->WalkSlot();
+            return data;
+        },
+        [](gm::GameObject* obj, const nlohmann::json& data) -> gm::Component* {
+            if (!data.is_object() || !obj) {
+                gm::core::Logger::Error("[SceneSerializer] CowAnimationController received invalid input");
+                return nullptr;
+            }
+
+            auto& factory = gm::scene::ComponentFactory::Instance();
+            auto component = std::dynamic_pointer_cast<gotmilked::CowAnimationController>(
+                factory.Create("CowAnimationController", obj));
+            if (!component) {
+                gm::core::Logger::Error(
+                    "[SceneSerializer] Failed to create CowAnimationController for GameObject '{}'",
+                    obj->GetName().c_str());
+                return nullptr;
+            }
+
+            const int version = data.value("version", 1);
+            if (version > 1) {
+                gm::core::Logger::Warning(
+                    "[SceneSerializer] CowAnimationController version {} is newer than supported (1)", version);
+            }
+
+            if (data.contains("speedThreshold") && data["speedThreshold"].is_number()) {
+                component->SetSpeedThreshold(data["speedThreshold"].get<float>());
+            }
+            if (data.contains("blendRate") && data["blendRate"].is_number()) {
+                component->SetBlendRate(data["blendRate"].get<float>());
+            }
+            if (data.contains("idleSlot") && data["idleSlot"].is_string()) {
+                component->SetIdleSlot(data["idleSlot"].get<std::string>());
+            }
+            if (data.contains("walkSlot") && data["walkSlot"].is_string()) {
+                component->SetWalkSlot(data["walkSlot"].get<std::string>());
+            }
+
+            return component.get();
+        });
+
     // Register RigidBodyComponent serializer
     gm::SceneSerializer::RegisterComponentSerializer(
         "RigidBodyComponent",
@@ -585,7 +802,10 @@ void UnregisterSerializers() {
     gm::SceneSerializer::UnregisterComponentSerializer("CameraRigComponent");
     gm::SceneSerializer::UnregisterComponentSerializer("QuestTriggerComponent");
     gm::SceneSerializer::UnregisterComponentSerializer("StaticMeshComponent");
+    gm::SceneSerializer::UnregisterComponentSerializer("SkinnedMeshComponent");
+    gm::SceneSerializer::UnregisterComponentSerializer("AnimatorComponent");
     gm::SceneSerializer::UnregisterComponentSerializer("RigidBodyComponent");
+    gm::SceneSerializer::UnregisterComponentSerializer("CowAnimationController");
 
     auto& factory = gm::scene::ComponentFactory::Instance();
     factory.Unregister("CameraRigComponent");
@@ -594,7 +814,10 @@ void UnregisterSerializers() {
     factory.Unregister("EditableTerrainComponent");
     #endif
     factory.Unregister("StaticMeshComponent");
+    factory.Unregister("SkinnedMeshComponent");
+    factory.Unregister("AnimatorComponent");
     factory.Unregister("RigidBodyComponent");
+    factory.Unregister("CowAnimationController");
 }
 
 } // namespace SceneSerializerExtensions

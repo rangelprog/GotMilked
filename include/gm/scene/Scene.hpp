@@ -79,7 +79,10 @@ private:
     };
     
     void CollectInstancedBatches(std::vector<InstancedBatch>& batches, const Frustum* frustum) const;
-    void RenderInstancedBatch(const InstancedBatch& batch, Shader& shader, const Camera& cam) const;
+    void RenderInstancedBatch(const InstancedBatch& batch,
+                              const Camera& cam,
+                              const glm::mat4& view,
+                              const glm::mat4& proj) const;
     bool m_instancedRenderingEnabled = true;  // Enable/disable instanced rendering
     gm::utils::ThreadPool m_updateThreadPool;
 

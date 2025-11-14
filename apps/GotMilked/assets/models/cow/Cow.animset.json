@@ -1,0 +1,63 @@
+{
+  "animations": [
+    {
+      "durationSeconds": 6.0,
+      "guid": "6066953347f130ae",
+      "name": "Eating",
+      "path": "Cow_eating.gmanim"
+    },
+    {
+      "durationSeconds": 3.333333251953125,
+      "guid": "d5ad897412497a46",
+      "name": "Idle",
+      "path": "Cow_idle.gmanim"
+    }
+  ],
+  "materials": [
+    {
+      "guid": "cow_mat0",
+      "name": "cow_mat0",
+      "path": "Cow_mat0.mat"
+    },
+    {
+      "guid": "cow_mat1",
+      "name": "cow_mat1",
+      "path": "Cow_mat1.mat"
+    },
+    {
+      "guid": "cow_mat2",
+      "name": "cow_mat2",
+      "path": "Cow_mat2.mat"
+    },
+    {
+      "guid": "cow_mat3",
+      "name": "cow_mat3",
+      "path": "Cow_mat3.mat"
+    },
+    {
+      "guid": "cow_mat4",
+      "name": "cow_mat4",
+      "path": "Cow_mat4.mat"
+    },
+    {
+      "guid": "cow_mat5",
+      "name": "cow_mat5",
+      "path": "Cow_mat5.mat"
+    },
+    {
+      "guid": "cow_mat6",
+      "name": "cow_mat6",
+      "path": "Cow_mat6.mat"
+    }
+  ],
+  "skeleton": {
+    "guid": "58f8fdb494838d5d",
+    "path": "Cow.gmskel"
+  },
+  "skinnedMesh": {
+    "guid": "5921fbb494a68f0b",
+    "path": "Cow.gmskin"
+  },
+  "source": "C:\\Users\\tmein\\Documents\\GitHub\\GotMilked\\apps\\GotMilked\\assets\\models\\cow\\Cow.glb",
+  "textures": []
+}

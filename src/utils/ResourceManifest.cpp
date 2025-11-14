@@ -196,6 +196,9 @@ ResourceManifestLoadResult LoadResourceManifest(const std::filesystem::path& man
                 if (materialJson.contains("emissionTexture") && materialJson["emissionTexture"].is_string()) {
                     entry.emissionTextureGuid = materialJson["emissionTexture"].get<std::string>();
                 }
+                if (materialJson.contains("shader") && materialJson["shader"].is_string()) {
+                    entry.shaderGuid = materialJson["shader"].get<std::string>();
+                }
 
                 result.manifest.materials.push_back(std::move(entry));
             }

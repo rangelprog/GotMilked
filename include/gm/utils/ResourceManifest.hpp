@@ -40,6 +40,7 @@ struct ResourceManifest {
         std::optional<std::string> specularTextureGuid;
         std::optional<std::string> normalTextureGuid;
         std::optional<std::string> emissionTextureGuid;
+        std::optional<std::string> shaderGuid;
     };
 
     struct Defaults {

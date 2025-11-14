@@ -6,16 +6,22 @@
 namespace gm {
 namespace {
 constexpr int kMaxTrackedTextureUnits = 32;
+constexpr int kMaxUniformBindings = 16;
 
 struct TextureBinding {
     GLenum target = GL_TEXTURE_2D;
     GLuint texture = 0;
 };
 
+struct UniformBinding {
+    GLuint buffer = 0;
+};
+
 struct CacheState {
     GLuint currentProgram = 0;
     int activeTextureUnit = -1;
     std::array<TextureBinding, kMaxTrackedTextureUnits> textures{};
+    std::array<UniformBinding, kMaxUniformBindings> uniformBuffers{};
 
     void Reset() {
         currentProgram = 0;
@@ -23,6 +29,9 @@ struct CacheState {
         for (auto& binding : textures) {
             binding.target = GL_TEXTURE_2D;
             binding.texture = 0;
+        }
+        for (auto& uniform : uniformBuffers) {
+            uniform.buffer = 0;
         }
     }
 };
@@ -73,6 +82,21 @@ void RenderStateCache::BindTexture(GLenum target, GLuint texture, int unit) {
     binding.texture = texture;
 }
 
+void RenderStateCache::BindUniformBuffer(GLuint buffer, GLuint bindingPoint) {
+    if (bindingPoint >= static_cast<GLuint>(kMaxUniformBindings)) {
+        glBindBufferBase(GL_UNIFORM_BUFFER, bindingPoint, buffer);
+        return;
+    }
+
+    auto& binding = g_cache.uniformBuffers[bindingPoint];
+    if (binding.buffer == buffer) {
+        return;
+    }
+
+    glBindBufferBase(GL_UNIFORM_BUFFER, bindingPoint, buffer);
+    binding.buffer = buffer;
+}
+
 void RenderStateCache::InvalidateShader(GLuint program) {
     if (program == 0) {
         return;
@@ -90,6 +114,17 @@ void RenderStateCache::InvalidateTexture(GLuint texture) {
         if (binding.texture == texture) {
             binding.texture = 0;
             binding.target = GL_TEXTURE_2D;
+        }
+    }
+}
+
+void RenderStateCache::InvalidateUniformBuffer(GLuint buffer) {
+    if (buffer == 0) {
+        return;
+    }
+    for (auto& binding : g_cache.uniformBuffers) {
+        if (binding.buffer == buffer) {
+            binding.buffer = 0;
         }
     }
 }

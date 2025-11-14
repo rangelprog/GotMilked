@@ -28,14 +28,21 @@ void GameRenderer::Render() {
 
     int fbw, fbh;
     glfwGetFramebufferSize(m_game.m_window, &fbw, &fbh);
+    if (fbw <= 0 || fbh <= 0) {
+        return;
+    }
     glViewport(0, 0, fbw, fbh);
     glClearColor(0.10f, 0.10f, 0.12f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     float aspect = static_cast<float>(fbw) / static_cast<float>(fbh);
-    float fov = m_game.m_cameraRigSystem ? m_game.m_cameraRigSystem->GetFovDegrees() : 60.0f;
+    float fov = m_game.GetRenderCameraFov();
     glm::mat4 proj = glm::perspective(glm::radians(fov), aspect, 0.1f, 200.0f);
-    glm::mat4 view = m_game.m_camera->View();
+    auto* activeCamera = m_game.GetRenderCamera();
+    if (!activeCamera) {
+        return;
+    }
+    glm::mat4 view = activeCamera->View();
 
     if (m_game.m_toolingFacade) {
         gm::utils::Profiler::ScopedTimer toolingTimer("GameRenderer::ToolingBegin");
@@ -43,9 +50,9 @@ void GameRenderer::Render() {
         m_game.m_toolingFacade->RenderGrid(view, proj);
     }
 
-    if (m_game.m_gameScene && m_game.m_camera) {
+    if (m_game.m_gameScene && activeCamera) {
         gm::utils::Profiler::ScopedTimer sceneTimer("GameRenderer::DrawScene");
-        m_game.m_gameScene->Draw(*m_game.m_resources.GetShader(), *m_game.m_camera, fbw, fbh, fov);
+        m_game.m_gameScene->Draw(*m_game.m_resources.GetShader(), *activeCamera, fbw, fbh, fov);
     }
     if (m_game.m_toolingFacade) {
         gm::utils::Profiler::ScopedTimer toolingUiTimer("GameRenderer::ToolingUI");

@@ -3,6 +3,7 @@
 #include "DebugMenu.hpp"
 #include "gm/tooling/DebugConsole.hpp"
 #include "gm/scene/Scene.hpp"
+#include "GameResources.hpp"
 
 #include <imgui.h>
 
@@ -60,6 +61,20 @@ void DebugMenu::Render(bool& menuVisible) {
         HandleLoad();
     }
 
+    if (m_pendingImport) {
+        m_pendingImport = false;
+        m_showImportDialog = true;
+        // Initialize import settings with defaults
+        if (m_importSettings.inputPath.empty() && m_gameResources) {
+            std::filesystem::path assetsDir = m_gameResources->GetAssetsDirectory();
+            m_importSettings.outputDir = assetsDir / "models";
+        }
+    }
+
+    if (m_showImportDialog) {
+        RenderImportModelDialog();
+    }
+
     if (m_showSceneExplorer) {
         RenderSceneExplorerWindow();
         RenderTransformGizmo();
@@ -83,6 +98,10 @@ void DebugMenu::Render(bool& menuVisible) {
 
     if (m_showContentBrowser) {
         RenderContentBrowser();
+    }
+
+    if (m_showAnimationDebugger) {
+        RenderAnimationDebugger();
     }
 
     RenderGameObjectOverlay();

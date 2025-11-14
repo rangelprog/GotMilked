@@ -18,12 +18,14 @@
 #include <cctype>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <optional>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 #include <fmt/format.h>
 #include <glm/vec3.hpp>
+#include <nlohmann/json.hpp>
 
 namespace {
 
@@ -154,6 +156,304 @@ std::string GameResources::ResolveMaterialGuid(const std::string& guid) const {
     return {};
 }
 
+void GameResources::LoadAnimationAssetManifests() {
+    m_skinnedMeshSources.clear();
+    m_skeletonSources.clear();
+    m_animationClipSources.clear();
+    m_animsetRecords.clear();
+
+    const auto modelsDir = m_assetsDir / "models";
+    std::error_code ec;
+    if (!std::filesystem::exists(modelsDir, ec)) {
+        return;
+    }
+
+    for (std::filesystem::recursive_directory_iterator it(modelsDir, ec), end; it != end && !ec; ++it) {
+        if (!it->is_regular_file()) {
+            continue;
+        }
+
+        const auto& path = it->path();
+        if (path.extension() != ".json") {
+            continue;
+        }
+
+        constexpr std::string_view kSuffix = ".animset.json";
+        const std::string filename = path.filename().string();
+        if (filename.length() < kSuffix.length()) {
+            continue;
+        }
+        if (filename.compare(filename.length() - kSuffix.length(), kSuffix.length(), kSuffix) != 0) {
+            continue;
+        }
+
+        ParseAnimsetManifest(path);
+    }
+
+    if (ec) {
+        ReportIssue(fmt::format("Animation manifest scan error: {}", ec.message()), false);
+    }
+}
+
+void GameResources::ParseAnimsetManifest(const std::filesystem::path& manifestPath) {
+    std::ifstream file(manifestPath);
+    if (!file.is_open()) {
+        ReportIssue(fmt::format("Failed to open animation manifest '{}'", manifestPath.generic_string()), true);
+        return;
+    }
+
+    nlohmann::json json;
+    try {
+        file >> json;
+    } catch (const std::exception& ex) {
+        ReportIssue(fmt::format("Animation manifest '{}' parse error: {}", manifestPath.generic_string(), ex.what()),
+                    true);
+        return;
+    }
+
+    const auto baseDir = manifestPath.parent_path();
+    auto resolvePath = [&](const std::string& relative) -> std::string {
+        if (relative.empty()) {
+            return {};
+        }
+        std::filesystem::path resolved(relative);
+        if (!resolved.is_absolute()) {
+            resolved = baseDir / resolved;
+        }
+        return resolved.lexically_normal().string();
+    };
+
+    if (auto texturesIt = json.find("textures"); texturesIt != json.end() && texturesIt->is_array()) {
+        for (const auto& textureJson : *texturesIt) {
+            if (!textureJson.is_object()) {
+                continue;
+            }
+            const std::string guid = textureJson.value("guid", "");
+            const std::string relativePath = textureJson.value("path", "");
+            if (guid.empty() || relativePath.empty()) {
+                continue;
+            }
+
+            gm::utils::ResourceManifest::TextureEntry entry;
+            entry.guid = guid;
+            entry.path = resolvePath(relativePath);
+            entry.generateMipmaps = textureJson.value("generateMipmaps", true);
+            entry.srgb = textureJson.value("srgb", true);
+            entry.flipY = textureJson.value("flipY", true);
+            m_textureSources[guid] = entry;
+            if (!entry.path.empty()) {
+                gm::ResourceRegistry::Instance().RegisterTexture(guid, entry.path);
+            }
+        }
+    }
+
+    if (auto materialsIt = json.find("materials"); materialsIt != json.end() && materialsIt->is_array()) {
+        for (const auto& materialJson : *materialsIt) {
+            if (!materialJson.is_object()) {
+                continue;
+            }
+            const std::string guid = materialJson.value("guid", "");
+            const std::string relativePath = materialJson.value("path", "");
+            const std::string displayName = materialJson.value("name", guid);
+            if (guid.empty() || relativePath.empty()) {
+                continue;
+            }
+
+            const std::string absolutePath = resolvePath(relativePath);
+            LoadMaterialDefinition(guid, absolutePath, displayName);
+        }
+    }
+
+    GameResources::AnimsetRecord record;
+    record.manifestPath = manifestPath.lexically_normal();
+    record.outputDir = record.manifestPath.parent_path();
+    record.baseName = record.manifestPath.stem().string();
+    constexpr std::string_view kAnimsetSuffix = ".animset";
+    if (record.baseName.size() > kAnimsetSuffix.size()) {
+        if (record.baseName.rfind(kAnimsetSuffix) == record.baseName.size() - kAnimsetSuffix.size()) {
+            record.baseName.erase(record.baseName.size() - kAnimsetSuffix.size());
+        }
+    }
+    std::string sourceGlb = json.value("source", "");
+    if (!sourceGlb.empty()) {
+        std::filesystem::path resolvedSource(sourceGlb);
+        if (!resolvedSource.is_absolute()) {
+            resolvedSource = resolvePath(sourceGlb);
+        }
+        record.sourceGlb = resolvedSource.lexically_normal().string();
+    }
+
+    if (auto it = json.find("skinnedMesh"); it != json.end() && it->is_object()) {
+        const std::string guid = it->value("guid", "");
+        const std::string path = resolvePath(it->value("path", ""));
+        if (!guid.empty() && !path.empty()) {
+            m_skinnedMeshSources[guid] = path;
+            record.skinnedMeshGuid = guid;
+        }
+    }
+
+    if (auto it = json.find("skeleton"); it != json.end() && it->is_object()) {
+        const std::string guid = it->value("guid", "");
+        const std::string path = resolvePath(it->value("path", ""));
+        if (!guid.empty() && !path.empty()) {
+            m_skeletonSources[guid] = path;
+        }
+    }
+
+    if (auto it = json.find("animations"); it != json.end() && it->is_array()) {
+        for (const auto& anim : *it) {
+            if (!anim.is_object()) {
+                continue;
+            }
+            const std::string guid = anim.value("guid", "");
+            const std::string path = resolvePath(anim.value("path", ""));
+            if (!guid.empty() && !path.empty()) {
+                m_animationClipSources[guid] = path;
+            }
+        }
+    }
+    if (!record.skinnedMeshGuid.empty() && !record.sourceGlb.empty()) {
+        m_animsetRecords[record.skinnedMeshGuid] = record;
+    }
+}
+
+const GameResources::AnimsetRecord* GameResources::GetAnimsetRecordForSkinnedMesh(const std::string& guid) const {
+    if (guid.empty()) {
+        return nullptr;
+    }
+    auto it = m_animsetRecords.find(guid);
+    if (it != m_animsetRecords.end()) {
+        return &it->second;
+    }
+    return nullptr;
+}
+
+namespace {
+glm::vec3 ParseColor(const nlohmann::json& value, const glm::vec3& fallback) {
+    if (!value.is_array() || value.size() != 3) {
+        return fallback;
+    }
+    return glm::vec3(
+        value[0].get<float>(),
+        value[1].get<float>(),
+        value[2].get<float>());
+}
+} // namespace
+
+std::optional<gm::utils::ResourceManifest::MaterialEntry> GameResources::ParseMaterialFile(
+    const std::filesystem::path& path,
+    const std::string& guid) {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        ReportIssue(fmt::format("Failed to open material '{}'", path.string()), true);
+        return std::nullopt;
+    }
+
+    nlohmann::json json;
+    try {
+        file >> json;
+    } catch (const std::exception& ex) {
+        ReportIssue(fmt::format("Failed to parse material '{}': {}", path.string(), ex.what()), true);
+        return std::nullopt;
+    }
+
+    gm::utils::ResourceManifest::MaterialEntry entry;
+    entry.guid = guid;
+    entry.name = json.value("name", path.stem().string());
+    if (json.contains("diffuseColor")) {
+        entry.diffuseColor = ParseColor(json["diffuseColor"], entry.diffuseColor);
+    }
+    if (json.contains("specularColor")) {
+        entry.specularColor = ParseColor(json["specularColor"], entry.specularColor);
+    }
+    if (json.contains("emissionColor")) {
+        entry.emissionColor = ParseColor(json["emissionColor"], entry.emissionColor);
+    }
+    if (json.contains("shininess") && json["shininess"].is_number()) {
+        entry.shininess = json["shininess"].get<float>();
+    }
+    if (json.contains("diffuseTexture") && json["diffuseTexture"].is_string()) {
+        entry.diffuseTextureGuid = json["diffuseTexture"].get<std::string>();
+    }
+    if (json.contains("specularTexture") && json["specularTexture"].is_string()) {
+        entry.specularTextureGuid = json["specularTexture"].get<std::string>();
+    }
+    if (json.contains("normalTexture") && json["normalTexture"].is_string()) {
+        entry.normalTextureGuid = json["normalTexture"].get<std::string>();
+    }
+    if (json.contains("emissionTexture") && json["emissionTexture"].is_string()) {
+        entry.emissionTextureGuid = json["emissionTexture"].get<std::string>();
+    }
+    if (json.contains("shader") && json["shader"].is_string()) {
+        entry.shaderGuid = json["shader"].get<std::string>();
+    }
+
+    return entry;
+}
+
+bool GameResources::LoadMaterialDefinition(const std::string& guid,
+                                           const std::filesystem::path& path,
+                                           const std::string& displayName) {
+    auto entryOpt = ParseMaterialFile(path, guid);
+    if (!entryOpt.has_value()) {
+        return false;
+    }
+
+    auto entry = *entryOpt;
+    if (!displayName.empty()) {
+        entry.name = displayName;
+    }
+
+    auto material = std::make_shared<gm::Material>();
+    material->SetName(entry.name.empty() ? guid : entry.name);
+    material->SetDiffuseColor(entry.diffuseColor);
+    material->SetSpecularColor(entry.specularColor);
+    material->SetEmissionColor(entry.emissionColor);
+    material->SetShininess(entry.shininess);
+
+    auto resolveTexture = [&](const std::optional<std::string>& textureGuid,
+                              auto setTextureFn) {
+        if (!textureGuid || textureGuid->empty()) {
+            return;
+        }
+        auto textureShared = EnsureTextureAvailable(*textureGuid);
+        if (!textureShared) {
+            textureShared = GetTextureShared(*textureGuid);
+        }
+        if (textureShared) {
+            (material.get()->*setTextureFn)(textureShared.get());
+        }
+    };
+
+    resolveTexture(entry.diffuseTextureGuid, &gm::Material::SetDiffuseTexture);
+    resolveTexture(entry.specularTextureGuid, &gm::Material::SetSpecularTexture);
+    resolveTexture(entry.normalTextureGuid, &gm::Material::SetNormalTexture);
+    resolveTexture(entry.emissionTextureGuid, &gm::Material::SetEmissionTexture);
+
+    m_materials[guid] = material;
+    m_materialSources[guid] = entry;
+
+    gm::ResourceRegistry::MaterialData registryEntry;
+    registryEntry.name = material->GetName();
+    registryEntry.diffuseColor = entry.diffuseColor;
+    registryEntry.specularColor = entry.specularColor;
+    registryEntry.emissionColor = entry.emissionColor;
+    registryEntry.shininess = entry.shininess;
+    registryEntry.diffuseTextureGuid = entry.diffuseTextureGuid;
+    registryEntry.specularTextureGuid = entry.specularTextureGuid;
+    registryEntry.normalTextureGuid = entry.normalTextureGuid;
+    registryEntry.emissionTextureGuid = entry.emissionTextureGuid;
+    gm::ResourceRegistry::Instance().RegisterMaterial(guid, registryEntry);
+
+    if (!entry.name.empty()) {
+        RegisterMaterialAlias(entry.name, guid);
+    }
+    if (entry.shaderGuid && !entry.shaderGuid->empty()) {
+        m_materialShaderOverrides[guid] = *entry.shaderGuid;
+    }
+    return true;
+}
+
 std::string GameResources::ResolveShaderAlias(const std::string& guid) const {
     auto resolved = ResolveShaderGuid(guid);
     return resolved.empty() ? guid : resolved;
@@ -208,6 +508,9 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
     m_shaderAliases.clear();
     m_meshAliases.clear();
     m_materialAliases.clear();
+    m_skinnedMeshSources.clear();
+    m_skeletonSources.clear();
+    m_animationClipSources.clear();
 
     bool success = false;
 
@@ -267,6 +570,8 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
                 RegisterShaderAlias(record.guid.substr(pos + 2), record.guid);
             }
         }
+
+        EnsureBuiltinShaders();
 
         for (const auto& meshRecord : meshRecords) {
             const auto& guid = meshRecord.guid;
@@ -330,6 +635,7 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
         if (GetDefaultMesh()) {
             gm::core::Event::Trigger(gotmilked::GameEvents::ResourceMeshLoaded);
         }
+        LoadAnimationAssetManifests();
         success = true;
     } catch (const gm::core::Error& err) {
         StoreError(err);
@@ -347,6 +653,51 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
     RegisterCatalogListener();
 
     return success;
+}
+
+void GameResources::EnsureBuiltinShaders() {
+    static constexpr const char* kSimpleSkinnedGuid = "shader::simple_skinned";
+    if (m_shaders.count(kSimpleSkinnedGuid)) {
+        return;
+    }
+
+    const std::filesystem::path vertPath = (m_assetsDir / "shaders/simple_skinned.vert.glsl").lexically_normal();
+    const std::filesystem::path fragPath = (m_assetsDir / "shaders/simple.frag.glsl").lexically_normal();
+
+    if (!FileExists(vertPath) || !FileExists(fragPath)) {
+        ReportIssue(
+            fmt::format("Built-in skinned shader missing files ({} / {})",
+                        vertPath.generic_string(),
+                        fragPath.generic_string()),
+            true);
+        return;
+    }
+
+    try {
+        gm::ResourceManager::ShaderDescriptor descriptor{
+            kSimpleSkinnedGuid,
+            vertPath.string(),
+            fragPath.string()};
+        auto handle = gm::ResourceManager::LoadShader(descriptor);
+        auto shader = handle.Lock();
+        if (!shader) {
+            ReportIssue("Failed to load built-in skinned shader: empty handle", true);
+            return;
+        }
+        shader->Use();
+        shader->SetInt("uTex", 0);
+
+        m_shaders[kSimpleSkinnedGuid] = shader;
+        m_shaderSources[kSimpleSkinnedGuid] = ShaderSources{descriptor.vertexPath, descriptor.fragmentPath};
+        gm::ResourceRegistry::Instance().RegisterShader(kSimpleSkinnedGuid, descriptor.vertexPath, descriptor.fragmentPath);
+
+        RegisterShaderAlias("simple_skinned", kSimpleSkinnedGuid);
+        RegisterShaderAlias("shaders/simple_skinned.vert.glsl", kSimpleSkinnedGuid);
+        RegisterShaderAlias("simple_skinned.vert.glsl", kSimpleSkinnedGuid);
+        RegisterShaderAlias("simple_skinned.vert", kSimpleSkinnedGuid);
+    } catch (const std::exception& ex) {
+        ReportIssue(fmt::format("Failed to compile built-in skinned shader: {}", ex.what()), true);
+    }
 }
 
 void GameResources::RegisterCatalogListener() {
@@ -541,6 +892,21 @@ std::shared_ptr<gm::Material> GameResources::GetMaterial(const std::string& guid
     return nullptr;
 }
 
+std::optional<std::string> GameResources::GetMaterialShaderOverride(const std::string& guid) const {
+    if (guid.empty()) {
+        return std::nullopt;
+    }
+    std::string resolved = ResolveMaterialGuid(guid);
+    if (resolved.empty()) {
+        resolved = guid;
+    }
+    auto it = m_materialShaderOverrides.find(resolved);
+    if (it != m_materialShaderOverrides.end()) {
+        return it->second;
+    }
+    return std::nullopt;
+}
+
 std::shared_ptr<gm::Texture> GameResources::GetTextureShared(const std::string& guid) const {
     auto it = m_textures.find(guid);
     if (it != m_textures.end()) {
@@ -559,16 +925,26 @@ std::shared_ptr<gm::Texture> GameResources::EnsureTextureAvailable(const std::st
     }
 
     auto descriptorOpt = gm::assets::AssetDatabase::Instance().FindByGuid(guid);
-    if (!descriptorOpt) {
-        return nullptr;
-    }
-
     gm::ResourceManager::TextureDescriptor desc;
     desc.guid = guid;
-    desc.path = (m_assetsDir / descriptorOpt->relativePath).lexically_normal().string();
-    desc.generateMipmaps = true;
-    desc.srgb = true;
-    desc.flipY = true;
+    if (descriptorOpt) {
+        desc.path = (m_assetsDir / descriptorOpt->relativePath).lexically_normal().string();
+        desc.generateMipmaps = true;
+        desc.srgb = true;
+        desc.flipY = true;
+    } else {
+        auto manifestIt = m_textureSources.find(guid);
+        if (manifestIt == m_textureSources.end() || manifestIt->second.path.empty()) {
+            return nullptr;
+        }
+        desc.path = manifestIt->second.path;
+        desc.generateMipmaps = manifestIt->second.generateMipmaps;
+        desc.srgb = manifestIt->second.srgb;
+        desc.flipY = manifestIt->second.flipY;
+    }
+    if (desc.path.empty()) {
+        return nullptr;
+    }
 
     auto handle = gm::ResourceManager::LoadTexture(desc);
     auto textureShared = handle.Lock();
@@ -588,6 +964,27 @@ std::shared_ptr<gm::Texture> GameResources::EnsureTextureAvailable(const std::st
 
     gm::ResourceRegistry::Instance().RegisterTexture(guid, entry.path);
     return textureShared;
+}
+
+std::optional<std::string> GameResources::GetSkinnedMeshPath(const std::string& guid) const {
+    if (auto it = m_skinnedMeshSources.find(guid); it != m_skinnedMeshSources.end()) {
+        return it->second;
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> GameResources::GetSkeletonPath(const std::string& guid) const {
+    if (auto it = m_skeletonSources.find(guid); it != m_skeletonSources.end()) {
+        return it->second;
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> GameResources::GetAnimationClipPath(const std::string& guid) const {
+    if (auto it = m_animationClipSources.find(guid); it != m_animationClipSources.end()) {
+        return it->second;
+    }
+    return std::nullopt;
 }
 
 gm::Shader* GameResources::GetDefaultShader() const {
@@ -802,7 +1199,7 @@ bool GameResources::ReloadMesh(const std::string& guid) {
 
 bool GameResources::ReloadAll() {
     bool shaderOk = ReloadShader();
-    bool textureOk = ReloadTexture();
+    bool textureOk = m_defaultTextureGuid.empty() ? true : ReloadTexture();
     bool meshOk = ReloadMesh();
 
     bool allOk = shaderOk && textureOk && meshOk;
@@ -839,6 +1236,7 @@ void GameResources::Release() {
     m_textureSources.clear();
     m_meshSources.clear();
     m_materialSources.clear();
+    m_materialShaderOverrides.clear();
     m_prefabSources.clear();
     m_shaderAliases.clear();
     m_meshAliases.clear();

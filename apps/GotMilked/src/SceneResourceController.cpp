@@ -7,10 +7,14 @@
 #include "gm/scene/GameObject.hpp"
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/StaticMeshComponent.hpp"
+#include "gm/scene/SkinnedMeshComponent.hpp"
+#include "gm/scene/AnimatorComponent.hpp"
 #include "gm/rendering/Camera.hpp"
 #include "gm/rendering/Material.hpp"
 #include "gm/rendering/Mesh.hpp"
 #include "gm/rendering/Shader.hpp"
+#include "gm/rendering/Texture.hpp"
+#include "gm/utils/ResourceManager.hpp"
 
 #include <fmt/format.h>
 
@@ -18,7 +22,6 @@
 #include "DebugHudController.hpp"
 #include "EditableTerrainComponent.hpp"
 #include "gm/debug/GridRenderer.hpp"
-#include "gm/rendering/Texture.hpp"
 #endif
 
 #include <algorithm>
@@ -70,6 +73,8 @@ void SceneResourceController::ApplyResourcesToScene() {
     ApplyResourcesToTerrain();
 #endif
     ApplyResourcesToStaticMeshComponents();
+    ApplyResourcesToSkinnedMeshComponents();
+    ApplyResourcesToAnimatorComponents();
 
     if (auto* tooling = m_game.GetToolingFacade()) {
         tooling->UpdateSceneReference();
@@ -101,45 +106,109 @@ void SceneResourceController::ApplyResourcesToStaticMeshComponents() {
     }
 }
 
+void SceneResourceController::ApplyResourcesToSkinnedMeshComponents() {
+    if (!m_game.m_gameScene) {
+        return;
+    }
+
+    ClearSkinnedMeshDependencies();
+
+    for (const auto& gameObject : m_game.m_gameScene->GetAllGameObjects()) {
+        if (!gameObject || !gameObject->IsActive()) {
+            continue;
+        }
+
+        auto component = gameObject->GetComponent<gm::scene::SkinnedMeshComponent>();
+        if (!component) {
+            continue;
+        }
+
+        ResolveSkinnedMeshComponent(gameObject, component.get());
+    }
+}
+
+void SceneResourceController::ApplyResourcesToAnimatorComponents() {
+    if (!m_game.m_gameScene) {
+        return;
+    }
+
+    for (const auto& gameObject : m_game.m_gameScene->GetAllGameObjects()) {
+        if (!gameObject || !gameObject->IsActive()) {
+            continue;
+        }
+
+        auto component = gameObject->GetComponent<gm::scene::AnimatorComponent>();
+        if (!component) {
+            continue;
+        }
+
+        ResolveAnimatorComponent(gameObject, component.get());
+    }
+}
+
 void SceneResourceController::RefreshShaders(const std::vector<std::string>& guids) {
     std::unordered_set<gm::scene::StaticMeshComponent*> candidates;
+    std::unordered_set<gm::scene::SkinnedMeshComponent*> skinnedCandidates;
     for (const auto& guid : guids) {
         std::string key = m_game.m_resources.ResolveShaderAlias(guid);
         auto it = m_shaderDependents.find(key);
         if (it != m_shaderDependents.end()) {
             candidates.insert(it->second.begin(), it->second.end());
         }
+        auto skinnedIt = m_skinnedShaderDependents.find(key);
+        if (skinnedIt != m_skinnedShaderDependents.end()) {
+            skinnedCandidates.insert(skinnedIt->second.begin(), skinnedIt->second.end());
+        }
     }
     for (auto* component : candidates) {
         ResolveStaticMeshComponentBinding(component);
+    }
+    for (auto* component : skinnedCandidates) {
+        ResolveSkinnedMeshComponentBinding(component);
     }
 }
 
 void SceneResourceController::RefreshMeshes(const std::vector<std::string>& guids) {
     std::unordered_set<gm::scene::StaticMeshComponent*> candidates;
+    std::unordered_set<gm::scene::SkinnedMeshComponent*> skinnedCandidates;
     for (const auto& guid : guids) {
         std::string key = m_game.m_resources.ResolveMeshAlias(guid);
         auto it = m_meshDependents.find(key);
         if (it != m_meshDependents.end()) {
             candidates.insert(it->second.begin(), it->second.end());
         }
+        auto skinnedIt = m_skinnedMeshDependents.find(key);
+        if (skinnedIt != m_skinnedMeshDependents.end()) {
+            skinnedCandidates.insert(skinnedIt->second.begin(), skinnedIt->second.end());
+        }
     }
     for (auto* component : candidates) {
         ResolveStaticMeshComponentBinding(component);
+    }
+    for (auto* component : skinnedCandidates) {
+        ResolveSkinnedMeshComponentBinding(component);
     }
 }
 
 void SceneResourceController::RefreshMaterials(const std::vector<std::string>& guids) {
     std::unordered_set<gm::scene::StaticMeshComponent*> candidates;
+    std::unordered_set<gm::scene::SkinnedMeshComponent*> skinnedCandidates;
     for (const auto& guid : guids) {
         std::string key = m_game.m_resources.ResolveMaterialAlias(guid);
         auto it = m_materialDependents.find(key);
         if (it != m_materialDependents.end()) {
             candidates.insert(it->second.begin(), it->second.end());
         }
+        auto skinnedIt = m_skinnedMaterialDependents.find(key);
+        if (skinnedIt != m_skinnedMaterialDependents.end()) {
+            skinnedCandidates.insert(skinnedIt->second.begin(), skinnedIt->second.end());
+        }
     }
     for (auto* component : candidates) {
         ResolveStaticMeshComponentBinding(component);
+    }
+    for (auto* component : skinnedCandidates) {
+        ResolveSkinnedMeshComponentBinding(component);
     }
 }
 
@@ -212,10 +281,35 @@ void SceneResourceController::ClearStaticMeshDependencies() {
     m_materialDependents.clear();
 }
 
+void SceneResourceController::ClearSkinnedMeshDependencies() {
+    m_skinnedMeshBindings.clear();
+    m_skinnedMeshDependents.clear();
+    m_skinnedShaderDependents.clear();
+    m_skinnedMaterialDependents.clear();
+    m_skinnedTextureDependents.clear();
+}
+
 void SceneResourceController::EraseDependent(
     std::unordered_map<std::string, std::unordered_set<gm::scene::StaticMeshComponent*>>& map,
     const std::string& guid,
     gm::scene::StaticMeshComponent* component) {
+    if (guid.empty()) {
+        return;
+    }
+    auto it = map.find(guid);
+    if (it == map.end()) {
+        return;
+    }
+    it->second.erase(component);
+    if (it->second.empty()) {
+        map.erase(it);
+    }
+}
+
+void SceneResourceController::EraseSkinnedDependent(
+    std::unordered_map<std::string, std::unordered_set<gm::scene::SkinnedMeshComponent*>>& map,
+    const std::string& guid,
+    gm::scene::SkinnedMeshComponent* component) {
     if (guid.empty()) {
         return;
     }
@@ -368,5 +462,331 @@ void SceneResourceController::ResolveStaticMeshComponentBinding(gm::scene::Stati
     }
 
     ResolveStaticMeshComponent(owner, component);
+}
+
+void SceneResourceController::RemoveSkinnedMeshBinding(gm::scene::SkinnedMeshComponent* component) {
+    auto it = m_skinnedMeshBindings.find(component);
+    if (it == m_skinnedMeshBindings.end()) {
+        return;
+    }
+
+    EraseSkinnedDependent(m_skinnedMeshDependents, it->second.meshGuid, component);
+    EraseSkinnedDependent(m_skinnedShaderDependents, it->second.shaderGuid, component);
+    EraseSkinnedDependent(m_skinnedMaterialDependents, it->second.materialGuid, component);
+    EraseSkinnedDependent(m_skinnedTextureDependents, it->second.textureGuid, component);
+    m_skinnedMeshBindings.erase(it);
+}
+
+void SceneResourceController::RegisterSkinnedMeshBinding(gm::scene::SkinnedMeshComponent* component,
+                                                         const std::shared_ptr<gm::GameObject>& owner,
+                                                         const std::string& meshGuid,
+                                                         const std::string& shaderGuid,
+                                                         const std::string& materialGuid,
+                                                         const std::string& textureGuid) {
+    if (!component) {
+        return;
+    }
+
+    RemoveSkinnedMeshBinding(component);
+
+    SkinnedMeshBinding binding;
+    binding.owner = owner;
+    binding.meshGuid = meshGuid;
+    binding.shaderGuid = shaderGuid;
+    binding.materialGuid = materialGuid;
+    binding.textureGuid = textureGuid;
+
+    m_skinnedMeshBindings[component] = binding;
+
+    if (!meshGuid.empty()) {
+        m_skinnedMeshDependents[meshGuid].insert(component);
+    }
+    if (!shaderGuid.empty()) {
+        m_skinnedShaderDependents[shaderGuid].insert(component);
+    }
+    if (!materialGuid.empty()) {
+        m_skinnedMaterialDependents[materialGuid].insert(component);
+    }
+    if (!textureGuid.empty()) {
+        m_skinnedTextureDependents[textureGuid].insert(component);
+    }
+}
+
+void SceneResourceController::ResolveSkinnedMeshComponentBinding(gm::scene::SkinnedMeshComponent* component) {
+    if (!component) {
+        return;
+    }
+
+    auto it = m_skinnedMeshBindings.find(component);
+    if (it == m_skinnedMeshBindings.end()) {
+        return;
+    }
+
+    auto owner = it->second.owner.lock();
+    if (!owner) {
+        RemoveSkinnedMeshBinding(component);
+        return;
+    }
+
+    ResolveSkinnedMeshComponent(owner, component);
+}
+
+void SceneResourceController::ResolveSkinnedMeshComponent(const std::shared_ptr<gm::GameObject>& gameObject,
+                                                          gm::scene::SkinnedMeshComponent* component) {
+    if (!component || !gameObject) {
+        return;
+    }
+
+    RemoveSkinnedMeshBinding(component);
+
+    const std::string meshGuid = component->MeshGuid();
+    if (!meshGuid.empty()) {
+        if (auto meshPath = m_game.m_resources.GetSkinnedMeshPath(meshGuid)) {
+            try {
+                gm::ResourceManager::SkinnedMeshDescriptor desc{meshGuid, *meshPath};
+                auto handle = gm::ResourceManager::LoadSkinnedMesh(desc);
+                component->SetMesh(std::move(handle));
+            } catch (const std::exception& ex) {
+                ReportSceneIssue(
+                    m_game,
+                    fmt::format("Failed to load skinned mesh '{}' for '{}': {}", meshGuid, gameObject->GetName(), ex.what()),
+                    true);
+            }
+        } else {
+            ReportSceneIssue(
+                m_game,
+                fmt::format("Skinned mesh GUID '{}' referenced by '{}' has no registered asset path",
+                            meshGuid,
+                            gameObject->GetName()),
+                true);
+        }
+    }
+
+    std::shared_ptr<gm::Material> resolvedMaterial = component->GetMaterial();
+    std::string resolvedMaterialGuid;
+    const std::string originalMaterialGuid = component->MaterialGuid();
+    if (!originalMaterialGuid.empty()) {
+        resolvedMaterialGuid = m_game.m_resources.ResolveMaterialAlias(originalMaterialGuid);
+        if (resolvedMaterialGuid.empty()) {
+            resolvedMaterialGuid = originalMaterialGuid;
+        }
+        resolvedMaterial = m_game.m_resources.GetMaterial(resolvedMaterialGuid);
+        if (resolvedMaterial) {
+            component->SetMaterial(resolvedMaterial, resolvedMaterialGuid);
+        } else {
+            resolvedMaterialGuid.clear();
+            resolvedMaterial.reset();
+            component->SetMaterial(nullptr);
+            ReportSceneIssue(
+                m_game,
+                fmt::format("Skinned mesh '{}' missing material '{}'", gameObject->GetName(), originalMaterialGuid),
+                true);
+        }
+    }
+
+    auto resolveShaderByGuid = [&](const std::string& guid,
+                                   bool silent) -> gm::Shader* {
+        if (guid.empty()) {
+            return nullptr;
+        }
+        std::string resolvedGuid = m_game.m_resources.ResolveShaderAlias(guid);
+        if (resolvedGuid.empty()) {
+            resolvedGuid = guid;
+        }
+        gm::Shader* shader = m_game.m_resources.GetShader(resolvedGuid);
+        if (!shader && !silent) {
+            ReportSceneIssue(
+                m_game,
+                fmt::format("Skinned mesh '{}' references missing shader '{}'",
+                            gameObject->GetName(),
+                            guid),
+                true);
+        }
+        if (shader) {
+            shader->Use();
+            shader->SetInt("uTex", 0);
+        }
+        if (shader) {
+            component->SetShader(shader, resolvedGuid);
+        }
+        return shader;
+    };
+
+    std::string resolvedShaderGuid;
+    gm::Shader* resolvedShader = nullptr;
+    bool shaderGuidFailed = false;
+    bool materialShaderFailed = false;
+
+    const std::string requestedShaderGuid = component->ShaderGuid();
+    if (!requestedShaderGuid.empty()) {
+        resolvedShader = resolveShaderByGuid(requestedShaderGuid, false);
+        if (resolvedShader) {
+            resolvedShaderGuid = component->ShaderGuid();
+        } else {
+            shaderGuidFailed = true;
+        }
+    } else {
+        component->SetShader(nullptr, std::string());
+    }
+
+    if (!resolvedShader && resolvedMaterial && !resolvedMaterialGuid.empty()) {
+        if (auto shaderOverride = m_game.m_resources.GetMaterialShaderOverride(resolvedMaterialGuid)) {
+            resolvedShader = resolveShaderByGuid(*shaderOverride, true);
+            if (resolvedShader) {
+                resolvedShaderGuid = component->ShaderGuid();
+            } else {
+                materialShaderFailed = true;
+            }
+        } else {
+            materialShaderFailed = true;
+        }
+    } else if (!resolvedShader && resolvedMaterial) {
+        materialShaderFailed = true;
+    }
+
+    if (!resolvedShader) {
+        bool allowFallback = shaderGuidFailed || requestedShaderGuid.empty();
+        if (resolvedMaterial) {
+            allowFallback = allowFallback && materialShaderFailed;
+        }
+        if (!resolvedMaterial) {
+            allowFallback = true;
+        }
+        if (allowFallback) {
+            resolvedShader = m_game.m_resources.GetDefaultShader();
+            resolvedShaderGuid = m_game.m_resources.GetShaderGuid();
+            if (resolvedShader) {
+                component->SetShader(resolvedShader, resolvedShaderGuid);
+                resolvedShader->Use();
+                resolvedShader->SetInt("uTex", 0);
+                ReportSceneIssue(
+                    m_game,
+                    fmt::format("Skinned mesh '{}' using default shader '{}' due to missing overrides",
+                                gameObject->GetName(),
+                                resolvedShaderGuid.empty() ? "<unset>" : resolvedShaderGuid),
+                    !resolvedMaterial);
+            }
+        }
+    }
+
+    if (!resolvedShader) {
+        component->SetShader(nullptr, std::string());
+    }
+
+    auto resolveTexture = [&](const std::string& guid) -> std::shared_ptr<gm::Texture> {
+        if (guid.empty()) {
+            return nullptr;
+        }
+        auto textureShared = m_game.m_resources.GetTextureShared(guid);
+        if (!textureShared) {
+            textureShared = m_game.m_resources.EnsureTextureAvailable(guid);
+        }
+        return textureShared;
+    };
+
+    std::string resolvedTextureGuid = component->TextureGuid();
+    if (!resolvedTextureGuid.empty()) {
+        auto textureShared = resolveTexture(resolvedTextureGuid);
+        if (textureShared) {
+            component->SetTexture(textureShared.get(), resolvedTextureGuid);
+        } else {
+            component->SetTexture(static_cast<gm::Texture*>(nullptr), std::string());
+            ReportSceneIssue(
+                m_game,
+                fmt::format("Skinned mesh '{}' missing texture '{}'",
+                            gameObject->GetName(),
+                            resolvedTextureGuid),
+                true);
+            resolvedTextureGuid.clear();
+        }
+    } else {
+        component->SetTexture(static_cast<gm::Texture*>(nullptr), std::string());
+    }
+
+    if (resolvedTextureGuid.empty() && !resolvedMaterial) {
+        if (auto* defaultTexture = m_game.m_resources.GetDefaultTexture()) {
+            const std::string& defaultTextureGuid = m_game.m_resources.GetTextureGuid();
+            component->SetTexture(defaultTexture, defaultTextureGuid);
+            resolvedTextureGuid = defaultTextureGuid;
+            ReportSceneIssue(
+                m_game,
+                fmt::format("Skinned mesh '{}' missing texture data; using default texture '{}'",
+                            gameObject->GetName(),
+                            defaultTextureGuid.empty() ? "<unset>" : defaultTextureGuid),
+                false);
+        }
+    }
+
+    RegisterSkinnedMeshBinding(component,
+                               gameObject,
+                               meshGuid,
+                               component->ShaderGuid(),
+                               resolvedMaterialGuid,
+                               resolvedTextureGuid);
+}
+
+void SceneResourceController::ResolveAnimatorComponent(const std::shared_ptr<gm::GameObject>& gameObject,
+                                                       gm::scene::AnimatorComponent* component) {
+    if (!component || !gameObject) {
+        return;
+    }
+
+    const std::string skeletonGuid = component->SkeletonGuid();
+    if (!skeletonGuid.empty()) {
+        if (auto skeletonPath = m_game.m_resources.GetSkeletonPath(skeletonGuid)) {
+            try {
+                gm::ResourceManager::SkeletonDescriptor desc{skeletonGuid, *skeletonPath};
+                auto handle = gm::ResourceManager::LoadSkeleton(desc);
+                component->SetSkeleton(std::move(handle));
+            } catch (const std::exception& ex) {
+                ReportSceneIssue(
+                    m_game,
+                    fmt::format("Failed to load skeleton '{}' for '{}': {}", skeletonGuid, gameObject->GetName(), ex.what()),
+                    true);
+            }
+        } else {
+            ReportSceneIssue(
+                m_game,
+                fmt::format("Animator '{}' references unknown skeleton '{}'", gameObject->GetName(), skeletonGuid),
+                true);
+        }
+    }
+
+    const auto layers = component->GetLayerSnapshots();
+    for (const auto& layer : layers) {
+        if (layer.clipGuid.empty()) {
+            continue;
+        }
+
+        auto clipPath = m_game.m_resources.GetAnimationClipPath(layer.clipGuid);
+        if (!clipPath) {
+            ReportSceneIssue(
+                m_game,
+                fmt::format("Animator '{}' references unknown animation '{}'", gameObject->GetName(), layer.clipGuid),
+                true);
+            continue;
+        }
+
+        try {
+            gm::ResourceManager::AnimationClipDescriptor desc{layer.clipGuid, *clipPath};
+            auto handle = gm::ResourceManager::LoadAnimationClip(desc);
+            component->SetClip(layer.slot, std::move(handle));
+            component->SetWeight(layer.slot, layer.weight);
+            if (layer.playing) {
+                component->Play(layer.slot, layer.loop);
+            } else {
+                component->Stop(layer.slot);
+            }
+        } catch (const std::exception& ex) {
+            ReportSceneIssue(
+                m_game,
+                fmt::format("Failed to load animation '{}' for '{}' slot '{}': {}",
+                            layer.clipGuid,
+                            gameObject->GetName(),
+                            layer.slot,
+                            ex.what()),
+                true);
+        }
+    }
 }
 

@@ -4,6 +4,7 @@
 #include "gm/tooling/DebugConsole.hpp"
 #include "GameConstants.hpp"
 #include "EditableTerrainComponent.hpp"
+#include "GameResources.hpp"
 
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/SceneSerializer.hpp"
@@ -23,11 +24,29 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cerrno>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <utility>
+
+namespace {
+inline void CopyToBuffer(char* dest, size_t destSize, const std::string& src) {
+    if (!dest || destSize == 0) {
+        return;
+    }
+#if defined(_MSC_VER)
+    errno_t result = strncpy_s(dest, destSize, src.c_str(), _TRUNCATE);
+    if (result != 0 && destSize > 0) {
+        dest[destSize - 1] = '\0';
+    }
+#else
+    std::strncpy(dest, src.c_str(), destSize - 1);
+    dest[destSize - 1] = '\0';
+#endif
+}
+} // namespace
 
 namespace gm::debug {
 
@@ -55,6 +74,12 @@ void DebugMenu::RenderMenuBar() {
 
         if (ImGui::MenuItem("Load Scene From...", "Ctrl+O")) {
             m_pendingLoad = true;
+        }
+
+        ImGui::Separator();
+
+        if (ImGui::MenuItem("Import Model...", "Ctrl+I")) {
+            m_pendingImport = true;
         }
 
         if (!m_recentFiles.empty()) {
@@ -111,6 +136,7 @@ void DebugMenu::RenderMenuBar() {
         ImGui::Checkbox("Scene Info", &m_showSceneInfo);
         ImGui::Checkbox("Prefab Browser", &m_showPrefabBrowser);
         ImGui::Checkbox("Content Browser", &m_showContentBrowser);
+        ImGui::Checkbox("Animation Preview", &m_showAnimationDebugger);
 #if defined(IMGUI_HAS_DOCK)
         if (ImGui::MenuItem("Reset Layout")) {
             m_resetDockLayout = true;
@@ -118,6 +144,7 @@ void DebugMenu::RenderMenuBar() {
             m_showSceneInfo = true;
             m_showPrefabBrowser = true;
             m_showContentBrowser = true;
+            m_showAnimationDebugger = true;
         }
 #endif
 
@@ -135,6 +162,15 @@ void DebugMenu::RenderMenuBar() {
                 m_overlaySetter(overlayVisible);
             }
         }
+
+        ImGui::Separator();
+        ImGui::MenuItem("Bone Overlay", nullptr, &m_enableBoneOverlay);
+        ImGui::BeginDisabled(!m_enableBoneOverlay);
+        ImGui::MenuItem("Annotate Bones", nullptr, &m_showBoneNames);
+        ImGui::MenuItem("Show Bones On All Objects", nullptr, &m_boneOverlayAllObjects);
+        ImGui::EndDisabled();
+        ImGui::MenuItem("Animation HUD", nullptr, &m_showAnimationDebugOverlay);
+
         ImGui::EndMenu();
     }
 }
@@ -240,6 +276,148 @@ void DebugMenu::RenderLoadDialog() {
     ImGui::SameLine();
     if (ImGui::Button("Cancel", ImVec2(120, 0))) {
         m_showLoadDialog = false;
+    }
+
+    ImGui::End();
+}
+
+void DebugMenu::RenderImportModelDialog() {
+    if (!ImGui::Begin("Import Model", &m_showImportDialog, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::End();
+        return;
+    }
+
+    static char inputPathBuffer[512] = {0};
+    static char outputDirBuffer[512] = {0};
+    static char baseNameBuffer[128] = {0};
+
+    // Initialize buffers from import settings when dialog opens or settings change
+    // Check if settings have changed (for drag-and-drop)
+    static std::filesystem::path lastInputPath;
+    if (!m_importSettings.inputPath.empty() && m_importSettings.inputPath != lastInputPath) {
+        CopyToBuffer(inputPathBuffer, sizeof(inputPathBuffer), m_importSettings.inputPath.string());
+        lastInputPath = m_importSettings.inputPath;
+    }
+
+    if (!m_importSettings.outputDir.empty()) {
+        std::string outputStr = m_importSettings.outputDir.string();
+        if (std::string(outputDirBuffer) != outputStr) {
+            CopyToBuffer(outputDirBuffer, sizeof(outputDirBuffer), outputStr);
+        }
+    }
+
+    if (!m_importSettings.baseName.empty()) {
+        if (std::string(baseNameBuffer) != m_importSettings.baseName) {
+            CopyToBuffer(baseNameBuffer, sizeof(baseNameBuffer), m_importSettings.baseName);
+        }
+    }
+
+    // Reset when dialog closes
+    if (!m_showImportDialog) {
+        lastInputPath.clear();
+    }
+
+    ImGui::Text("Input File:");
+    ImGui::InputText("##InputPath", inputPathBuffer, sizeof(inputPathBuffer));
+    ImGui::SameLine();
+    if (ImGui::Button("Browse...")) {
+        auto result = gm::utils::FileDialog::OpenFile(
+            "GLB/GLTF Files\0*.glb;*.gltf\0All Files\0*.*\0",
+            "",
+            m_windowHandle);
+        if (result.has_value()) {
+            CopyToBuffer(inputPathBuffer, sizeof(inputPathBuffer), result.value());
+            std::filesystem::path path(result.value());
+            m_importSettings.inputPath = path;
+            if (baseNameBuffer[0] == '\0') {
+                CopyToBuffer(baseNameBuffer, sizeof(baseNameBuffer), path.stem().string());
+                m_importSettings.baseName = path.stem().string();
+            }
+            if (outputDirBuffer[0] == '\0' && m_gameResources) {
+                std::filesystem::path defaultOutput = m_gameResources->GetAssetsDirectory() / "models" / path.stem();
+                std::string outputStr = defaultOutput.string();
+                CopyToBuffer(outputDirBuffer, sizeof(outputDirBuffer), outputStr);
+                m_importSettings.outputDir = defaultOutput;
+            }
+        }
+    }
+
+    ImGui::Text("Output Directory:");
+    ImGui::InputText("##OutputDir", outputDirBuffer, sizeof(outputDirBuffer));
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        m_importSettings.outputDir = outputDirBuffer;
+    }
+
+    ImGui::Text("Base Name:");
+    ImGui::InputText("##BaseName", baseNameBuffer, sizeof(baseNameBuffer));
+
+    ImGui::Separator();
+
+    ImGui::Checkbox("Generate Prefab", &m_importSettings.generatePrefab);
+    ImGui::Checkbox("Overwrite Existing", &m_importSettings.overwriteExisting);
+
+    ImGui::Separator();
+
+    if (m_importInProgress) {
+        ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Importing...");
+        if (!m_importStatusMessage.empty()) {
+            ImGui::TextWrapped("%s", m_importStatusMessage.c_str());
+        }
+    } else {
+        if (!m_importStatusMessage.empty()) {
+            ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%s", m_importStatusMessage.c_str());
+        }
+
+        if (ImGui::Button("Import", ImVec2(120, 0))) {
+            std::string inputPath(inputPathBuffer);
+            std::string outputDir(outputDirBuffer);
+            std::string baseName(baseNameBuffer);
+
+            if (inputPath.empty()) {
+                m_importStatusMessage = "Error: Input file path is required";
+            } else if (!std::filesystem::exists(inputPath)) {
+                m_importStatusMessage = "Error: Input file does not exist";
+            } else if (outputDir.empty()) {
+                m_importStatusMessage = "Error: Output directory is required";
+            } else if (baseName.empty()) {
+                m_importStatusMessage = "Error: Base name is required";
+            } else {
+                m_importSettings.inputPath = inputPath;
+                m_importSettings.outputDir = outputDir;
+                m_importSettings.baseName = baseName;
+                m_importInProgress = true;
+                m_importStatusMessage.clear();
+
+                bool success = ExecuteModelImport(
+                    m_importSettings.inputPath,
+                    m_importSettings.outputDir,
+                    m_importSettings.baseName);
+
+                m_importInProgress = false;
+                if (success) {
+                    m_importStatusMessage = "Import completed successfully!";
+                    if (m_applyResourcesCallback) {
+                        m_applyResourcesCallback();
+                    }
+                    // Clear buffers for next import
+                    inputPathBuffer[0] = '\0';
+                    outputDirBuffer[0] = '\0';
+                    baseNameBuffer[0] = '\0';
+                    m_importSettings = ImportSettings{};
+                } else {
+                    m_importStatusMessage = "Import failed. Check console for details.";
+                }
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+            m_showImportDialog = false;
+            m_importStatusMessage.clear();
+            inputPathBuffer[0] = '\0';
+            outputDirBuffer[0] = '\0';
+            baseNameBuffer[0] = '\0';
+            m_importSettings = ImportSettings{};
+        }
     }
 
     ImGui::End();

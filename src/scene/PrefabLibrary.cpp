@@ -88,6 +88,18 @@ void ValidateComponent(const nlohmann::json& componentJson, std::string_view pre
     if (componentJson.contains("active") && !componentJson["active"].is_boolean()) {
         result.warnings.push_back(fmt::format("{}: optional 'active' field should be a boolean", context));
     }
+
+    const std::string type = componentJson.value("type", "");
+    if ((type == "StaticMeshComponent" || type == "SkinnedMeshComponent") &&
+        componentJson.contains("data") && componentJson["data"].is_object()) {
+        const auto& data = componentJson["data"];
+        const std::string meshGuid = data.value("meshGuid", "");
+        const std::string materialGuid = data.value("materialGuid", "");
+        if (!meshGuid.empty() && materialGuid.empty()) {
+            result.warnings.push_back(
+                fmt::format("{}: {} references mesh '{}' without a material assignment", context, type, meshGuid));
+        }
+    }
 }
 
 void ValidateGameObject(const nlohmann::json& objectJson, std::string_view prefabName, std::size_t objectIndex, PrefabValidationResult& result) {

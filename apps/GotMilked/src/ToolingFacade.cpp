@@ -1,5 +1,15 @@
 #include "ToolingFacade.hpp"
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#define WIN32_LEAN_AND_MEAN
+#ifdef APIENTRY
+#undef APIENTRY
+#endif
+#include <windows.h>
+#endif
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -66,7 +76,7 @@ bool ToolingFacade::HandleOverlayToggle() {
 bool ToolingFacade::IsOverlayActive() const {
 #if GM_DEBUG_TOOLS
     if (m_game.m_debugHud) {
-        return m_game.m_debugHud->IsHudVisible() && m_game.m_debugHud->GetOverlayVisible();
+        return m_game.m_debugHud->IsHudVisible();
     }
 #endif
     return m_game.m_overlayVisible;
@@ -200,24 +210,47 @@ void ToolingFacade::RenderUI() {
         m_game.m_debugMenu->Render(visible);
     }
 #endif
-    bool open = m_game.m_overlayVisible;
+    bool overlayPreferred = m_game.m_overlayVisible;
 #if GM_DEBUG_TOOLS
+    bool hudVisible = true;
     if (m_game.m_debugHud) {
-        open = m_game.m_debugHud->IsHudVisible() && m_game.m_debugHud->GetOverlayVisible();
+        overlayPreferred = m_game.m_debugHud->GetOverlayVisible();
+        hudVisible = m_game.m_debugHud->IsHudVisible();
     }
 #endif
     if (m_game.m_tooling) {
-        m_game.m_tooling->Render(open);
+#if GM_DEBUG_TOOLS
+        if (!m_game.m_debugHud || hudVisible) {
+            bool renderOpen = overlayPreferred;
+            m_game.m_tooling->Render(renderOpen);
+            overlayPreferred = renderOpen;
+        }
+#else
+        bool renderOpen = overlayPreferred;
+        m_game.m_tooling->Render(renderOpen);
+        overlayPreferred = renderOpen;
+#endif
 #if GM_DEBUG_TOOLS
         if (m_game.m_debugHud) {
-            m_game.m_debugHud->SetOverlayVisible(open);
+            m_game.m_debugHud->SetOverlayVisible(overlayPreferred);
         }
 #endif
-        m_game.m_overlayVisible = open;
+        m_game.m_overlayVisible = overlayPreferred;
     }
 #if GM_DEBUG_TOOLS
     if (m_game.m_debugHud) {
         m_game.m_debugHud->RenderTerrainEditors();
+    }
+    {
+        const bool viewportActive = IsOverlayActive();
+        static bool s_lastViewportState = false;
+        if (viewportActive != s_lastViewportState) {
+            AddNotification(viewportActive
+                ? "[ViewportCam] Debug HUD activated"
+                : "[ViewportCam] Debug HUD hidden");
+            s_lastViewportState = viewportActive;
+        }
+        m_game.SetDebugViewportCameraActive(viewportActive);
     }
 #endif
     m_game.m_imgui->Render();

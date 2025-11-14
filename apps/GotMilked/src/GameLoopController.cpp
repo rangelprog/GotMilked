@@ -150,6 +150,13 @@ void GameLoopController::UpdateGameplay(float dt) {
         m_game.m_cameraRigSystem->SetInputSuppressed(imguiWantsInput || overlayActive || debugSelectionBlocksInput);
     }
 
+#if GM_DEBUG_TOOLS
+    if (m_game.IsDebugViewportCameraActive()) {
+        bool suppressDebugCameraInput = imguiWantsInput || debugSelectionBlocksInput;
+        m_game.UpdateViewportCamera(dt, suppressDebugCameraInput);
+    }
+#endif
+
     if (m_game.m_questSystem) {
         m_game.m_questSystem->SetInputSuppressed(imguiWantsInput || overlayActive);
     }

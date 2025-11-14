@@ -1,29 +1,69 @@
 {
-    "name": "Cow",
-    "gameObjects": [
-      {
-        "name": "Cow",
-        "active": true,
-        "tags": ["prop"],
-        "components": [
-          {
-            "type": "TransformComponent",
-            "active": true,
-            "data": {
-              "position": [0.0, 0.0, 0.0],
-              "rotation": [0.0, 0.0, 0.0],
-              "scale": [1.0, 1.0, 1.0]
-            }
+  "gameObjects": [
+    {
+      "active": true,
+      "components": [
+        {
+          "active": true,
+          "data": {
+            "position": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "scale": [
+              1.0,
+              1.0,
+              1.0
+            ]
           },
-          {
-            "type": "StaticMeshComponent",
-            "active": true,
-            "data": {
-              "meshGuid": "cow",
-              "shaderGuid": "game_shader"
-            }
-          }
-        ]
-      }
-    ]
-  }
+          "type": "TransformComponent"
+        },
+        {
+          "active": true,
+          "data": {
+            "materialGuid": "cow_mat0",
+            "meshGuid": "5921fbb494a68f0b",
+            "shaderGuid": "shader::simple_skinned"
+          },
+          "type": "SkinnedMeshComponent"
+        },
+        {
+          "active": true,
+          "data": {
+            "layers": [
+              {
+                "clipGuid": "6066953347f130ae",
+                "loop": true,
+                "playing": true,
+                "slot": "eating",
+                "timeSeconds": 0.0,
+                "weight": 1.0
+              },
+              {
+                "clipGuid": "d5ad897412497a46",
+                "loop": true,
+                "playing": true,
+                "slot": "idle",
+                "timeSeconds": 0.0,
+                "weight": 0.0
+              }
+            ],
+            "skeletonGuid": "58f8fdb494838d5d"
+          },
+          "type": "AnimatorComponent"
+        }
+      ],
+      "name": "Cow",
+      "tags": [
+        "prop"
+      ]
+    }
+  ],
+  "name": "Cow"
+}

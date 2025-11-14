@@ -1,0 +1,20 @@
+{
+  "diffuseColor": [
+    0.17335183918476105,
+    0.09889983385801315,
+    0.031058523803949356
+  ],
+  "emissionColor": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "name": "cow_mat2",
+  "shader": "shader::simple_skinned",
+  "shininess": 250.0,
+  "specularColor": [
+    1.0,
+    1.0,
+    1.0
+  ]
+}

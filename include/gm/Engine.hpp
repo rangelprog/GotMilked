@@ -16,6 +16,11 @@
 #include "gm/rendering/Material.hpp"
 #include "gm/rendering/LightManager.hpp"
 
+// Animation
+#include "gm/animation/Skeleton.hpp"
+#include "gm/animation/AnimationClip.hpp"
+#include "gm/animation/SkinnedMeshAsset.hpp"
+
 // Scene Management
 #include "gm/scene/Component.hpp"
 #include "gm/scene/GameObject.hpp"
@@ -50,3 +55,7 @@
 #include "gm/save/SaveManager.hpp"
 #include "gm/save/SaveSnapshotHelpers.hpp"
 #include "gm/tooling/Overlay.hpp"
+
+// Animation Components
+#include "gm/scene/SkinnedMeshComponent.hpp"
+#include "gm/scene/AnimatorComponent.hpp"

@@ -29,6 +29,14 @@ class GameResources {
     friend void PopulateGameResourcesFromTestAssets(const TestAssetBundle&, GameResources&);
 
 public:
+    struct AnimsetRecord {
+        std::filesystem::path manifestPath;
+        std::filesystem::path outputDir;
+        std::string baseName;
+        std::string sourceGlb;
+        std::string skinnedMeshGuid;
+    };
+
     ~GameResources();
     /**
      * @brief Load resources from the given assets directory using the asset catalog and optional metadata manifest.
@@ -64,6 +72,7 @@ public:
     gm::Texture* GetTexture(const std::string& guid) const;
     gm::Mesh* GetMesh(const std::string& guid) const;
     std::shared_ptr<gm::Material> GetMaterial(const std::string& guid) const;
+    std::optional<std::string> GetMaterialShaderOverride(const std::string& guid) const;
 
     gm::Shader* GetDefaultShader() const;
     gm::Texture* GetDefaultTexture() const;
@@ -93,6 +102,11 @@ public:
     std::shared_ptr<gm::Texture> GetTextureShared(const std::string& guid) const;
     const std::unordered_map<std::string, std::shared_ptr<gm::Mesh>>& GetMeshMap() const { return m_meshes; }
     const std::unordered_map<std::string, std::string>& GetPrefabMap() const { return m_prefabSources; }
+    std::optional<std::string> GetSkinnedMeshPath(const std::string& guid) const;
+    std::optional<std::string> GetSkeletonPath(const std::string& guid) const;
+    std::optional<std::string> GetAnimationClipPath(const std::string& guid) const;
+    const std::unordered_map<std::string, std::string>& GetSkinnedMeshSources() const { return m_skinnedMeshSources; }
+    const AnimsetRecord* GetAnimsetRecordForSkinnedMesh(const std::string& guid) const;
 
     const std::filesystem::path& GetAssetsDirectory() const { return m_assetsDir; }
 
@@ -115,6 +129,11 @@ private:
     std::string ResolveShaderGuid(const std::string& guid) const;
     std::string ResolveMeshGuid(const std::string& guid) const;
     std::string ResolveMaterialGuid(const std::string& guid) const;
+    void LoadAnimationAssetManifests();
+    void ParseAnimsetManifest(const std::filesystem::path& manifestPath);
+    bool LoadMaterialDefinition(const std::string& guid, const std::filesystem::path& path, const std::string& displayName = {});
+    std::optional<gm::utils::ResourceManifest::MaterialEntry> ParseMaterialFile(const std::filesystem::path& path, const std::string& guid);
+    void EnsureBuiltinShaders();
 
     struct ShaderSources {
         std::string vertPath;
@@ -130,10 +149,15 @@ private:
     std::unordered_map<std::string, gm::utils::ResourceManifest::TextureEntry> m_textureSources;
     std::unordered_map<std::string, gm::utils::ResourceManifest::MeshEntry> m_meshSources;
     std::unordered_map<std::string, gm::utils::ResourceManifest::MaterialEntry> m_materialSources;
+    std::unordered_map<std::string, std::string> m_materialShaderOverrides;
     std::unordered_map<std::string, std::string> m_prefabSources;
     std::unordered_map<std::string, std::string> m_shaderAliases;
     std::unordered_map<std::string, std::string> m_meshAliases;
     std::unordered_map<std::string, std::string> m_materialAliases;
+    std::unordered_map<std::string, std::string> m_skinnedMeshSources;
+    std::unordered_map<std::string, std::string> m_skeletonSources;
+    std::unordered_map<std::string, std::string> m_animationClipSources;
+    std::unordered_map<std::string, AnimsetRecord> m_animsetRecords;
 
     std::string m_defaultShaderGuid;
     std::string m_defaultShaderVertPath;

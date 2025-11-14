@@ -53,6 +53,14 @@ add_library(GotMilkedEngine
     src/rendering/LightManager.cpp
     src/rendering/stb_image_impl.cpp
 
+    # Animation
+    src/animation/Skeleton.cpp
+    src/animation/AnimationClip.cpp
+    src/animation/SkinnedMeshAsset.cpp
+    src/animation/AnimationPose.cpp
+    src/animation/PoseMath.cpp
+    src/animation/AnimationPoseEvaluator.cpp
+
     # Scene management
     src/scene/Scene.cpp
     src/scene/Scene_GameObject.cpp
@@ -66,6 +74,9 @@ add_library(GotMilkedEngine
     src/scene/SceneSerializer.cpp
     src/scene/ComponentFactory.cpp
     src/scene/StaticMeshComponent.cpp
+    src/scene/SkinnedMeshComponent.cpp
+    src/scene/AnimatorComponent.cpp
+    src/scene/AnimationSystem.cpp
 
     # Utils
     src/utils/ObjLoader.cpp
@@ -144,7 +155,7 @@ target_include_directories(GotMilkedEngine
         ${CMAKE_CURRENT_SOURCE_DIR}/src/debug
 )
 target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm::glm imgui Jolt)
-target_link_libraries(GotMilkedEngine PUBLIC fmt::fmt nlohmann_json::nlohmann_json)
+target_link_libraries(GotMilkedEngine PUBLIC fmt::fmt nlohmann_json::nlohmann_json assimp::assimp)
 gm_apply_warnings(GotMilkedEngine)
 
 # Windows-specific libraries for user documents path resolution
@@ -162,6 +173,26 @@ add_custom_target(lock-deps
 # ---------------------------
 # Applications / Executables
 # ---------------------------
+add_executable(AssimpInspector
+    tools/AssimpInspector.cpp
+)
+target_link_libraries(AssimpInspector PRIVATE assimp::assimp fmt::fmt)
+gm_apply_warnings(AssimpInspector)
+
+add_executable(AssimpImporter
+    tools/AssimpImporter.cpp
+)
+target_link_libraries(AssimpImporter
+    PRIVATE
+        assimp::assimp
+        fmt::fmt
+        nlohmann_json::nlohmann_json
+        glm::glm
+        GotMilkedEngine
+)
+target_include_directories(AssimpImporter PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+gm_apply_warnings(AssimpImporter)
+
 if (GM_BUILD_GAME)
     add_subdirectory(apps/GotMilked)
 endif()

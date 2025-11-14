@@ -3,6 +3,16 @@
 #include "gm/core/input/InputManager.hpp"
 #include "gm/core/input/InputAction.hpp"
 #include "gm/core/input/InputSystem.hpp"
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#define WIN32_LEAN_AND_MEAN
+#ifdef APIENTRY
+#undef APIENTRY
+#endif
+#include <windows.h>
+#endif
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 

@@ -1,8 +1,17 @@
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#define WIN32_LEAN_AND_MEAN
+#ifdef APIENTRY
+#undef APIENTRY
+#endif
+#include <windows.h>
+#endif
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
-#include <windows.h>
 #include <GLFW/glfw3native.h>
 #endif
 
@@ -19,6 +28,7 @@
 #include "GameEvents.hpp"
 #include "SceneSerializerExtensions.hpp"
 #include "GameLoopController.hpp"
+#include "gm/gameplay/FlyCameraController.hpp"
 #include "gm/scene/SceneSerializer.hpp"
 #include "gm/scene/PrefabLibrary.hpp"
 #include "gm/utils/Profiler.hpp"
@@ -131,6 +141,9 @@ bool Game::SetupLogging() {
     const std::filesystem::path logPath = logDir / "game.log";
     gm::core::Logger::SetLogFile(logPath);
     gm::core::Logger::Info("[Game] Logging to {}", logPath.string());
+#ifdef GM_DEBUG
+    gm::core::Logger::SetDebugEnabled(true);
+#endif
     return true;
 }
 
@@ -183,7 +196,7 @@ void Game::SetupGameplay() {
 
 #if GM_DEBUG_TOOLS
     if (m_terrainEditingSystem) {
-        m_terrainEditingSystem->SetCamera(m_camera.get());
+        m_terrainEditingSystem->SetCamera(GetRenderCamera());
         m_terrainEditingSystem->SetWindow(m_window);
         m_terrainEditingSystem->SetFovProvider([this]() -> float {
             return m_cameraRigSystem ? m_cameraRigSystem->GetFovDegrees()
@@ -331,6 +344,7 @@ void Game::Render() {
 }
 
 void Game::Shutdown() {
+    SetDebugViewportCameraActive(false);
     if (m_shutdownController) {
         m_shutdownController->Shutdown();
     }
@@ -485,11 +499,15 @@ void Game::ApplyResourcesToScene() {
         m_sceneResources->ApplyResourcesToScene();
     }
     EnsureCameraRig();
+    if (m_tooling) {
+        m_tooling->SetCamera(GetRenderCamera());
+    }
     if (m_questSystem) {
         m_questSystem->SetSceneContext(m_gameScene);
     }
 #if GM_DEBUG_TOOLS
     if (m_terrainEditingSystem) {
+        m_terrainEditingSystem->SetCamera(GetRenderCamera());
         m_terrainEditingSystem->RefreshBindings();
     }
 #endif
@@ -518,24 +536,158 @@ void Game::EnsureCameraRig() {
         return;
     }
 
+    std::shared_ptr<gm::GameObject> cameraRigObject;
     for (const auto& obj : m_gameScene->GetAllGameObjects()) {
-        if (obj && obj->GetComponent<gm::gameplay::CameraRigComponent>()) {
+        if (!obj) {
+            continue;
+        }
+        if (obj->GetComponent<gm::gameplay::CameraRigComponent>()) {
+            // A valid camera rig already exists
             return;
+        }
+
+        if (!cameraRigObject && obj->GetName() == "CameraRig") {
+            cameraRigObject = obj;
         }
     }
 
-    auto rigObject = m_gameScene->SpawnGameObject("CameraRig");
-    if (!rigObject) {
-        gm::core::Logger::Warning("[Game] Failed to spawn CameraRig GameObject");
-        return;
+    bool spawnedNewObject = false;
+    if (!cameraRigObject) {
+        cameraRigObject = m_gameScene->SpawnGameObject("CameraRig");
+        if (!cameraRigObject) {
+            gm::core::Logger::Warning("[Game] Failed to spawn CameraRig GameObject");
+            return;
+        }
+        spawnedNewObject = true;
     }
-    auto rig = rigObject->AddComponent<gm::gameplay::CameraRigComponent>();
+
+    auto rig = cameraRigObject->GetComponent<gm::gameplay::CameraRigComponent>();
     if (!rig) {
-        gm::core::Logger::Warning("[Game] Failed to add CameraRigComponent to CameraRig GameObject");
+        rig = cameraRigObject->AddComponent<gm::gameplay::CameraRigComponent>();
+        if (!rig) {
+            gm::core::Logger::Warning("[Game] Failed to add CameraRigComponent to CameraRig GameObject");
+            return;
+        }
+        rig->SetRigId("PrimaryCamera");
+        rig->SetInitialFov(gotmilked::GameConstants::Camera::DefaultFovDegrees);
+    } else if (spawnedNewObject) {
+        // Newly spawned object already had a rig component (unlikely), but ensure defaults
+        rig->SetRigId("PrimaryCamera");
+        rig->SetInitialFov(gotmilked::GameConstants::Camera::DefaultFovDegrees);
+    }
+}
+
+gm::Camera* Game::GetRenderCamera() const {
+#if GM_DEBUG_TOOLS
+    if (m_viewportCameraActive && m_viewportCamera) {
+        return m_viewportCamera.get();
+    }
+#endif
+    return m_camera.get();
+}
+
+float Game::GetRenderCameraFov() const {
+#if GM_DEBUG_TOOLS
+    if (m_viewportCameraActive && m_viewportCameraController) {
+        return m_viewportCameraController->GetFovDegrees();
+    }
+#endif
+    return m_cameraRigSystem ? m_cameraRigSystem->GetFovDegrees()
+                             : gotmilked::GameConstants::Camera::DefaultFovDegrees;
+}
+
+void Game::SetDebugViewportCameraActive(bool enabled) {
+#if GM_DEBUG_TOOLS
+    if (enabled == m_viewportCameraActive) {
         return;
     }
-    rig->SetRigId("PrimaryCamera");
-    rig->SetInitialFov(gotmilked::GameConstants::Camera::DefaultFovDegrees);
+
+    if (enabled) {
+        if (!m_viewportCamera) {
+            m_viewportCamera = std::make_unique<gm::Camera>();
+        }
+        if (m_camera) {
+            m_viewportSavedPosition = m_camera->Position();
+            m_viewportSavedForward = m_camera->Front();
+            m_viewportSavedFov = m_cameraRigSystem ? m_cameraRigSystem->GetFovDegrees()
+                                                   : gotmilked::GameConstants::Camera::DefaultFovDegrees;
+            m_viewportCameraHasSavedPose = true;
+        }
+        m_viewportCamera->SetPosition(m_viewportSavedPosition);
+        m_viewportCamera->SetForward(m_viewportSavedForward);
+        m_viewportCamera->SetFov(m_viewportSavedFov);
+
+        gm::gameplay::FlyCameraController::Config config;
+        config.initialFov = m_viewportSavedFov;
+        config.fovMin = 30.0f;
+        config.fovMax = 100.0f;
+        config.fovScrollSensitivity = 2.0f;
+        m_viewportCameraController = std::make_unique<gm::gameplay::FlyCameraController>(
+            *m_viewportCamera,
+            m_window,
+            config);
+        if (m_gameScene) {
+            m_viewportCameraController->SetScene(m_gameScene);
+        }
+        m_viewportCameraActive = true;
+
+        if (m_tooling) {
+            m_tooling->SetCamera(m_viewportCamera.get());
+        }
+        if (m_terrainEditingSystem) {
+            m_terrainEditingSystem->SetCamera(m_viewportCamera.get());
+        }
+    } else {
+        if (m_viewportCameraController && m_viewportCamera) {
+            m_viewportSavedPosition = m_viewportCamera->Position();
+            m_viewportSavedForward = m_viewportCamera->Front();
+            m_viewportSavedFov = m_viewportCameraController->GetFovDegrees();
+        }
+        if (m_tooling) {
+            m_tooling->SetCamera(m_camera.get());
+        }
+        if (m_terrainEditingSystem) {
+            m_terrainEditingSystem->SetCamera(m_camera.get());
+        }
+        m_viewportCameraController.reset();
+        m_viewportCamera.reset();
+        m_viewportCameraHasSavedPose = false;
+        m_viewportCameraActive = false;
+    }
+#else
+    (void)enabled;
+#endif
+}
+
+bool Game::IsDebugViewportCameraActive() const {
+#if GM_DEBUG_TOOLS
+    return m_viewportCameraActive;
+#else
+    return false;
+#endif
+}
+
+void Game::UpdateViewportCamera(float deltaTime, bool inputSuppressed) {
+#if GM_DEBUG_TOOLS
+    if (!m_viewportCameraActive || !m_viewportCameraController) {
+        return;
+    }
+    m_viewportCameraController->SetWindow(m_window);
+    if (m_gameScene) {
+        m_viewportCameraController->SetScene(m_gameScene);
+    }
+    m_viewportCameraController->SetInputSuppressed(inputSuppressed);
+    m_viewportCameraController->Update(deltaTime);
+    if (m_viewportCamera) {
+        m_viewportSavedPosition = m_viewportCamera->Position();
+        m_viewportSavedForward = m_viewportCamera->Front();
+        m_viewportSavedFov = m_viewportCameraController->GetFovDegrees();
+        m_viewportCameraHasSavedPose = true;
+    }
+#else
+    (void)deltaTime;
+    (void)inputSuppressed;
+#endif
 }
 
 void Game::PerformQuickSave() {
