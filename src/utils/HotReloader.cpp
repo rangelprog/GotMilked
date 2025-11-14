@@ -481,9 +481,6 @@ void HotReloader::AddWatch(const std::string& id,
     bool useNativeWatching = false;  // Temporarily disabled until multi-watch support is implemented
     
     if (useNativeWatching && m_enabled && m_watcherImpl && m_watcherImpl->IsSupported()) {
-        // Find the entry we just added
-        auto& watch = m_watches.back();
-        
         // Set up file watcher callback
         // This callback runs in a background thread, so we queue the callback
         // for execution on the main thread instead of calling it directly

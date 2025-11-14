@@ -2,6 +2,7 @@
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/GameObject.hpp"
 #include "gm/scene/Component.hpp"
+#include "gm/scene/ComponentDescriptor.hpp"
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/scene/MaterialComponent.hpp"
 #include "gm/scene/LightComponent.hpp"
@@ -17,6 +18,8 @@
 // Include JSON library
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
+using gm::scene::ComponentDescriptor;
+using gm::scene::ComponentSchemaRegistry;
 
 namespace gm {
 namespace {
@@ -79,19 +82,6 @@ static glm::vec3 jsonToVec3(const json& j) {
         return glm::vec3(j[0].get<float>(), j[1].get<float>(), j[2].get<float>());
     }
     return glm::vec3(0.0f);
-}
-
-// Helper: Convert glm::mat4 to JSON (store as array of 16 floats)
-static json mat4ToJson(const glm::mat4& m) {
-    // nlohmann::json doesn't support reserve(), but we can pre-allocate with initializer list
-    // or just build the array (nlohmann::json handles memory efficiently internally)
-    json arr = json::array();
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) {
-            arr.push_back(m[i][j]);
-        }
-    }
-    return arr;
 }
 
 bool SceneSerializer::SaveToFile(Scene& scene, const std::string& filepath) {
@@ -364,7 +354,20 @@ json SceneSerializer::SerializeComponent(Component* component) {
     
     core::Logger::Debug("[SceneSerializer] Serializing component type: {}", type);
     
-    // Component-specific serialization
+    // Check schema registry first (schema-driven components)
+    auto& schemaRegistry = ComponentSchemaRegistry::Instance();
+    const ComponentDescriptor* descriptor = schemaRegistry.GetDescriptor(type);
+    if (descriptor) {
+        auto serializer = ComponentSchemaRegistry::GenerateSerializer(*descriptor);
+        json customData = serializer(component);
+        if (!customData.is_null() && !customData.empty()) {
+            compJson["data"] = customData;
+            core::Logger::Debug("[SceneSerializer] Serialized component '{}' via schema", type);
+            return compJson;
+        }
+    }
+    
+    // Component-specific serialization (legacy hardcoded types)
     if (type == "TransformComponent" || type == "Transform") {
         json data = SceneSerializer::SerializeTransformComponent(component);
         compJson["data"] = data;
@@ -375,7 +378,7 @@ json SceneSerializer::SerializeComponent(Component* component) {
         json data = SceneSerializer::SerializeLightComponent(component);
         compJson["data"] = data;
     } else {
-        // Try registered custom component serializers
+        // Try registered custom component serializers (legacy callback-based)
         auto& registry = CustomSerializerRegistry();
         core::Logger::Debug("[SceneSerializer] Looking for custom serializer for type: {} (registry size: {})", 
             type, registry.size());
@@ -421,7 +424,20 @@ void SceneSerializer::DeserializeComponent(GameObject* obj, const json& componen
         data = componentJson["data"];
     }
     
-    // Component-specific deserialization
+    // Check schema registry first (schema-driven components)
+    auto& schemaRegistry = ComponentSchemaRegistry::Instance();
+    const ComponentDescriptor* descriptor = schemaRegistry.GetDescriptor(type);
+    if (descriptor) {
+        auto deserializer = ComponentSchemaRegistry::GenerateDeserializer(*descriptor);
+        Component* component = deserializer(obj, data);
+        if (component) {
+            component->SetActive(active);
+            core::Logger::Debug("[SceneSerializer] Deserialized component '{}' via schema", type);
+            return;
+        }
+    }
+    
+    // Component-specific deserialization (legacy hardcoded types)
     Component* component = nullptr;
     if (type == "TransformComponent" || type == "Transform") {
         component = SceneSerializer::DeserializeTransformComponent(obj, data);
@@ -430,7 +446,7 @@ void SceneSerializer::DeserializeComponent(GameObject* obj, const json& componen
     } else if (type == "LightComponent") {
         component = SceneSerializer::DeserializeLightComponent(obj, data);
     } else {
-        // Try registered custom component deserializers
+        // Try registered custom component deserializers (legacy callback-based)
         auto& registry = CustomSerializerRegistry();
         core::Logger::Debug("[SceneSerializer] Looking for custom serializer for type: {} (registry size: {})", 
             type, registry.size());

@@ -113,22 +113,12 @@ public:
     void EnsureTextureRegistered(const std::string& guid, std::shared_ptr<gm::Texture> texture);
     std::shared_ptr<gm::Texture> EnsureTextureAvailable(const std::string& guid);
 
-    std::string ResolveShaderAlias(const std::string& guid) const;
-    std::string ResolveMeshAlias(const std::string& guid) const;
-    std::string ResolveMaterialAlias(const std::string& guid) const;
-
 private:
     bool LoadInternal(const std::filesystem::path& assetsDir);
     void StoreError(const gm::core::Error& err);
     void RegisterDefaults();
     void ValidateManifests(const std::vector<gm::assets::AssetDatabase::ManifestRecord>& manifests);
     void ReportIssue(const std::string& message, bool isError) const;
-    void RegisterShaderAlias(const std::string& alias, const std::string& guid);
-    void RegisterMeshAlias(const std::string& alias, const std::string& guid);
-    void RegisterMaterialAlias(const std::string& alias, const std::string& guid);
-    std::string ResolveShaderGuid(const std::string& guid) const;
-    std::string ResolveMeshGuid(const std::string& guid) const;
-    std::string ResolveMaterialGuid(const std::string& guid) const;
     void LoadAnimationAssetManifests();
     void ParseAnimsetManifest(const std::filesystem::path& manifestPath);
     bool LoadMaterialDefinition(const std::string& guid, const std::filesystem::path& path, const std::string& displayName = {});
@@ -151,9 +141,6 @@ private:
     std::unordered_map<std::string, gm::utils::ResourceManifest::MaterialEntry> m_materialSources;
     std::unordered_map<std::string, std::string> m_materialShaderOverrides;
     std::unordered_map<std::string, std::string> m_prefabSources;
-    std::unordered_map<std::string, std::string> m_shaderAliases;
-    std::unordered_map<std::string, std::string> m_meshAliases;
-    std::unordered_map<std::string, std::string> m_materialAliases;
     std::unordered_map<std::string, std::string> m_skinnedMeshSources;
     std::unordered_map<std::string, std::string> m_skeletonSources;
     std::unordered_map<std::string, std::string> m_animationClipSources;

@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
-#include "Mesh.hpp"
+#include "gm/rendering/Mesh.hpp"
 
 namespace gm {
 

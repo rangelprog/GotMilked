@@ -53,13 +53,13 @@ void RigidBodyComponent::CreatePhysicsBody() {
         return;
     }
 
-    auto* owner = GetOwner();
+    auto* componentOwner = GetOwner();
     if (m_bodyType == BodyType::Static && m_colliderShape == ColliderShape::Plane) {
-        m_bodyHandle = physics.CreateStaticPlane(*owner, m_planeNormal, m_planeConstant);
+        m_bodyHandle = physics.CreateStaticPlane(*componentOwner, m_planeNormal, m_planeConstant);
     } else if (m_bodyType == BodyType::Dynamic && m_colliderShape == ColliderShape::Box) {
-        m_bodyHandle = physics.CreateDynamicBox(*owner, m_boxHalfExtent, m_mass);
+        m_bodyHandle = physics.CreateDynamicBox(*componentOwner, m_boxHalfExtent, m_mass);
     } else {
-        const char* ownerName = owner ? owner->GetName().c_str() : "<null>";
+        const char* ownerName = componentOwner ? componentOwner->GetName().c_str() : "<null>";
         core::Logger::Warning(
             "[RigidBodyComponent] Unsupported body/collider combination (body=%s, collider=%s) on '%s'",
             ToString(m_bodyType),

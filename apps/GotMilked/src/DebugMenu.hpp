@@ -12,10 +12,17 @@
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
 
+#include <unordered_map>
+#include <nlohmann/json_fwd.hpp>
+
+#include <imgui.h>
+
 #include "gm/animation/AnimationPose.hpp"
 #include "gm/animation/AnimationClip.hpp"
 #include "gm/animation/AnimationPoseEvaluator.hpp"
 #include "gm/animation/Skeleton.hpp"
+#include "gm/debug/EditorPlugin.hpp"
+#include "gm/content/ContentDatabase.hpp"
 
 namespace gm {
 class Scene;
@@ -41,8 +48,11 @@ namespace gm::debug {
 class DebugConsole;
 class EditableTerrainComponent;
 
-class DebugMenu {
+class DebugMenu : public EditorPluginHost {
 public:
+    DebugMenu();
+    ~DebugMenu();
+
     struct Callbacks {
         std::function<void()> quickSave;
         std::function<void()> quickLoad;
@@ -73,6 +83,9 @@ public:
     void SetDebugConsole(DebugConsole* console) { m_debugConsole = console; }
     void SetPrefabLibrary(gm::scene::PrefabLibrary* library) { m_prefabLibrary = library; }
     void SetGameResources(::GameResources* resources) { m_gameResources = resources; }
+    void SetContentDatabase(gm::content::ContentDatabase* database) { m_contentDatabase = database; }
+    void SetLayoutProfilePath(const std::filesystem::path& path);
+    void SetPluginManifestPath(const std::filesystem::path& path);
     void SetApplyResourcesCallback(std::function<void()> callback) { m_applyResourcesCallback = std::move(callback); }
     void SetConsoleVisible(bool visible);
     bool IsConsoleVisible() const;
@@ -94,7 +107,60 @@ public:
     // Load recent files from disk (call after construction)
     void LoadRecentFilesFromDisk();
 
+    // Plugin controls
+    void ReloadPlugins();
+
+    // EditorPluginHost
+    GameResources* GetGameResources() const override { return m_gameResources; }
+    std::shared_ptr<gm::Scene> GetActiveScene() const override { return m_scene.lock(); }
+    void RegisterDockWindow(const std::string& id,
+                            const std::string& title,
+                            const std::function<void()>& renderFn,
+                            bool* visibilityFlag = nullptr) override;
+    void RegisterShortcut(const ShortcutDesc& desc,
+                          const std::function<void()>& handler) override;
+    void PushUndoableAction(const std::string& description,
+                            const std::function<void()>& redo,
+                            const std::function<void()>& undo) override;
+
 private:
+    struct ShortcutBinding {
+        ImGuiKey key = ImGuiKey_None;
+        bool ctrl = false;
+        bool shift = false;
+        bool alt = false;
+    };
+
+    struct ShortcutHandler {
+        ShortcutBinding binding;
+        std::function<void()> callback;
+        bool fromPlugin = false;
+        EditorPlugin* owner = nullptr;
+    };
+
+    struct EditorAction {
+        std::function<void()> redo;
+        std::function<void()> undo;
+        std::string description;
+    };
+
+    struct PluginWindow {
+        std::string id;
+        std::string title;
+        std::function<void()> renderFn;
+        bool* externalVisibility = nullptr;
+        bool visible = true;
+        EditorPlugin* owner = nullptr;
+    };
+
+    struct LoadedPlugin {
+        std::string name;
+        std::filesystem::path path;
+        void* handle = nullptr;
+        EditorPlugin* instance = nullptr;
+        DestroyEditorPluginFn destroy = nullptr;
+    };
+
     struct AnimationAssetEntry {
         std::filesystem::path absolutePath;
         std::string displayName;
@@ -122,6 +188,7 @@ private:
     void RenderTransformGizmo();
     void RenderGameObjectOverlay();
     void RenderAnimationDebugger();
+    void RenderContentValidationWindow();
     void RenderDockspace();
     void HandleSaveAs();
     void HandleLoad();
@@ -152,6 +219,44 @@ private:
                             const std::filesystem::path& outputDir,
                             const std::string& baseName);
 
+    // Shortcut helpers
+    void InitializeShortcutDefaults();
+    void RegisterShortcutHandler(const std::string& id,
+                                 ShortcutBinding binding,
+                                 const std::function<void()>& handler,
+                                 bool fromPlugin = false,
+                                 EditorPlugin* owner = nullptr);
+    bool IsShortcutPressed(const ShortcutBinding& binding) const;
+    bool IsShortcutPressed(const std::string& id) const;
+    std::string FormatShortcutLabel(const ShortcutBinding& binding) const;
+    void ApplyShortcutOverrides();
+    ShortcutBinding ShortcutFromDesc(const ShortcutDesc& desc) const;
+    ShortcutBinding ShortcutFromJson(const nlohmann::json& data) const;
+    nlohmann::json ShortcutToJson(const ShortcutBinding& binding) const;
+
+    // Window/layout persistence
+    std::vector<std::pair<std::string, bool*>> GetWindowBindings();
+    void MarkLayoutDirty();
+    void AutosaveLayout(float deltaTime);
+    bool SaveLayoutProfileInternal(const std::filesystem::path& path) const;
+    bool LoadLayoutProfileInternal(const std::filesystem::path& path);
+    void ApplyWindowStateOverrides();
+
+    // Undo/redo
+    bool UndoLastAction();
+    bool RedoLastAction();
+
+    // Plugins
+    void HandlePluginMenu();
+    void RenderPluginWindows();
+    void LoadPluginsFromManifest();
+    void RemovePluginArtifacts(EditorPlugin* plugin);
+    void UnloadPlugins();
+    void* LoadLibraryHandle(const std::filesystem::path& path);
+    void UnloadLibraryHandle(void* handle);
+    void* ResolveSymbol(void* handle, const char* name);
+
+
     Callbacks m_callbacks;
     gm::save::SaveManager* m_saveManager = nullptr;
     std::weak_ptr<gm::Scene> m_scene;
@@ -168,6 +273,7 @@ private:
     bool m_showPrefabBrowser = false;
     bool m_showContentBrowser = false;
     bool m_showAnimationDebugger = false;
+    bool m_showContentValidation = false;
 
     // Layout control
     bool m_resetDockLayout = false;
@@ -208,6 +314,7 @@ private:
     int m_sceneReloadFramesToSkip = 0;
     std::uint64_t m_lastSeenSceneVersion = 0;
     ::GameResources* m_gameResources = nullptr;
+    gm::content::ContentDatabase* m_contentDatabase = nullptr;
 
     std::string m_pendingContentBrowserFocusPath;
 
@@ -251,6 +358,28 @@ private:
     ImportSettings m_importSettings;
     bool m_importInProgress = false;
     std::string m_importStatusMessage;
+
+    // Layout persistence
+    std::filesystem::path m_layoutProfilePath;
+    mutable std::string m_cachedDockspaceLayout;
+    bool m_pendingDockRestore = false;
+    bool m_layoutDirty = false;
+    float m_layoutAutosaveTimer = 0.0f;
+    float m_layoutAutosaveInterval = 2.0f;
+    std::unordered_map<std::string, bool> m_windowStateOverrides;
+    std::unordered_map<std::string, ShortcutBinding> m_shortcutOverrides;
+    std::unordered_map<std::string, ShortcutHandler> m_shortcutHandlers;
+
+    // Undo stack
+    std::vector<EditorAction> m_undoStack;
+    std::vector<EditorAction> m_redoStack;
+    size_t m_maxUndoDepth = 256;
+
+    // Plugins
+    std::filesystem::path m_pluginManifestPath;
+    std::vector<LoadedPlugin> m_plugins;
+    std::vector<PluginWindow> m_pluginWindows;
+    EditorPlugin* m_activePlugin = nullptr;
 };
 
 } // namespace gm::debug

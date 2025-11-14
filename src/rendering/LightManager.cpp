@@ -34,6 +34,7 @@ void LightManager::CollectLights(const std::vector<std::shared_ptr<GameObject>>&
 }
 
 void LightManager::ApplyLights(Shader& shader, const glm::vec3& viewPos) const {
+    static_cast<void>(viewPos);
     // Set number of active lights
     shader.SetInt("uNumLights", static_cast<int>(m_lights.size()));
 
@@ -48,46 +49,55 @@ void LightManager::ApplyLights(Shader& shader, const glm::vec3& viewPos) const {
         // Build base prefix: "uLights[N]."
         int prefixLen = std::snprintf(uniformName, sizeof(uniformName), "uLights[%zu].", i);
         char* suffixPtr = uniformName + prefixLen;
+        const auto suffixCapacity = sizeof(uniformName) > static_cast<size_t>(prefixLen)
+            ? sizeof(uniformName) - static_cast<size_t>(prefixLen)
+            : 0;
+        auto setSuffix = [&](const char* suffix) {
+            if (suffixCapacity == 0) {
+                return;
+            }
+            std::snprintf(suffixPtr, suffixCapacity, "%s", suffix);
+        };
 
         // Light type (0=Directional, 1=Point, 2=Spot)
         int type = static_cast<int>(light->GetType());
-        std::strcpy(suffixPtr, "type");
+        setSuffix("type");
         shader.SetInt(uniformName, type);
 
         // Color and intensity
         glm::vec3 color = light->GetColor() * light->GetIntensity();
-        std::strcpy(suffixPtr, "color");
+        setSuffix("color");
         shader.SetVec3(uniformName, color);
 
         if (light->GetType() == LightComponent::LightType::Directional) {
             // Directional light
             glm::vec3 direction = light->GetWorldDirection();
-            std::strcpy(suffixPtr, "direction");
+            setSuffix("direction");
             shader.SetVec3(uniformName, direction);
         } else if (light->GetType() == LightComponent::LightType::Point) {
             // Point light
             glm::vec3 position = light->GetWorldPosition();
-            std::strcpy(suffixPtr, "position");
+            setSuffix("position");
             shader.SetVec3(uniformName, position);
             glm::vec3 attenuation = light->GetAttenuation();
-            std::strcpy(suffixPtr, "attenuation");
+            setSuffix("attenuation");
             shader.SetVec3(uniformName, attenuation);
         } else if (light->GetType() == LightComponent::LightType::Spot) {
             // Spot light
             glm::vec3 position = light->GetWorldPosition();
-            std::strcpy(suffixPtr, "position");
+            setSuffix("position");
             shader.SetVec3(uniformName, position);
             glm::vec3 direction = light->GetWorldDirection();
-            std::strcpy(suffixPtr, "direction");
+            setSuffix("direction");
             shader.SetVec3(uniformName, direction);
             glm::vec3 attenuation = light->GetAttenuation();
-            std::strcpy(suffixPtr, "attenuation");
+            setSuffix("attenuation");
             shader.SetVec3(uniformName, attenuation);
             float innerCone = glm::cos(light->GetInnerConeAngle());
-            std::strcpy(suffixPtr, "innerCone");
+            setSuffix("innerCone");
             shader.SetFloat(uniformName, innerCone);
             float outerCone = glm::cos(light->GetOuterConeAngle());
-            std::strcpy(suffixPtr, "outerCone");
+            setSuffix("outerCone");
             shader.SetFloat(uniformName, outerCone);
         }
     }

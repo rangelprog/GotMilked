@@ -1,61 +1,21 @@
 #pragma once
 
-// Core Systems
+// This header intentionally exposes only the primary runtime entry points.
+// Include the specific module headers you need (core, rendering, scene, etc.)
+// instead of relying on this façade to pull in the entire engine.
+
+// Core application bootstrap
+#include "gm/core/GameApp.hpp"
 #include "gm/core/Event.hpp"
 #include "gm/core/Logger.hpp"
-#include "gm/core/Time.hpp"
-#include "gm/core/Input.hpp"
-#include "gm/core/InputBindings.hpp"
-#include "gm/core/Error.hpp"
 
-// Rendering
-#include "gm/rendering/Camera.hpp"
-#include "gm/rendering/Mesh.hpp"
-#include "gm/rendering/Shader.hpp"
-#include "gm/rendering/Texture.hpp"
-#include "gm/rendering/Material.hpp"
-#include "gm/rendering/LightManager.hpp"
-
-// Animation
-#include "gm/animation/Skeleton.hpp"
-#include "gm/animation/AnimationClip.hpp"
-#include "gm/animation/SkinnedMeshAsset.hpp"
-
-// Scene Management
-#include "gm/scene/Component.hpp"
-#include "gm/scene/GameObject.hpp"
+// Scene lifecycle management
 #include "gm/scene/Scene.hpp"
-#include "gm/scene/Transform.hpp"
-#include "gm/scene/TransformComponent.hpp"
-#include "gm/scene/MaterialComponent.hpp"
-#include "gm/scene/LightComponent.hpp"
-#include "gm/scene/SceneSerializer.hpp"
-#include "gm/scene/ComponentFactory.hpp"
-#include "gm/scene/StaticMeshComponent.hpp"
+#include "gm/scene/SceneManager.hpp"
 
-// Utilities
-#include "gm/utils/ObjLoader.hpp"
+// Resource & hot reload services
 #include "gm/utils/ResourceManager.hpp"
-#include "gm/utils/CoordinateDisplay.hpp"
-#include "gm/utils/ImGuiManager.hpp"
 #include "gm/utils/HotReloader.hpp"
-#include "gm/utils/FileDialog.hpp"
 
-// Prototypes
-#include "gm/prototypes/Primitives.hpp"
-
-// Physics
+// Physics world access
 #include "gm/physics/PhysicsWorld.hpp"
-#include "gm/physics/RigidBodyComponent.hpp"
-
-// Gameplay
-#include "gm/gameplay/FlyCameraController.hpp"
-
-// Save / Tooling
-#include "gm/save/SaveManager.hpp"
-#include "gm/save/SaveSnapshotHelpers.hpp"
-#include "gm/tooling/Overlay.hpp"
-
-// Animation Components
-#include "gm/scene/SkinnedMeshComponent.hpp"
-#include "gm/scene/AnimatorComponent.hpp"

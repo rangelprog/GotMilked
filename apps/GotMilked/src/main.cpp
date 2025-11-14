@@ -43,7 +43,11 @@ int main() {
           gm::core::Logger::Error("[main] GameAppContext missing SceneManager");
           return false;
         }
-        return game.Init(ctx.window, *ctx.sceneManager);
+        bool initialized = game.Init(ctx.window, *ctx.sceneManager);
+        if (initialized) {
+          game.BindAppContext(ctx);
+        }
+        return initialized;
       } catch (const std::exception& ex) {
         gm::core::Logger::Error("[main] Exception in onInit: {}", ex.what());
         return false;

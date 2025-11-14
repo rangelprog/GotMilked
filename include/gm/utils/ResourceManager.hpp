@@ -1,11 +1,14 @@
 #pragma once
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <shared_mutex>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <type_traits>
+#include <vector>
 
 namespace gm {
 
@@ -28,12 +31,23 @@ class ResourceManager {
 public:
     class Registry;
 
+    class ScopedRegistry;
+
     template <typename T>
     struct ResourceSlot {
         mutable std::shared_mutex mutex;
         std::shared_ptr<T> resource;
         std::atomic<std::uint32_t> refCount{0};
     };
+
+    struct ResourceNotification {
+        std::string resourceType;
+        std::string guid;
+        bool reloaded = false;
+        bool success = true;
+    };
+
+    using NotificationCallback = std::function<void(const ResourceNotification&)>;
 
     template <typename T>
     class ResourceHandle {
@@ -112,6 +126,11 @@ public:
 
     class Registry : public std::enable_shared_from_this<Registry> {
     public:
+        struct NotificationToken {
+            std::uint64_t value = 0;
+            explicit operator bool() const { return value != 0; }
+        };
+
         Registry();
 
         void Reset();
@@ -145,6 +164,9 @@ public:
         SkinnedMeshHandle ReloadSkinnedMesh(const SkinnedMeshDescriptor& descriptor);
         std::shared_ptr<animation::SkinnedMeshAsset> GetSkinnedMesh(const std::string& guid) const;
         bool HasSkinnedMesh(const std::string& guid) const;
+
+        NotificationToken RegisterNotificationCallback(NotificationCallback callback);
+        void UnregisterNotificationCallback(NotificationToken token);
 
     private:
         template <typename>
@@ -180,12 +202,24 @@ public:
         template <typename T>
         void DecrementRef(const std::string& guid, const SlotPtr<T>& slot);
 
+        template <typename T, typename Loader, typename SwapHook>
+        ResourceHandle<T> LoadOrStoreResource(const std::string& guid,
+                                              Loader&& loader,
+                                              bool reload,
+                                              SwapHook&& swapHook);
+
+        void NotifyAsync(std::string_view type, const std::string& guid, bool reloaded, bool success = true) const;
+
         CacheStore<Shader> m_shaderCache;
         CacheStore<Texture> m_textureCache;
         CacheStore<Mesh> m_meshCache;
         CacheStore<animation::Skeleton> m_skeletonCache;
         CacheStore<animation::AnimationClip> m_animationClipCache;
         CacheStore<animation::SkinnedMeshAsset> m_skinnedMeshCache;
+
+        mutable std::shared_mutex m_notificationMutex;
+        std::unordered_map<std::uint64_t, NotificationCallback> m_notificationCallbacks;
+        std::atomic<std::uint64_t> m_nextNotificationId{1};
     };
 
     static void Init(std::shared_ptr<Registry> registry = nullptr);
@@ -223,8 +257,29 @@ public:
     static std::shared_ptr<animation::SkinnedMeshAsset> GetSkinnedMesh(const std::string& guid);
     static bool HasSkinnedMesh(const std::string& guid);
 
+    struct NotificationHandle {
+        std::weak_ptr<Registry> registry;
+        Registry::NotificationToken token;
+        explicit operator bool() const { return !registry.expired() && token; }
+    };
+
+    static NotificationHandle RegisterNotificationCallback(NotificationCallback callback);
+    static void UnregisterNotificationCallback(NotificationHandle& handle);
+
 private:
     ResourceManager() = delete;
+};
+
+class ResourceManager::ScopedRegistry {
+public:
+    explicit ScopedRegistry(std::shared_ptr<Registry> registry);
+    ~ScopedRegistry();
+
+    ScopedRegistry(const ScopedRegistry&) = delete;
+    ScopedRegistry& operator=(const ScopedRegistry&) = delete;
+
+private:
+    std::shared_ptr<Registry> m_previous;
 };
 
 // ----- ResourceHandle Implementation -----

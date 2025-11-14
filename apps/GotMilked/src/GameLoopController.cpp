@@ -25,7 +25,7 @@ GameLoopController::GameLoopController(Game& game)
     : m_game(game) {}
 
 void GameLoopController::Update(float dt) {
-    if (!m_game.m_window) {
+    if (!m_game.Window()) {
         return;
     }
 
@@ -92,9 +92,9 @@ void GameLoopController::HandleGlobalInputs() {
     if (inputSys && inputSys->IsKeyJustPressed(GLFW_KEY_V)) {
         bool imguiWantsKeyboard = m_game.m_toolingFacade && m_game.m_toolingFacade->WantsKeyboardInput();
         if (!imguiWantsKeyboard) {
-            m_game.m_vsyncEnabled = !m_game.m_vsyncEnabled;
-            glfwSwapInterval(m_game.m_vsyncEnabled ? 1 : 0);
-            gm::core::Logger::Info("[Game] VSync {}", m_game.m_vsyncEnabled ? "enabled" : "disabled");
+            bool enabled = !m_game.IsVSyncEnabled();
+            m_game.SetVSyncEnabled(enabled);
+            gm::core::Logger::Info("[Game] VSync {}", enabled ? "enabled" : "disabled");
         }
     }
 
@@ -104,7 +104,7 @@ void GameLoopController::HandleGlobalInputs() {
             shouldExit = false;
         }
         if (shouldExit) {
-            glfwSetWindowShouldClose(m_game.m_window, 1);
+            m_game.RequestExit();
         }
     }
 
@@ -140,7 +140,7 @@ void GameLoopController::HandleDebugShortcuts() {
 
 void GameLoopController::UpdateGameplay(float dt) {
     if (m_game.m_cameraRigSystem) {
-        m_game.m_cameraRigSystem->SetWindow(m_game.m_window);
+        m_game.m_cameraRigSystem->SetWindow(m_game.Window());
     }
 
     bool imguiWantsInput = m_game.m_toolingFacade && m_game.m_toolingFacade->WantsAnyInput();
@@ -167,6 +167,6 @@ void GameLoopController::UpdateGameplay(float dt) {
 }
 
 void GameLoopController::UpdateHotReloader(float dt) {
-    m_game.m_hotReloader.Update(dt);
+        m_game.m_hotReloader.Update(dt);
 }
 

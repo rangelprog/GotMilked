@@ -9,10 +9,6 @@ class Camera;
 class Scene;
 }
 
-namespace gm::gameplay {
-class FlyCameraController;
-}
-
 namespace gm::save {
 
 /**

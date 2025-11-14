@@ -1,0 +1,21 @@
+{
+  "id": "quest_farm_intro",
+  "displayName": "Welcome to the Farm",
+  "description": "Meet the foreman and milk your first cow.",
+  "repeatable": false,
+  "stages": [
+    {
+      "id": "meet_foreman",
+      "objective": "Talk to Foreman Bill near the barn entrance.",
+      "target": "npc_foreman_bill",
+      "reward": "tutorial_progress"
+    },
+    {
+      "id": "milk_first_cow",
+      "objective": "Milk any healthy cow and return with a full bucket.",
+      "target": "cow_any",
+      "reward": "currency_small"
+    }
+  ]
+}
+

@@ -436,9 +436,9 @@ void PhysicsWorld::Step(float deltaTime) {
         transform->SetRotation(euler);
     }
 
+#ifdef GM_DEBUG
     const auto stepEnd = std::chrono::high_resolution_clock::now();
     const double elapsedMs = std::chrono::duration<double, std::milli>(stepEnd - stepStart).count();
-#ifdef GM_DEBUG
     if (substeps > 0) {
         gm::core::Logger::Debug("[PhysicsWorld] Step dt={:.4f}s substeps={} elapsed={:.3f} ms",
                                 deltaTime, substeps, elapsedMs);

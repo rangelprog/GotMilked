@@ -1,6 +1,6 @@
-#include "gm/gameplay/CameraRigSystem.hpp"
+#include "CameraRigSystem.hpp"
 
-#include "gm/gameplay/CameraRigComponent.hpp"
+#include "CameraRigComponent.hpp"
 #include "gm/rendering/Camera.hpp"
 #include "gm/scene/GameObject.hpp"
 #include "gm/scene/Scene.hpp"

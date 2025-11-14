@@ -75,14 +75,8 @@ void Scene::GameObjectPool::Clear() {
     objects.clear();
 }
 
-static void RemoveFromVector(std::vector<std::shared_ptr<GameObject>>& vec,
-                              const std::shared_ptr<GameObject>& gameObject) {
-    vec.erase(std::remove(vec.begin(), vec.end(), gameObject), vec.end());
-}
-
 void Scene::RemoveFromActiveLists(const std::shared_ptr<GameObject>& gameObject) {
-    RemoveFromVector(m_activeRenderables, gameObject);
-    RemoveFromVector(m_activeUpdatables, gameObject);
+    m_scheduler.RemoveFromActiveLists(gameObject);
 }
 
 std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string& name) {
@@ -110,7 +104,7 @@ std::shared_ptr<GameObject> Scene::CreateGameObject(const std::string& name) {
     auto gameObject = AcquireGameObject(finalName);
     gameObjects.push_back(gameObject);
     MarkNameLookupDirty();
-    m_activeListsDirty = true;
+    MarkActiveListsDirty();
     core::Logger::Debug("[Scene] Created GameObject '{}'", gameObject ? gameObject->GetName().c_str() : "<null>");
     return gameObject;
 }
@@ -169,7 +163,7 @@ void Scene::DestroyGameObject(std::shared_ptr<GameObject> gameObject) {
     }
 
     gameObject->Destroy();
-    m_activeListsDirty = true;
+    MarkActiveListsDirty();
     MarkNameLookupDirty();
     ++m_destroyedSinceLastCleanup;
 }
@@ -445,7 +439,8 @@ void Scene::CleanupDestroyedObjects() {
     }
 
     if (removedAny) {
-        m_activeListsDirty = true;
+        MarkActiveListsDirty();
+        MarkActiveListsDirty();
         MarkNameLookupDirty();
     }
 

@@ -1,0 +1,14 @@
+{
+  "id": "building_barn_basic",
+  "displayName": "Timber Barn",
+  "size": {
+    "width": 12.0,
+    "length": 18.0,
+    "height": 9.0
+  },
+  "entrances": [
+    { "id": "front", "x": 0.0, "y": 1.5 },
+    { "id": "rear", "x": 12.0, "y": 1.5 }
+  ]
+}
+

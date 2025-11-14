@@ -28,10 +28,11 @@
 #include "GameEvents.hpp"
 #include "SceneSerializerExtensions.hpp"
 #include "GameLoopController.hpp"
-#include "gm/gameplay/FlyCameraController.hpp"
+#include "gameplay/FlyCameraController.hpp"
 #include "gm/scene/SceneSerializer.hpp"
 #include "gm/scene/PrefabLibrary.hpp"
 #include "gm/utils/Profiler.hpp"
+#include "gm/core/GameApp.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -63,10 +64,10 @@
 #include "gm/utils/ImGuiManager.hpp"
 #include "gm/utils/HotReloader.hpp"
 #include "gm/tooling/Overlay.hpp"
-#include "gm/gameplay/CameraRigSystem.hpp"
-#include "gm/gameplay/CameraRigComponent.hpp"
-#include "gm/gameplay/QuestTriggerComponent.hpp"
-#include "gm/gameplay/QuestTriggerSystem.hpp"
+#include "gameplay/CameraRigSystem.hpp"
+#include "gameplay/CameraRigComponent.hpp"
+#include "gameplay/QuestTriggerComponent.hpp"
+#include "gameplay/QuestTriggerSystem.hpp"
 #if GM_DEBUG_TOOLS
 #include "EditableTerrainComponent.hpp"
 #include "DebugMenu.hpp"
@@ -106,9 +107,25 @@ Game::Game(const gm::utils::AppConfig& config)
     m_shutdownController = std::make_unique<GameShutdownController>(*this);
     m_eventRouter = std::make_unique<EventRouter>();
     m_loopController = std::make_unique<GameLoopController>(*this);
+    m_contentDatabase = std::make_unique<gm::content::ContentDatabase>();
+    m_contentDatabase->SetNotificationCallback([this](const std::string& message, bool isError) {
+        if (m_toolingFacade) {
+            m_toolingFacade->AddNotification(message);
+            return;
+        }
+        if (isError) {
+            gm::core::Logger::Error("[Content] {}", message);
+        } else {
+            gm::core::Logger::Info("[Content] {}", message);
+        }
+    });
 }
 
-Game::~Game() = default;
+Game::~Game() {
+    if (m_contentDatabase) {
+        m_contentDatabase->Shutdown();
+    }
+}
 
 bool Game::Init(GLFWwindow* window, gm::SceneManager& sceneManager) {
     if (!m_bootstrapper) {
@@ -118,6 +135,13 @@ bool Game::Init(GLFWwindow* window, gm::SceneManager& sceneManager) {
         m_debugTooling = std::make_unique<DebugToolingController>(*this);
     }
     return m_bootstrapper->Initialize(window, sceneManager);
+}
+
+void Game::BindAppContext(gm::core::GameAppContext& context) {
+    m_appContext = &context;
+    if (context.setVSyncEnabled) {
+        context.setVSyncEnabled(m_vsyncEnabled);
+    }
 }
 
 bool Game::SetupLogging() {
@@ -145,6 +169,30 @@ bool Game::SetupLogging() {
     gm::core::Logger::SetDebugEnabled(true);
 #endif
     return true;
+}
+
+void Game::RequestExit() const {
+    if (m_appContext && m_appContext->requestExit) {
+        m_appContext->requestExit();
+    } else if (m_window) {
+        glfwSetWindowShouldClose(m_window, GLFW_TRUE);
+    }
+}
+
+void Game::SetVSyncEnabled(bool enabled) {
+    m_vsyncEnabled = enabled;
+    if (m_appContext && m_appContext->setVSyncEnabled) {
+        m_appContext->setVSyncEnabled(enabled);
+    } else if (m_window) {
+        glfwSwapInterval(enabled ? 1 : 0);
+    }
+}
+
+bool Game::IsVSyncEnabled() const {
+    if (m_appContext && m_appContext->isVSyncEnabled) {
+        return m_appContext->isVSyncEnabled();
+    }
+    return m_vsyncEnabled;
 }
 
 bool Game::SetupPhysics() {
@@ -175,6 +223,9 @@ bool Game::SetupRendering() {
         return false;
     }
     m_assetsDir = m_resources.GetAssetsDirectory();
+    if (m_contentDatabase) {
+        m_contentDatabase->Initialize(m_assetsDir);
+    }
 
     gm::SceneSerializerExtensions::RegisterSerializers();
     m_camera = std::make_unique<gm::Camera>();

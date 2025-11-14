@@ -1,6 +1,6 @@
-#include "gm/gameplay/QuestTriggerSystem.hpp"
+#include "QuestTriggerSystem.hpp"
 
-#include "gm/gameplay/QuestTriggerComponent.hpp"
+#include "QuestTriggerComponent.hpp"
 #include "gm/core/Input.hpp"
 #include "gm/core/Logger.hpp"
 #include "gm/scene/Scene.hpp"

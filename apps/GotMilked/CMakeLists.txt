@@ -13,6 +13,11 @@ set(GOTMILKED_SOURCES
   src/GameResources.cpp
   src/GameSceneHelpers.cpp
   src/CowAnimationController.cpp
+  src/gameplay/FlyCameraController.cpp
+  src/gameplay/CameraRigComponent.cpp
+  src/gameplay/CameraRigSystem.cpp
+  src/gameplay/QuestTriggerComponent.cpp
+  src/gameplay/QuestTriggerSystem.cpp
 )
 
 if(GM_ENABLE_DEBUG_TOOLS)
@@ -23,6 +28,8 @@ if(GM_ENABLE_DEBUG_TOOLS)
     src/DebugMenu_Menus.cpp
     src/DebugMenu_Windows.cpp
     src/DebugMenu_RecentFiles.cpp
+    src/debug_menu/SceneOutlinerPanel.cpp
+    src/debug_menu/ContentValidationPanel.cpp
     ${ImGuizmo_SOURCE_DIR}/ImGuizmo.cpp
   )
 endif()

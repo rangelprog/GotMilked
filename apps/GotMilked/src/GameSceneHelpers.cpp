@@ -6,8 +6,8 @@
 #include "EditableTerrainComponent.hpp"
 #endif
 
-#include "gm/gameplay/CameraRigComponent.hpp"
-#include "gm/gameplay/QuestTriggerComponent.hpp"
+#include "gameplay/CameraRigComponent.hpp"
+#include "gameplay/QuestTriggerComponent.hpp"
 
 #include "gm/scene/Scene.hpp"
 #include "gm/scene/GameObject.hpp"

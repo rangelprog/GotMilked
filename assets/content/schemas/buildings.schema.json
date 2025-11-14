@@ -1,0 +1,37 @@
+{
+  "type": "building",
+  "displayName": "Building Definition",
+  "version": 1,
+  "dataDirectories": [
+    "content/data/buildings"
+  ],
+  "fields": [
+    { "name": "id", "type": "string", "required": true },
+    { "name": "displayName", "type": "string", "required": true },
+    {
+      "name": "size",
+      "type": "object",
+      "required": true,
+      "fields": [
+        { "name": "width", "type": "number", "required": true, "minimum": 1.0 },
+        { "name": "length", "type": "number", "required": true, "minimum": 1.0 },
+        { "name": "height", "type": "number", "required": true, "minimum": 1.0 }
+      ]
+    },
+    {
+      "name": "entrances",
+      "type": "array",
+      "required": false,
+      "items": {
+        "name": "entrance",
+        "type": "object",
+        "fields": [
+          { "name": "id", "type": "string", "required": true },
+          { "name": "x", "type": "number", "required": true },
+          { "name": "y", "type": "number", "required": true }
+        ]
+      }
+    }
+  ]
+}
+

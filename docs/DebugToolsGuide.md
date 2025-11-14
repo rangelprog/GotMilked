@@ -32,6 +32,19 @@ When disabled, all HUD sources are removed from the target and the macro `GM_DEB
 2. Provide toggle callbacks to the menu via `DebugMenu::SetOverlayToggleCallbacks` (or related helpers) so state changes route through the controller instead of touching individual widgets.
 3. Call `DebugHudController::Refresh()` if a resource reload or hot-reload path needs to reapply visibility/editing flags (e.g., after shaders recompile).
 
+### Plugin Architecture & Extension Points
+
+The debug menu now exposes a runtime plugin system so authoring tools can ship as DLLs/SOs without rebuilding the editor:
+
+1. **Plugin descriptors** live in `assets/tools/plugins.json`. Each entry contains `name`, `path`, and optional shortcut/window metadata. `DebugToolingController` passes this file to `DebugMenu::SetPluginManifestPath`, and `ReloadPlugins()` rebuilds the catalog at runtime.
+2. **Editor interface**: Implement `gm::debug::EditorPlugin` (see `include/gm/debug/EditorPlugin.hpp`). Provide `Name()`, `Initialize(EditorPluginHost&)`, `Render(EditorPluginHost&, bool& isVisible)`, and `Shutdown(EditorPluginHost&)`. Export `CreateEditorPlugin` / `DestroyEditorPlugin` functions with C linkage so the host can load the plugin.
+3. **Host services** (`EditorPluginHost`): request engine state via helpers such as `GetGameResources()`, `GetActiveScene()`, `RegisterDockWindow()`, `RegisterShortcut()`, and `PushUndoableAction()`. These keep plugins sandboxed—no direct globals.
+4. **Docking & layout**: Layouts persist to JSON (default `assets/tools/layouts/default.json`). Call `DebugMenu::SetLayoutProfilePath` to point at a different file and `MarkLayoutDirty()` whenever a plugin reconfigures dockspace nodes. Users can switch layouts at runtime via the Layouts submenu; autosave runs every few seconds when dirty.
+5. **Shortcut bindings**: `DebugMenu` converts JSON descriptors into `ShortcutBinding` structs (key + modifiers). Plugins can call `RegisterShortcut(name, ShortcutDesc, callback)` to participate. Bindings serialize back into the layout profile so teams can share authored bindings.
+6. **Undo/redo**: Tools that mutate scene/content data should wrap operations in `EditorAction` objects. The host exposes `PushUndoableAction(EditorAction action)`; undo/redo menu items call back into the registered lambdas.
+
+When authoring new tooling, prefer the plugin route (DLL) for optional features and static linkage (`apps/GotMilked/src/debug_menu/*.cpp`) for always-on panels such as the Scene Outliner.
+
 ---
 
 ## Existing Components

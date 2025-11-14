@@ -101,6 +101,9 @@ KeyState InputSystem::GetMouseButtonState(MouseButton button) const {
 
 // Static GLFW callbacks
 void InputSystem::KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    static_cast<void>(window);
+    static_cast<void>(scancode);
+    static_cast<void>(mods);
     if (!s_instance) return;
 
     switch (action) {
@@ -117,6 +120,8 @@ void InputSystem::KeyCallback(GLFWwindow* window, int key, int scancode, int act
 }
 
 void InputSystem::MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
+    static_cast<void>(window);
+    static_cast<void>(mods);
     if (!s_instance || button >= static_cast<int>(MouseButton::Count)) return;
 
     switch (action) {
@@ -130,12 +135,14 @@ void InputSystem::MouseButtonCallback(GLFWwindow* window, int button, int action
 }
 
 void InputSystem::CursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
+    static_cast<void>(window);
     if (!s_instance) return;
     s_instance->m_mouseState.x = xpos;
     s_instance->m_mouseState.y = ypos;
 }
 
 void InputSystem::ScrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+    static_cast<void>(window);
     if (!s_instance) return;
     s_instance->m_mouseState.scrollX += xoffset;
     s_instance->m_mouseState.scrollY += yoffset;

@@ -31,6 +31,7 @@ void StaticMeshComponent::Render() {
     const glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(model)));
 
     m_shader->Use();
+    m_shader->SetInt("uUseInstanceBuffers", 0);
     m_shader->SetMat4("uModel", model);
     m_shader->SetMat3("uNormalMat", normalMat);
 

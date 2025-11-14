@@ -44,18 +44,26 @@ The GotMilked game demonstrates engine features (scene management, rendering, se
 
 ---
 
-## 2. Engine Modules
+## 2. Engine Modules & Boundaries
 
-| Module | Key Responsibilities |
-| ------ | -------------------- |
-| `gm/core` | Timing, input, events |
-| `gm/rendering` | Camera, shader, mesh, texture, material, light manager |
-| `gm/scene` | Scene, GameObject, components (transform/material/light), SceneManager, SceneSerializer |
-| `gm/utils` | Resource loading (`ObjLoader`, `ResourceManager`), UI helpers |
+All engine code now compiles into focused static libraries that the umbrella `GotMilkedEngine` INTERFACE target re-exports. Keep new symbols inside the module that owns their domain to avoid the monolithic include chains we just retired.
 
-Each module is built into the `GotMilkedEngine` library. Applications (like the GotMilked game) link against this library and provide their own components, resources, and serialization extensions.
+| Module | Responsibilities | Depends On |
+| ------ | ---------------- | ---------- |
+| `gm_core` | Entry (`GameApp`), logging, timing, input, config plumbing | n/a |
+| `gm_rendering` | GPU abstractions: `Shader`, `Mesh`, `Material`, `Camera`, `LightManager`, batch helpers | `gm_core` |
+| `gm_animation` | `Skeleton`, `AnimationClip`, `AnimatorComponent`, animation graph helpers | `gm_rendering`, `gm_scene` |
+| `gm_scene` | `Scene`, `SceneManager`, `GameObjectScheduler`, `RenderBatcher`, schema-driven serialization | `gm_core`, `gm_rendering`, `gm_utils` |
+| `gm_utils` | `ResourceManager`, threading, profilers, OBJ/YAML helpers | `gm_core` |
+| `gm_physics` | `PhysicsWorld`, `RigidBodyComponent`, Jolt bindings | `gm_scene` |
+| `gm_save` | Save/load infrastructure, diffing, snapshots | `gm_utils` |
+| `gm_tooling` | Overlay plumbing, catalog listeners, asset watch helpers | `gm_utils`, `gm_scene` |
+| `gm_assets` | Asset database, catalog, importers | `gm_utils` |
+| `gm_content` | `ContentDatabase`, schema registry, validation | `gm_assets` |
+| `gm_runtime` | Thin runtime glue, hot reload plumbing shared between editor/game | `gm_scene`, `gm_utils` |
+| `gm_debug` (optional) | Debug HUD, ImGui bridge, plugin host | depends on `gm_tooling`, `gm_scene` |
 
-> New in this revision: scenes own a stack of `SceneSystem` instances. The built-in `GameObjectUpdate` system preserves existing behaviour, while custom systems (AI, animation, physics) can slot in and even opt into async execution.
+> `apps/GotMilked` only accesses services through their published headers. If you need a type from another module, include its header directly rather than reaching through `gm/Engine.hpp`.
 
 ---
 
@@ -79,9 +87,30 @@ The scene system revolves around `gm::Scene` and `gm::GameObject`. The detailed 
 The engine supplies basic rendering wrappers but leaves resource ownership to the application:
 
 - Use `gm::Texture::loadOrThrow`, `gm::Shader::loadFromFiles`, and `gm::Mesh` (via `ObjLoader`) to load data.
-- Use `gm::ResourceManager` for centralized resource loading and caching. The manager now tracks GUID aliases (legacy asset names, file stems, hashed IDs) so hot reload only rebinds components that depend on a changed asset instead of sweeping the entire scene.
+- Use `gm::ResourceManager` for centralized resource loading and caching. The manager now provides a per-thread `ScopedRegistry` so background jobs can stage loads without trampling the global registry lock. Call `gm::ResourceManager::Init()` once at startup (typically in `GameApp::onInit`), wrap bulk loads in `ScopedRegistry` instances, and always call `Cleanup()` during shutdown to release GPU/CPU allocations deterministically.
 - When serializing, store asset identifiers (paths or GUIDs) in the component JSON so resources can be rehydrated on load.
 - Register asset GUIDs with `gm::ResourceRegistry` so scenes can resolve resources even if files move between releases.
+
+### Registry & Database Lifecycles
+
+| Service | Initialize | Use | Shutdown |
+| ------- | ---------- | --- | -------- |
+| `gm::ResourceManager` | `ResourceManager::Init(config)` once per process. Set an explicit registry (`SetRegistry`) when bootstrapping headless tools. | Acquire handles via `LoadOrStoreResource<T>(guid, loader)`. Use `ScopedRegistry` to give worker threads their own caches. | `ResourceManager::Cleanup()` to flush caches and join outstanding notifications. |
+| `gm::scene::ComponentSchemaRegistry` | Auto-populated via `GM_REGISTER_COMPONENT_*` macros when each TU initializes. Call `ComponentSchemaRegistry::Instance().Finalize()` from app startup if you need to assert on missing schemas. | `ComponentDescriptor` objects supply serializer/deserializer lambdas that `SceneSerializer` consumes. | No explicit shutdown; lives until process exit. |
+| `gm::content::ContentDatabase` | `contentDb.Initialize(assetRoot)` after the asset manifest and schema directories exist. Provide a callback interface for validation events (see `DebugToolingController`). | `FindRecord(type, id)` during gameplay/editor sessions. Subscribe to `OnContentChanged` to react to hot reload. | `contentDb.Shutdown()` before destroying file watchers or asset catalogs. |
+| `gm::content::ContentSchemaRegistry` | `LoadSchemas(schemaDir)` (happens inside `ContentDatabase::Initialize`). | `GetSchema(type)` feeds serializer/editor tooling. | No explicit shutdown beyond releasing owning `ContentDatabase`. |
+
+The GotMilked game wires these services inside `Game::SetupResources` and `DebugToolingController`, but the pattern is the same for standalone tools:
+
+```cpp
+gm::ResourceManager::Init({ .assetRoot = assetsPath });
+gm::content::ContentDatabase contentDb;
+contentDb.Initialize(assetsPath / "content");
+auto scoped = gm::ResourceManager::ScopedRegistry::Create();
+// Load assets / scenes
+contentDb.Shutdown();
+gm::ResourceManager::Cleanup();
+```
 
 ---
 

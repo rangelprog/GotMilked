@@ -150,12 +150,11 @@ void SceneResourceController::RefreshShaders(const std::vector<std::string>& gui
     std::unordered_set<gm::scene::StaticMeshComponent*> candidates;
     std::unordered_set<gm::scene::SkinnedMeshComponent*> skinnedCandidates;
     for (const auto& guid : guids) {
-        std::string key = m_game.m_resources.ResolveShaderAlias(guid);
-        auto it = m_shaderDependents.find(key);
+        auto it = m_shaderDependents.find(guid);
         if (it != m_shaderDependents.end()) {
             candidates.insert(it->second.begin(), it->second.end());
         }
-        auto skinnedIt = m_skinnedShaderDependents.find(key);
+        auto skinnedIt = m_skinnedShaderDependents.find(guid);
         if (skinnedIt != m_skinnedShaderDependents.end()) {
             skinnedCandidates.insert(skinnedIt->second.begin(), skinnedIt->second.end());
         }
@@ -172,12 +171,11 @@ void SceneResourceController::RefreshMeshes(const std::vector<std::string>& guid
     std::unordered_set<gm::scene::StaticMeshComponent*> candidates;
     std::unordered_set<gm::scene::SkinnedMeshComponent*> skinnedCandidates;
     for (const auto& guid : guids) {
-        std::string key = m_game.m_resources.ResolveMeshAlias(guid);
-        auto it = m_meshDependents.find(key);
+        auto it = m_meshDependents.find(guid);
         if (it != m_meshDependents.end()) {
             candidates.insert(it->second.begin(), it->second.end());
         }
-        auto skinnedIt = m_skinnedMeshDependents.find(key);
+        auto skinnedIt = m_skinnedMeshDependents.find(guid);
         if (skinnedIt != m_skinnedMeshDependents.end()) {
             skinnedCandidates.insert(skinnedIt->second.begin(), skinnedIt->second.end());
         }
@@ -194,12 +192,11 @@ void SceneResourceController::RefreshMaterials(const std::vector<std::string>& g
     std::unordered_set<gm::scene::StaticMeshComponent*> candidates;
     std::unordered_set<gm::scene::SkinnedMeshComponent*> skinnedCandidates;
     for (const auto& guid : guids) {
-        std::string key = m_game.m_resources.ResolveMaterialAlias(guid);
-        auto it = m_materialDependents.find(key);
+        auto it = m_materialDependents.find(guid);
         if (it != m_materialDependents.end()) {
             candidates.insert(it->second.begin(), it->second.end());
         }
-        auto skinnedIt = m_skinnedMaterialDependents.find(key);
+        auto skinnedIt = m_skinnedMaterialDependents.find(guid);
         if (skinnedIt != m_skinnedMaterialDependents.end()) {
             skinnedCandidates.insert(skinnedIt->second.begin(), skinnedIt->second.end());
         }
@@ -375,7 +372,7 @@ void SceneResourceController::ResolveStaticMeshComponent(const std::shared_ptr<g
     bool updatedAny = false;
 
     const std::string originalMeshGuid = meshComp->GetMeshGuid();
-    const std::string meshGuid = m_game.m_resources.ResolveMeshAlias(originalMeshGuid);
+    const std::string meshGuid = originalMeshGuid;
     gm::Mesh* resolvedMesh = nullptr;
     if (!meshGuid.empty()) {
         resolvedMesh = m_game.m_resources.GetMesh(meshGuid);
@@ -395,7 +392,7 @@ void SceneResourceController::ResolveStaticMeshComponent(const std::shared_ptr<g
     }
 
     const std::string originalShaderGuid = meshComp->GetShaderGuid();
-    const std::string shaderGuid = m_game.m_resources.ResolveShaderAlias(originalShaderGuid);
+    const std::string shaderGuid = originalShaderGuid;
     gm::Shader* resolvedShader = nullptr;
     if (!shaderGuid.empty()) {
         resolvedShader = m_game.m_resources.GetShader(shaderGuid);
@@ -416,8 +413,7 @@ void SceneResourceController::ResolveStaticMeshComponent(const std::shared_ptr<g
             true);
     }
 
-    const std::string originalMaterialGuid = meshComp->GetMaterialGuid();
-    const std::string materialGuid = m_game.m_resources.ResolveMaterialAlias(originalMaterialGuid);
+    const std::string materialGuid = meshComp->GetMaterialGuid();
     std::shared_ptr<gm::Material> resolvedMaterial;
     if (!materialGuid.empty()) {
         resolvedMaterial = m_game.m_resources.GetMaterial(materialGuid);
@@ -433,7 +429,7 @@ void SceneResourceController::ResolveStaticMeshComponent(const std::shared_ptr<g
         ReportSceneIssue(
             m_game,
             fmt::format("[Game] StaticMeshComponent on '{}' references missing material GUID '{}'",
-                        gameObject->GetName(), originalMaterialGuid),
+                        gameObject->GetName(), materialGuid),
             true);
     }
 
@@ -562,20 +558,15 @@ void SceneResourceController::ResolveSkinnedMeshComponent(const std::shared_ptr<
         }
     }
 
-    std::shared_ptr<gm::Material> resolvedMaterial = component->GetMaterial();
+    std::shared_ptr<gm::Material> resolvedMaterial;
     std::string resolvedMaterialGuid;
     const std::string originalMaterialGuid = component->MaterialGuid();
     if (!originalMaterialGuid.empty()) {
-        resolvedMaterialGuid = m_game.m_resources.ResolveMaterialAlias(originalMaterialGuid);
-        if (resolvedMaterialGuid.empty()) {
-            resolvedMaterialGuid = originalMaterialGuid;
-        }
-        resolvedMaterial = m_game.m_resources.GetMaterial(resolvedMaterialGuid);
+        resolvedMaterial = m_game.m_resources.GetMaterial(originalMaterialGuid);
         if (resolvedMaterial) {
+            resolvedMaterialGuid = originalMaterialGuid;
             component->SetMaterial(resolvedMaterial, resolvedMaterialGuid);
         } else {
-            resolvedMaterialGuid.clear();
-            resolvedMaterial.reset();
             component->SetMaterial(nullptr);
             ReportSceneIssue(
                 m_game,
@@ -589,11 +580,7 @@ void SceneResourceController::ResolveSkinnedMeshComponent(const std::shared_ptr<
         if (guid.empty()) {
             return nullptr;
         }
-        std::string resolvedGuid = m_game.m_resources.ResolveShaderAlias(guid);
-        if (resolvedGuid.empty()) {
-            resolvedGuid = guid;
-        }
-        gm::Shader* shader = m_game.m_resources.GetShader(resolvedGuid);
+        gm::Shader* shader = m_game.m_resources.GetShader(guid);
         if (!shader && !silent) {
             ReportSceneIssue(
                 m_game,
@@ -605,9 +592,7 @@ void SceneResourceController::ResolveSkinnedMeshComponent(const std::shared_ptr<
         if (shader) {
             shader->Use();
             shader->SetInt("uTex", 0);
-        }
-        if (shader) {
-            component->SetShader(shader, resolvedGuid);
+            component->SetShader(shader, guid);
         }
         return shader;
     };
@@ -621,7 +606,7 @@ void SceneResourceController::ResolveSkinnedMeshComponent(const std::shared_ptr<
     if (!requestedShaderGuid.empty()) {
         resolvedShader = resolveShaderByGuid(requestedShaderGuid, false);
         if (resolvedShader) {
-            resolvedShaderGuid = component->ShaderGuid();
+            resolvedShaderGuid = requestedShaderGuid;
         } else {
             shaderGuidFailed = true;
         }
@@ -633,7 +618,7 @@ void SceneResourceController::ResolveSkinnedMeshComponent(const std::shared_ptr<
         if (auto shaderOverride = m_game.m_resources.GetMaterialShaderOverride(resolvedMaterialGuid)) {
             resolvedShader = resolveShaderByGuid(*shaderOverride, true);
             if (resolvedShader) {
-                resolvedShaderGuid = component->ShaderGuid();
+                resolvedShaderGuid = *shaderOverride;
             } else {
                 materialShaderFailed = true;
             }

@@ -35,13 +35,14 @@ namespace gm::debug {
 #include "gm/utils/Config.hpp"
 #include "GameResources.hpp"
 #include "GameConstants.hpp"
-#include "gm/gameplay/CameraRigSystem.hpp"
-#include "gm/gameplay/QuestTriggerSystem.hpp"
+#include "gameplay/CameraRigSystem.hpp"
+#include "gameplay/QuestTriggerSystem.hpp"
 #include "gm/utils/HotReloader.hpp"
 #include "gm/utils/ImGuiManager.hpp"
 #include "gm/tooling/Overlay.hpp"
 #include "gm/save/SaveManager.hpp"
 #include "gm/save/SaveSnapshotHelpers.hpp"
+#include "gm/content/ContentDatabase.hpp"
 #include "gm/scene/PrefabLibrary.hpp"
 #include "gm/core/Event.hpp"
 #if GM_DEBUG_TOOLS
@@ -63,16 +64,33 @@ class FlyCameraController;
 }
 #endif
 
+namespace gm::core {
+struct GameAppContext;
+}
+
 class Game {
 public:
     Game(const gm::utils::AppConfig& config);
     ~Game();
 
     bool Init(GLFWwindow* window, gm::SceneManager& sceneManager);
+    void BindAppContext(gm::core::GameAppContext& context);
     void Update(float dt);
     void Render();
     void Shutdown();
     ToolingFacade* GetToolingFacade() const { return m_toolingFacade.get(); }
+    DebugToolingController* DebugTooling() { return m_debugTooling.get(); }
+    const DebugToolingController* DebugTooling() const { return m_debugTooling.get(); }
+    GLFWwindow* Window() const { return m_window; }
+    void SetWindow(GLFWwindow* window) { m_window = window; }
+    gm::SceneManager* SceneManager() const { return m_sceneManager; }
+    void SetSceneManager(gm::SceneManager& manager) { m_sceneManager = &manager; }
+    gm::content::ContentDatabase* ContentDatabase() const { return m_contentDatabase.get(); }
+    void SetVSyncEnabled(bool enabled);
+    bool IsVSyncEnabled() const;
+    void RequestExit() const;
+    gm::core::GameAppContext* AppContext() const { return m_appContext; }
+    const gm::utils::AppConfig& Config() const { return m_config; }
     gm::Camera* GetRenderCamera() const;
     float GetRenderCameraFov() const;
 #if GM_DEBUG_TOOLS
@@ -122,6 +140,8 @@ private:
     std::unique_ptr<ToolingFacade> m_toolingFacade;
     std::unique_ptr<EventRouter> m_eventRouter;
     std::unique_ptr<GameLoopController> m_loopController;
+    std::unique_ptr<gm::content::ContentDatabase> m_contentDatabase;
+    gm::core::GameAppContext* m_appContext = nullptr;
     
     void PerformQuickSave();
     void PerformQuickLoad();

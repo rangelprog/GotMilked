@@ -13,8 +13,8 @@
 #include "gm/scene/GameObject.hpp"
 #include "gm/rendering/Mesh.hpp"
 #include "gm/core/Logger.hpp"
-#include "gm/gameplay/CameraRigComponent.hpp"
-#include "gm/gameplay/QuestTriggerComponent.hpp"
+#include "gameplay/CameraRigComponent.hpp"
+#include "gameplay/QuestTriggerComponent.hpp"
 #include <nlohmann/json.hpp>
 #include <glm/vec3.hpp>
 #include <algorithm>

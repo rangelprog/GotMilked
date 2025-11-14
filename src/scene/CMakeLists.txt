@@ -1,0 +1,39 @@
+set(GM_SCENE_SOURCES
+    AnimationSystem.cpp
+    AnimatorComponent.cpp
+    Component.cpp
+    ComponentDescriptor.cpp
+    ComponentFactory.cpp
+    GameObjectScheduler.cpp
+    GameObject.cpp
+    LightComponent.cpp
+    MaterialComponent.cpp
+    PrefabLibrary.cpp
+    RenderBatcher.cpp
+    Scene.cpp
+    SceneManager.cpp
+    SceneLifecycle.cpp
+    SceneSerializer.cpp
+    Scene_GameObject.cpp
+    SkinnedMeshComponent.cpp
+    StaticMeshComponent.cpp
+    TransformComponent.cpp
+)
+
+add_library(gm_scene STATIC ${GM_SCENE_SOURCES})
+target_include_directories(gm_scene
+    PUBLIC
+        ${PROJECT_SOURCE_DIR}/include
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(gm_scene
+    PUBLIC
+        gm_core
+        gm_rendering
+        gm_animation
+        gm_utils
+        glm::glm
+)
+gm_apply_warnings(gm_scene)
+

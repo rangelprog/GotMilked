@@ -41,20 +41,6 @@ Mesh& Mesh::operator=(Mesh&& o) noexcept {
     return *this;
 }
 
-// Helper function for attribute setup
-static void setupAttributes() {
-    const GLsizei stride = 8 * sizeof(float);
-    // layout(location = 0) vec3 aPos
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
-    // layout(location = 1) vec3 aNormal
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
-    // layout(location = 2) vec2 aUV
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
-}
-
 Mesh Mesh::fromPositions(const std::vector<float>& positions) {
     Mesh m;
     glGenVertexArrays(1, &m.VAO);

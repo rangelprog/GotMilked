@@ -17,7 +17,7 @@
 #include "gm/save/SaveSnapshotHelpers.hpp"
 #include "gm/utils/FileDialog.hpp"
 #include "gm/rendering/Camera.hpp"
-#include "gm/gameplay/FlyCameraController.hpp"
+#include "gameplay/FlyCameraController.hpp"
 #include "gm/save/SaveVersion.hpp"
 
 #include <imgui.h>
@@ -29,6 +29,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <system_error>
 #include <utility>
 
 namespace {
@@ -123,7 +124,23 @@ void DebugMenu::RenderMenuBar() {
     if (ImGui::BeginMenu("Edit")) {
         m_editMenuOpen = true;
 
-        ImGui::MenuItem("Scene Explorer", nullptr, &m_showSceneExplorer);
+        auto undoIt = m_shortcutHandlers.find("undo");
+        std::string undoShortcut = undoIt != m_shortcutHandlers.end() ? FormatShortcutLabel(undoIt->second.binding) : "Ctrl+Z";
+        if (ImGui::MenuItem("Undo", undoShortcut.c_str(), false, !m_undoStack.empty())) {
+            UndoLastAction();
+        }
+
+        auto redoIt = m_shortcutHandlers.find("redo");
+        std::string redoShortcut = redoIt != m_shortcutHandlers.end() ? FormatShortcutLabel(redoIt->second.binding) : "Ctrl+Y";
+        if (ImGui::MenuItem("Redo", redoShortcut.c_str(), false, !m_redoStack.empty())) {
+            RedoLastAction();
+        }
+
+        ImGui::Separator();
+
+        if (ImGui::MenuItem("Scene Explorer", nullptr, &m_showSceneExplorer)) {
+            MarkLayoutDirty();
+        }
 
         ImGui::EndMenu();
     } else {
@@ -133,10 +150,21 @@ void DebugMenu::RenderMenuBar() {
     if (ImGui::BeginMenu("View")) {
         m_optionsMenuOpen = true;
 
-        ImGui::Checkbox("Scene Info", &m_showSceneInfo);
-        ImGui::Checkbox("Prefab Browser", &m_showPrefabBrowser);
-        ImGui::Checkbox("Content Browser", &m_showContentBrowser);
-        ImGui::Checkbox("Animation Preview", &m_showAnimationDebugger);
+        if (ImGui::Checkbox("Scene Info", &m_showSceneInfo)) {
+            MarkLayoutDirty();
+        }
+        if (ImGui::Checkbox("Prefab Browser", &m_showPrefabBrowser)) {
+            MarkLayoutDirty();
+        }
+        if (ImGui::Checkbox("Content Browser", &m_showContentBrowser)) {
+            MarkLayoutDirty();
+        }
+        if (ImGui::Checkbox("Animation Preview", &m_showAnimationDebugger)) {
+            MarkLayoutDirty();
+        }
+        if (ImGui::Checkbox("Content Validation", &m_showContentValidation)) {
+            MarkLayoutDirty();
+        }
 #if defined(IMGUI_HAS_DOCK)
         if (ImGui::MenuItem("Reset Layout")) {
             m_resetDockLayout = true;
@@ -145,8 +173,37 @@ void DebugMenu::RenderMenuBar() {
             m_showPrefabBrowser = true;
             m_showContentBrowser = true;
             m_showAnimationDebugger = true;
+            MarkLayoutDirty();
         }
 #endif
+
+        if (ImGui::BeginMenu("Layouts")) {
+            bool hasProfile = !m_layoutProfilePath.empty();
+            if (ImGui::MenuItem("Save Layout", nullptr, false, hasProfile)) {
+                SaveLayoutProfileInternal(m_layoutProfilePath);
+                m_layoutDirty = false;
+                m_layoutAutosaveTimer = 0.0f;
+            }
+            if (ImGui::MenuItem("Reload Layout", nullptr, false, hasProfile)) {
+                LoadLayoutProfileInternal(m_layoutProfilePath);
+            }
+
+            std::error_code ec;
+            auto layoutDir = m_layoutProfilePath.parent_path();
+            if (!layoutDir.empty() && std::filesystem::exists(layoutDir, ec)) {
+                for (const auto& entry : std::filesystem::directory_iterator(layoutDir, ec)) {
+                    if (entry.is_regular_file() && entry.path().extension() == ".json") {
+                        std::string name = entry.path().stem().string();
+                        if (ImGui::MenuItem(name.c_str())) {
+                            LoadLayoutProfileInternal(entry.path());
+                        }
+                    }
+                }
+            }
+            ImGui::EndMenu();
+        }
+
+        HandlePluginMenu();
 
         ImGui::EndMenu();
     } else {

@@ -1,0 +1,43 @@
+{
+  "shortcuts": {
+    "gizmo_rotate": {
+      "alt": false,
+      "ctrl": false,
+      "key": "E",
+      "shift": false
+    },
+    "gizmo_scale": {
+      "alt": false,
+      "ctrl": false,
+      "key": "R",
+      "shift": false
+    },
+    "gizmo_translate": {
+      "alt": false,
+      "ctrl": false,
+      "key": "W",
+      "shift": false
+    },
+    "redo": {
+      "alt": false,
+      "ctrl": true,
+      "key": "Y",
+      "shift": false
+    },
+    "undo": {
+      "alt": false,
+      "ctrl": true,
+      "key": "Z",
+      "shift": false
+    }
+  },
+  "version": 1,
+  "windows": {
+    "animationDebugger": false,
+    "contentBrowser": false,
+    "debugConsole": false,
+    "prefabBrowser": false,
+    "sceneExplorer": false,
+    "sceneInfo": false
+  }
+}

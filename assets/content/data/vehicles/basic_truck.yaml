@@ -1,0 +1,9 @@
+id: vehicle_truck_basic
+displayName: Utility Truck
+maxSpeed: 22.5
+mass: 2400
+engineTorque: 450
+cargoSlots:
+  - hay_bale
+  - milk_crate
+

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gm/scene/Component.hpp"
-#include "gm/gameplay/FlyCameraController.hpp"
+#include "FlyCameraController.hpp"
 
 #include <string>
 

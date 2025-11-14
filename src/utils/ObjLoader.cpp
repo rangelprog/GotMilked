@@ -9,6 +9,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -52,27 +53,39 @@ Mesh ObjLoader::LoadObjPNUV(const std::string& path) {
         std::vector<PTN> tmp;
 
         while (ss >> vtx) {
-          int p = -1, t = -1, n = -1;
-          // mgliche Formen:
-          // p/t/n  p//n  p/t
-          if (sscanf(vtx.c_str(), "%d/%d/%d", &p, &t, &n) == 3) {
-            // ok
-          } else if (sscanf(vtx.c_str(), "%d//%d", &p, &n) == 2) {
-            t = -1;
-          } else if (sscanf(vtx.c_str(), "%d/%d", &p, &t) == 2) {
-            n = -1;
+          auto parseIndex = [](std::string_view token) -> int {
+            if (token.empty()) {
+              return -1;
+            }
+            try {
+              const int value = std::stoi(std::string(token));
+              return value > 0 ? value - 1 : value;
+            } catch (...) {
+              return -1;
+            }
+          };
+
+          PTN triple{-1, -1, -1};
+          const size_t firstSlash = vtx.find('/');
+          if (firstSlash == std::string::npos) {
+            triple.p = parseIndex(vtx);
           } else {
-            sscanf(vtx.c_str(), "%d", &p);
-            t = n = -1;
+            triple.p = parseIndex(std::string_view(vtx).substr(0, firstSlash));
+            const size_t secondSlash = vtx.find('/', firstSlash + 1);
+            if (secondSlash == std::string::npos) {
+              // Format p/t
+              triple.t = parseIndex(std::string_view(vtx).substr(firstSlash + 1));
+            } else {
+              // Format p/t/n or p//n
+              const auto tToken = std::string_view(vtx).substr(firstSlash + 1, secondSlash - firstSlash - 1);
+              if (!tToken.empty()) {
+                triple.t = parseIndex(tToken);
+              }
+              triple.n = parseIndex(std::string_view(vtx).substr(secondSlash + 1));
+            }
           }
 
-          if (p > 0)
-            p -= 1;
-          if (t > 0)
-            t -= 1;
-          if (n > 0)
-            n -= 1;
-          tmp.push_back({p, t, n});
+          tmp.push_back(triple);
         }
 
         // Triangulieren falls mehr als 3

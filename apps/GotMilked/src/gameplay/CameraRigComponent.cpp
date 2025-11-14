@@ -1,4 +1,4 @@
-#include "gm/gameplay/CameraRigComponent.hpp"
+#include "CameraRigComponent.hpp"
 
 #include <algorithm>
 #include <utility>

@@ -38,6 +38,7 @@
 #include <unordered_map>
 #include <vector>
 #include <string>
+#include <filesystem>
 #ifdef _WIN32
 #ifdef APIENTRY
 #undef APIENTRY
@@ -239,6 +240,11 @@ void DebugToolingController::ConfigureDebugMenu() {
     m_game.m_debugMenu->SetScene(m_game.m_gameScene);
     m_game.m_debugMenu->SetPrefabLibrary(m_game.m_prefabLibrary.get());
     m_game.m_debugMenu->SetGameResources(&m_game.m_resources);
+    m_game.m_debugMenu->SetContentDatabase(m_game.ContentDatabase());
+    const std::filesystem::path toolingDir = m_game.m_resources.GetAssetsDirectory() / "tools";
+    const std::filesystem::path layoutsDir = toolingDir / "layouts";
+    m_game.m_debugMenu->SetLayoutProfilePath(layoutsDir / "default.json");
+    m_game.m_debugMenu->SetPluginManifestPath(toolingDir / "plugins.json");
     m_game.m_debugMenu->SetApplyResourcesCallback([this]() {
         m_game.ApplyResourcesToScene();
     });

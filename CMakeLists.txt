@@ -34,137 +34,44 @@ endfunction()
 set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/external")
 include(cmake/Dependencies.cmake)
 
-add_library(GotMilkedEngine
-    # Core systems
-    src/core/Time.cpp
-    src/core/Event.cpp
-    src/core/GameApp.cpp
-    src/core/Input.cpp
-    src/core/InputBindings.cpp
-    src/core/input/InputSystem.cpp
+add_subdirectory(src/core)
+add_subdirectory(src/rendering)
+add_subdirectory(src/animation)
+add_subdirectory(src/utils)
+add_subdirectory(src/scene)
+add_subdirectory(src/physics)
+add_subdirectory(src/save)
+add_subdirectory(src/prototypes)
+add_subdirectory(src/tooling)
+add_subdirectory(src/assets)
+add_subdirectory(src/runtime)
+add_subdirectory(src/content)
 
-    # Rendering systems
-    src/rendering/Camera.cpp
-    src/rendering/Shader.cpp
-    src/rendering/Texture.cpp
-    src/rendering/RenderStateCache.cpp
-    src/rendering/Mesh.cpp
-    src/rendering/Material.cpp
-    src/rendering/LightManager.cpp
-    src/rendering/stb_image_impl.cpp
+if(GM_ENABLE_DEBUG_TOOLS)
+    add_subdirectory(src/debug)
+endif()
 
-    # Animation
-    src/animation/Skeleton.cpp
-    src/animation/AnimationClip.cpp
-    src/animation/SkinnedMeshAsset.cpp
-    src/animation/AnimationPose.cpp
-    src/animation/PoseMath.cpp
-    src/animation/AnimationPoseEvaluator.cpp
-
-    # Scene management
-    src/scene/Scene.cpp
-    src/scene/Scene_GameObject.cpp
-    src/scene/PrefabLibrary.cpp
-    src/scene/SceneManager.cpp
-    src/scene/GameObject.cpp
-    src/scene/Component.cpp
-    src/scene/TransformComponent.cpp
-    src/scene/MaterialComponent.cpp
-    src/scene/LightComponent.cpp
-    src/scene/SceneSerializer.cpp
-    src/scene/ComponentFactory.cpp
-    src/scene/StaticMeshComponent.cpp
-    src/scene/SkinnedMeshComponent.cpp
-    src/scene/AnimatorComponent.cpp
-    src/scene/AnimationSystem.cpp
-
-    # Utils
-    src/utils/ObjLoader.cpp
-    src/utils/ResourceManager.cpp
-    src/utils/ResourceManifest.cpp
-    src/utils/CoordinateDisplay.cpp
-    src/utils/ImGuiManager.cpp
-    src/utils/ResourceRegistry.cpp
-    src/utils/Config.cpp
-    src/utils/HotReloader.cpp
-    src/utils/FileDialog.cpp
-    src/utils/ThreadPool.cpp
-    src/utils/Profiler.cpp
-
-    # Physics
-    src/physics/PhysicsWorld.cpp
-    src/physics/JoltImpl.cpp
-    src/physics/RigidBodyComponent.cpp
-
-    # Prototypes
-    src/prototypes/Primitives.cpp
-
-    # Gameplay
-    src/gameplay/FlyCameraController.cpp
-    src/gameplay/CameraRigComponent.cpp
-    src/gameplay/CameraRigSystem.cpp
-    src/gameplay/QuestTriggerComponent.cpp
-    src/gameplay/QuestTriggerSystem.cpp
-
-    # Save / Tooling
-    src/save/SaveManager.cpp
-    src/save/SaveSnapshotHelpers.cpp
-    src/save/SaveVersion.cpp
-    src/save/SaveDiff.cpp
-    src/tooling/Overlay.cpp
-
-    # Assets
-    src/assets/AssetCatalog.cpp
-    src/assets/AssetDatabase.cpp
+add_library(GotMilkedEngine INTERFACE)
+target_include_directories(GotMilkedEngine INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(GotMilkedEngine
+    INTERFACE
+        gm_core
+        gm_rendering
+        gm_animation
+        gm_utils
+        gm_scene
+        gm_physics
+        gm_save
+        gm_prototypes
+        gm_tooling
+        gm_assets
+        gm_content
+        gm_runtime
 )
 
 if(GM_ENABLE_DEBUG_TOOLS)
-    target_sources(GotMilkedEngine PRIVATE
-        src/tooling/DebugConsole.cpp
-        src/debug/GridRenderer.cpp
-        src/debug/TerrainEditingSystem.cpp
-    )
+    target_link_libraries(GotMilkedEngine INTERFACE gm_debug)
 endif()
-
-target_include_directories(GotMilkedEngine 
-    PUBLIC 
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/core
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/rendering
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/scene
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/utils
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/physics
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/prototypes
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/gameplay
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/save
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/assets
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/tooling
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/gm/debug
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/core
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/rendering
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/scene
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/utils
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/physics
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/prototypes
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/save
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/assets
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/tooling
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/debug
-)
-target_link_libraries(GotMilkedEngine PUBLIC glfw glad glm::glm imgui Jolt)
-target_link_libraries(GotMilkedEngine PUBLIC fmt::fmt nlohmann_json::nlohmann_json assimp::assimp)
-gm_apply_warnings(GotMilkedEngine)
-
-# Windows-specific libraries for user documents path resolution
-if(WIN32)
-    target_link_libraries(GotMilkedEngine PRIVATE ole32)
-endif()
-
-target_include_directories(GotMilkedEngine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_include_directories(GotMilkedEngine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 add_custom_target(lock-deps
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/cmake/LockDeps.cmake

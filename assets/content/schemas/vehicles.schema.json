@@ -1,0 +1,22 @@
+{
+  "type": "vehicle",
+  "displayName": "Vehicle Definition",
+  "version": 1,
+  "dataDirectories": [
+    "content/data/vehicles"
+  ],
+  "fields": [
+    { "name": "id", "type": "string", "required": true },
+    { "name": "displayName", "type": "string", "required": true },
+    { "name": "maxSpeed", "type": "number", "required": true, "minimum": 0.0 },
+    { "name": "mass", "type": "number", "required": true, "minimum": 0.0 },
+    { "name": "engineTorque", "type": "number", "required": true, "minimum": 0.0 },
+    {
+      "name": "cargoSlots",
+      "type": "array",
+      "required": false,
+      "items": { "name": "slot", "type": "string" }
+    }
+  ]
+}
+

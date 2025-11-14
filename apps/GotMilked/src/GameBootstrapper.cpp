@@ -10,11 +10,11 @@ GameBootstrapper::GameBootstrapper(Game& game)
     : m_game(game) {}
 
 bool GameBootstrapper::Initialize(GLFWwindow* window, gm::SceneManager& sceneManager) {
-    m_game.m_window = window;
-    m_game.m_sceneManager = &sceneManager;
-    m_game.m_vsyncEnabled = m_game.m_config.window.vsync;
+    m_game.SetWindow(window);
+    m_game.SetSceneManager(sceneManager);
+    m_game.SetVSyncEnabled(m_game.Config().window.vsync);
     m_game.SetupLogging();
-    if (!m_game.m_window) {
+    if (!m_game.Window()) {
         gm::core::Logger::Error("[Game] Invalid window handle");
         return false;
     }
@@ -35,7 +35,7 @@ bool GameBootstrapper::Initialize(GLFWwindow* window, gm::SceneManager& sceneMan
         gm::core::Logger::Warning("[Game] Prefab library failed to initialize");
     }
 
-    if (m_game.m_debugTooling && !m_game.m_debugTooling->Initialize()) {
+    if (m_game.DebugTooling() && !m_game.DebugTooling()->Initialize()) {
         gm::core::Logger::Warning("[Game] Some debug tools failed to initialize, continuing anyway");
     }
 

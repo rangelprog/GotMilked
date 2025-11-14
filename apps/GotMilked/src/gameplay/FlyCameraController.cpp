@@ -1,4 +1,4 @@
-#include "gm/gameplay/FlyCameraController.hpp"
+#include "FlyCameraController.hpp"
 
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>

@@ -34,17 +34,6 @@ bool FileExists(const std::filesystem::path& path) {
     return std::filesystem::exists(path, ec);
 }
 
-std::string NormalizeAliasKey(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
-    return value;
-}
-
-const std::unordered_map<std::string, std::vector<std::string>> kLegacyShaderAliases{
-    {"shaders/simple", {"game_shader"}}
-};
-
 std::shared_ptr<gm::core::Error> CloneError(const gm::core::Error& err) {
     if (auto resourceErr = dynamic_cast<const gm::core::ResourceError*>(&err)) {
         return std::make_shared<gm::core::ResourceError>(*resourceErr);
@@ -100,60 +89,6 @@ void GameResources::ValidateManifests(const std::vector<gm::assets::AssetDatabas
             ReportIssue(fmt::format("Manifest '{}': {}", displayName, warning), false);
         }
     }
-}
-
-void GameResources::RegisterShaderAlias(const std::string& alias, const std::string& guid) {
-    if (alias.empty() || guid.empty()) {
-        return;
-    }
-    m_shaderAliases[NormalizeAliasKey(alias)] = guid;
-}
-
-void GameResources::RegisterMeshAlias(const std::string& alias, const std::string& guid) {
-    if (alias.empty() || guid.empty()) {
-        return;
-    }
-    m_meshAliases[NormalizeAliasKey(alias)] = guid;
-}
-
-void GameResources::RegisterMaterialAlias(const std::string& alias, const std::string& guid) {
-    if (alias.empty() || guid.empty()) {
-        return;
-    }
-    m_materialAliases[NormalizeAliasKey(alias)] = guid;
-}
-
-std::string GameResources::ResolveShaderGuid(const std::string& guid) const {
-    if (guid.empty()) {
-        return {};
-    }
-    auto it = m_shaderAliases.find(NormalizeAliasKey(guid));
-    if (it != m_shaderAliases.end()) {
-        return it->second;
-    }
-    return {};
-}
-
-std::string GameResources::ResolveMeshGuid(const std::string& guid) const {
-    if (guid.empty()) {
-        return {};
-    }
-    auto it = m_meshAliases.find(NormalizeAliasKey(guid));
-    if (it != m_meshAliases.end()) {
-        return it->second;
-    }
-    return {};
-}
-
-std::string GameResources::ResolveMaterialGuid(const std::string& guid) const {
-    if (guid.empty()) {
-        return {};
-    }
-    auto it = m_materialAliases.find(NormalizeAliasKey(guid));
-    if (it != m_materialAliases.end()) {
-        return it->second;
-    }
-    return {};
 }
 
 void GameResources::LoadAnimationAssetManifests() {
@@ -445,28 +380,10 @@ bool GameResources::LoadMaterialDefinition(const std::string& guid,
     registryEntry.emissionTextureGuid = entry.emissionTextureGuid;
     gm::ResourceRegistry::Instance().RegisterMaterial(guid, registryEntry);
 
-    if (!entry.name.empty()) {
-        RegisterMaterialAlias(entry.name, guid);
-    }
     if (entry.shaderGuid && !entry.shaderGuid->empty()) {
         m_materialShaderOverrides[guid] = *entry.shaderGuid;
     }
     return true;
-}
-
-std::string GameResources::ResolveShaderAlias(const std::string& guid) const {
-    auto resolved = ResolveShaderGuid(guid);
-    return resolved.empty() ? guid : resolved;
-}
-
-std::string GameResources::ResolveMeshAlias(const std::string& guid) const {
-    auto resolved = ResolveMeshGuid(guid);
-    return resolved.empty() ? guid : resolved;
-}
-
-std::string GameResources::ResolveMaterialAlias(const std::string& guid) const {
-    auto resolved = ResolveMaterialGuid(guid);
-    return resolved.empty() ? guid : resolved;
 }
 
 GameResources::~GameResources() {
@@ -505,9 +422,6 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
     std::unordered_set<std::string> loadedMeshGuids;
 
     m_prefabSources.clear();
-    m_shaderAliases.clear();
-    m_meshAliases.clear();
-    m_materialAliases.clear();
     m_skinnedMeshSources.clear();
     m_skeletonSources.clear();
     m_animationClipSources.clear();
@@ -552,23 +466,6 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
             registry.RegisterShader(record.guid, descriptor.vertexPath, descriptor.fragmentPath);
             loadedShaderGuids.insert(record.guid);
 
-            RegisterShaderAlias(record.baseKey, record.guid);
-            RegisterShaderAlias(record.vertex.relativePath, record.guid);
-            RegisterShaderAlias(record.fragment.relativePath, record.guid);
-
-            std::filesystem::path vertexRel(record.vertex.relativePath);
-            std::filesystem::path fragmentRel(record.fragment.relativePath);
-            RegisterShaderAlias(vertexRel.stem().string(), record.guid);
-            RegisterShaderAlias(fragmentRel.stem().string(), record.guid);
-
-            if (auto legacyIt = kLegacyShaderAliases.find(record.baseKey); legacyIt != kLegacyShaderAliases.end()) {
-                for (const auto& alias : legacyIt->second) {
-                    RegisterShaderAlias(alias, record.guid);
-                }
-            }
-            if (auto pos = record.guid.find("::"); pos != std::string::npos && pos + 2 < record.guid.size()) {
-                RegisterShaderAlias(record.guid.substr(pos + 2), record.guid);
-            }
         }
 
         EnsureBuiltinShaders();
@@ -598,24 +495,14 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
                 throw gm::core::ResourceError("mesh", guid, "Loaded mesh handle is empty");
             }
 
-            gm::utils::ResourceManifest::MeshEntry entry;
-            entry.guid = guid;
-            entry.path = desc.path;
+        gm::utils::ResourceManifest::MeshEntry entry;
+        entry.guid = guid;
+        entry.path = desc.path;
 
-            m_meshes[guid] = mesh;
-            m_meshSources[guid] = entry;
-            registry.RegisterMesh(guid, entry.path);
-            loadedMeshGuids.insert(guid);
-
-            RegisterMeshAlias(meshRecord.descriptor.relativePath, guid);
-            std::filesystem::path meshRel(meshRecord.descriptor.relativePath);
-            RegisterMeshAlias(meshRel.stem().string(), guid);
-            std::filesystem::path withoutExt = meshRel;
-            withoutExt.replace_extension();
-            RegisterMeshAlias(withoutExt.string(), guid);
-            if (auto pos = guid.find("::"); pos != std::string::npos && pos + 2 < guid.size()) {
-                RegisterMeshAlias(guid.substr(pos + 2), guid);
-            }
+        m_meshes[guid] = mesh;
+        m_meshSources[guid] = entry;
+        registry.RegisterMesh(guid, entry.path);
+        loadedMeshGuids.insert(guid);
         }
 
         for (const auto& prefabRecord : prefabRecords) {
@@ -691,10 +578,6 @@ void GameResources::EnsureBuiltinShaders() {
         m_shaderSources[kSimpleSkinnedGuid] = ShaderSources{descriptor.vertexPath, descriptor.fragmentPath};
         gm::ResourceRegistry::Instance().RegisterShader(kSimpleSkinnedGuid, descriptor.vertexPath, descriptor.fragmentPath);
 
-        RegisterShaderAlias("simple_skinned", kSimpleSkinnedGuid);
-        RegisterShaderAlias("shaders/simple_skinned.vert.glsl", kSimpleSkinnedGuid);
-        RegisterShaderAlias("simple_skinned.vert.glsl", kSimpleSkinnedGuid);
-        RegisterShaderAlias("simple_skinned.vert", kSimpleSkinnedGuid);
     } catch (const std::exception& ex) {
         ReportIssue(fmt::format("Failed to compile built-in skinned shader: {}", ex.what()), true);
     }
@@ -839,17 +722,7 @@ gm::Shader* GameResources::GetShader(const std::string& guid) const {
         return nullptr;
     }
     auto it = m_shaders.find(guid);
-    if (it != m_shaders.end()) {
-        return it->second.get();
-    }
-    auto resolved = ResolveShaderGuid(guid);
-    if (!resolved.empty()) {
-        auto resolvedIt = m_shaders.find(resolved);
-        if (resolvedIt != m_shaders.end()) {
-            return resolvedIt->second.get();
-        }
-    }
-    return nullptr;
+    return it != m_shaders.end() ? it->second.get() : nullptr;
 }
 
 gm::Texture* GameResources::GetTexture(const std::string& guid) const {
@@ -862,45 +735,22 @@ gm::Mesh* GameResources::GetMesh(const std::string& guid) const {
         return nullptr;
     }
     auto it = m_meshes.find(guid);
-    if (it != m_meshes.end()) {
-        return it->second.get();
-    }
-    auto resolved = ResolveMeshGuid(guid);
-    if (!resolved.empty()) {
-        auto resolvedIt = m_meshes.find(resolved);
-        if (resolvedIt != m_meshes.end()) {
-            return resolvedIt->second.get();
-        }
-    }
-    return nullptr;
+    return it != m_meshes.end() ? it->second.get() : nullptr;
 }
 
 std::shared_ptr<gm::Material> GameResources::GetMaterial(const std::string& guid) const {
-    if (!guid.empty()) {
-        auto it = m_materials.find(guid);
-        if (it != m_materials.end()) {
-            return it->second;
-        }
-        auto resolved = ResolveMaterialGuid(guid);
-        if (!resolved.empty()) {
-            auto resolvedIt = m_materials.find(resolved);
-            if (resolvedIt != m_materials.end()) {
-                return resolvedIt->second;
-            }
-        }
+    if (guid.empty()) {
+        return nullptr;
     }
-    return nullptr;
+    auto it = m_materials.find(guid);
+    return it != m_materials.end() ? it->second : nullptr;
 }
 
 std::optional<std::string> GameResources::GetMaterialShaderOverride(const std::string& guid) const {
     if (guid.empty()) {
         return std::nullopt;
     }
-    std::string resolved = ResolveMaterialGuid(guid);
-    if (resolved.empty()) {
-        resolved = guid;
-    }
-    auto it = m_materialShaderOverrides.find(resolved);
+    auto it = m_materialShaderOverrides.find(guid);
     if (it != m_materialShaderOverrides.end()) {
         return it->second;
     }
@@ -1238,10 +1088,6 @@ void GameResources::Release() {
     m_materialSources.clear();
     m_materialShaderOverrides.clear();
     m_prefabSources.clear();
-    m_shaderAliases.clear();
-    m_meshAliases.clear();
-    m_materialAliases.clear();
-
     m_defaultShaderGuid.clear();
     m_defaultShaderVertPath.clear();
     m_defaultShaderFragPath.clear();

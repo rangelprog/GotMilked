@@ -1,4 +1,4 @@
-#include "gm/gameplay/QuestTriggerComponent.hpp"
+#include "QuestTriggerComponent.hpp"
 
 #include <algorithm>
 #include <utility>
