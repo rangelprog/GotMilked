@@ -33,6 +33,9 @@ uniform sampler2D uMaterial_specularTex;
 uniform sampler2D uMaterial_normalTex;
 uniform sampler2D uMaterial_emissionTex;
 
+uniform vec4 uWeatherSurface = vec4(0.0); // x=wetness, y=puddles, z=darkening, w=unused
+uniform vec3 uWeatherTint = vec3(1.0);
+
 // Lighting
 struct Light {
     int type;              // 0=Directional, 1=Point, 2=Spot, -1=Disabled
@@ -147,6 +150,18 @@ void main() {
         materialDiffuse = albedo;
     }
     
+    float wetness = clamp(uWeatherSurface.x, 0.0, 1.0);
+    float puddleLevel = clamp(uWeatherSurface.y, 0.0, 1.0);
+    float darkening = clamp(uWeatherSurface.z, 0.0, 1.0);
+    materialDiffuse *= mix(vec3(1.0), uWeatherTint, wetness);
+    vec3 darkenedTint = mix(materialDiffuse, materialDiffuse * vec3(0.45, 0.48, 0.55), darkening);
+    materialDiffuse = mix(materialDiffuse, darkenedTint, darkening);
+
+    float wetSpecBoost = wetness * 0.35;
+    float puddleMask = pow(max(dot(N, vec3(0.0, 1.0, 0.0)), 0.0), 8.0) * puddleLevel;
+    materialSpecular += vec3(wetSpecBoost + puddleMask * 0.9);
+    materialDiffuse = mix(materialDiffuse, materialDiffuse * 0.7, puddleMask * 0.5);
+
     // Use defaults for specular and shininess if not set
     if (length(materialSpecular) < 0.001) materialSpecular = vec3(0.5);
     if (materialShininess < 0.001) materialShininess = 32.0;

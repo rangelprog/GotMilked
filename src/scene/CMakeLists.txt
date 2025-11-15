@@ -18,6 +18,9 @@ set(GM_SCENE_SOURCES
     SkinnedMeshComponent.cpp
     StaticMeshComponent.cpp
     TransformComponent.cpp
+    TimeOfDayController.cpp
+    WeatherEmitterComponent.cpp
+    VolumetricFogComponent.cpp
 )
 
 add_library(gm_scene STATIC ${GM_SCENE_SOURCES})

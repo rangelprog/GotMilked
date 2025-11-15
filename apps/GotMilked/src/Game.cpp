@@ -35,10 +35,15 @@
 #include "gm/core/GameApp.hpp"
 
 #include <filesystem>
+#include <fstream>
 #include <optional>
 #include <algorithm>
+#include <cmath>
+#include <glm/common.hpp>
 #include <vector>
+#include <cmath>
 #include <glm/glm.hpp>
+#include <glm/common.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <nlohmann/json.hpp>
@@ -52,6 +57,7 @@
 #include "gm/scene/StaticMeshComponent.hpp"
 #include "gm/physics/PhysicsWorld.hpp"
 #include "gm/rendering/Material.hpp"
+#include "gm/rendering/CascadeShadowMap.hpp"
 #include "gm/core/Input.hpp"
 #include "gm/core/InputBindings.hpp"
 #include "gm/core/input/InputManager.hpp"
@@ -227,9 +233,301 @@ bool Game::SetupRendering() {
         m_contentDatabase->Initialize(m_assetsDir);
     }
 
+    LoadCelestialConfig();
+    LoadWeatherProfiles();
     gm::SceneSerializerExtensions::RegisterSerializers();
     m_camera = std::make_unique<gm::Camera>();
     return true;
+}
+
+void Game::LoadCelestialConfig() {
+    gm::scene::CelestialConfig config{};
+    const auto configPath = (m_assetsDir / "config" / "celestial.json").lexically_normal();
+    std::error_code existsEc;
+    if (!std::filesystem::exists(configPath, existsEc)) {
+        if (existsEc) {
+            gm::core::Logger::Warning("[Game] Unable to check celestial config '{}': {}", configPath.string(), existsEc.message());
+        } else {
+            gm::core::Logger::Info("[Game] Celestial config '{}' not found; using defaults", configPath.string());
+        }
+        m_timeOfDayController.SetConfig(config);
+        m_sunMoonState = m_timeOfDayController.Evaluate();
+        return;
+    }
+
+    std::ifstream file(configPath);
+    if (!file.is_open()) {
+        gm::core::Logger::Warning("[Game] Failed to open celestial config '{}'; using defaults", configPath.string());
+        m_timeOfDayController.SetConfig(config);
+        m_sunMoonState = m_timeOfDayController.Evaluate();
+        return;
+    }
+
+    nlohmann::json json = nlohmann::json::parse(file, nullptr, false);
+    if (!json.is_object()) {
+        gm::core::Logger::Warning("[Game] Celestial config '{}' is malformed; using defaults", configPath.string());
+        m_timeOfDayController.SetConfig(config);
+        m_sunMoonState = m_timeOfDayController.Evaluate();
+        return;
+    }
+
+    config.latitudeDeg = json.value("latitudeDeg", config.latitudeDeg);
+    config.axialTiltDeg = json.value("axialTiltDeg", config.axialTiltDeg);
+    config.dayLengthSeconds = std::max(1.0f, json.value("dayLengthSeconds", config.dayLengthSeconds));
+    config.timeOffsetSeconds = json.value("timeOffsetSeconds", config.timeOffsetSeconds);
+    config.moonPhaseOffsetSeconds = json.value("moonPhaseOffsetSeconds", config.moonPhaseOffsetSeconds);
+    config.moonlightIntensity = json.value("moonlightIntensity", config.moonlightIntensity);
+    config.turbidity = json.value("turbidity", config.turbidity);
+    config.exposure = json.value("exposure", config.exposure);
+    config.airDensity = json.value("airDensity", config.airDensity);
+    if (auto albedoIt = json.find("groundAlbedo"); albedoIt != json.end() && albedoIt->is_array() && albedoIt->size() == 3) {
+        config.groundAlbedo = glm::vec3((*albedoIt)[0].get<float>(),
+                                        (*albedoIt)[1].get<float>(),
+                                        (*albedoIt)[2].get<float>());
+    }
+    config.useGradientSky = json.value("useGradientSky", config.useGradientSky);
+    config.middayLux = json.value("middayLux", config.middayLux);
+    config.exposureReferenceLux = json.value("exposureReferenceLux", config.exposureReferenceLux);
+    config.exposureTargetEv = json.value("exposureTargetEv", config.exposureTargetEv);
+    config.exposureBias = json.value("exposureBias", config.exposureBias);
+    config.exposureSmoothing = json.value("exposureSmoothing", config.exposureSmoothing);
+    config.exposureMin = json.value("exposureMin", config.exposureMin);
+    config.exposureMax = json.value("exposureMax", config.exposureMax);
+
+    m_timeOfDayController.SetConfig(config);
+
+    const float startTimeHours = json.value("startTimeHours", 6.0f);
+    const float clampedHours = std::clamp(startTimeHours / 24.0f, 0.0f, 1.0f);
+    m_timeOfDayController.SetTimeSeconds(clampedHours * config.dayLengthSeconds);
+    m_sunMoonState = m_timeOfDayController.Evaluate();
+    m_exposureAccumulator = config.exposureBias;
+    m_sunMoonState.exposureCompensation = m_exposureAccumulator;
+
+    gm::core::Logger::Info("[Game] Loaded celestial config '{}': latitude={}°, tilt={}°, dayLength={}s",
+                           configPath.string(),
+                           config.latitudeDeg,
+                           config.axialTiltDeg,
+                           config.dayLengthSeconds);
+}
+
+bool Game::LoadWeatherProfiles() {
+    m_weatherProfiles.clear();
+    const auto configPath = (m_assetsDir / "config" / "weather_profiles.json").lexically_normal();
+    std::error_code existsEc;
+    if (!std::filesystem::exists(configPath, existsEc)) {
+        if (existsEc) {
+            gm::core::Logger::Warning("[Game] Unable to check weather profile config '{}': {}", configPath.string(), existsEc.message());
+        } else {
+            gm::core::Logger::Info("[Game] Weather profile config '{}' not found; using defaults", configPath.string());
+        }
+        WeatherProfile fallback{};
+        fallback.name = "default";
+        fallback.spawnMultiplier = 0.0f;
+        fallback.tint = glm::vec3(1.0f);
+        m_weatherProfiles.emplace(fallback.name, fallback);
+        m_weatherState = WeatherState{};
+        return true;
+    }
+
+    std::ifstream file(configPath);
+    if (!file.is_open()) {
+        gm::core::Logger::Warning("[Game] Failed to open weather profile config '{}'", configPath.string());
+        return false;
+    }
+
+    nlohmann::json json = nlohmann::json::parse(file, nullptr, false);
+    if (!json.is_object()) {
+        gm::core::Logger::Warning("[Game] Weather profile config '{}' is malformed", configPath.string());
+        return false;
+    }
+
+    if (auto profilesIt = json.find("profiles"); profilesIt != json.end() && profilesIt->is_array()) {
+        for (const auto& entry : *profilesIt) {
+            if (!entry.is_object()) {
+                continue;
+            }
+            WeatherProfile profile = ParseProfile(entry);
+            if (!profile.name.empty()) {
+                m_weatherProfiles[profile.name] = profile;
+            }
+        }
+    }
+
+    if (m_weatherProfiles.empty()) {
+        WeatherProfile fallback{};
+        fallback.name = "default";
+        fallback.spawnMultiplier = 0.0f;
+        fallback.tint = glm::vec3(1.0f);
+        fallback.surfaceTint = glm::vec3(1.0f);
+        m_weatherProfiles.emplace(fallback.name, fallback);
+    }
+
+    const std::string defaultProfile = "default";
+    std::string quality = json.value("quality", "high");
+    if (quality == "low") {
+        m_weatherQuality = WeatherQuality::Low;
+    } else if (quality == "medium") {
+        m_weatherQuality = WeatherQuality::Medium;
+    } else {
+        m_weatherQuality = WeatherQuality::High;
+    }
+
+    if (auto initialIt = json.find("initialState"); initialIt != json.end() && initialIt->is_object()) {
+        m_weatherState = ParseInitialWeather(*initialIt);
+    } else {
+        m_weatherState = WeatherState{};
+    }
+
+    if (!m_weatherProfiles.contains(m_weatherState.activeProfile)) {
+        m_weatherState.activeProfile = defaultProfile;
+    }
+
+    const WeatherProfile& activeProfile = ResolveWeatherProfile(m_weatherState.activeProfile);
+    m_weatherState.surfaceWetness = activeProfile.surfaceWetness;
+    m_weatherState.puddleAmount = activeProfile.puddleAmount;
+    m_weatherState.surfaceDarkening = activeProfile.surfaceDarkening;
+    m_weatherState.surfaceTint = activeProfile.surfaceTint;
+
+    gm::core::Logger::Info("[Game] Loaded {} weather profiles from '{}'", m_weatherProfiles.size(), configPath.string());
+    BroadcastWeatherEvent();
+    return true;
+}
+
+WeatherProfile Game::ParseProfile(const nlohmann::json& entry) const {
+    WeatherProfile profile{};
+    profile.name = entry.value("name", std::string{});
+    profile.spawnMultiplier = entry.value("spawnMultiplier", profile.spawnMultiplier);
+    profile.speedMultiplier = entry.value("speedMultiplier", profile.speedMultiplier);
+    profile.sizeMultiplier = entry.value("sizeMultiplier", profile.sizeMultiplier);
+    if (auto tintIt = entry.find("tint"); tintIt != entry.end() && tintIt->is_array() && tintIt->size() == 3) {
+        profile.tint = glm::vec3((*tintIt)[0].get<float>(),
+                                 (*tintIt)[1].get<float>(),
+                                 (*tintIt)[2].get<float>());
+    }
+    profile.surfaceWetness = entry.value("surfaceWetness", profile.surfaceWetness);
+    profile.puddleAmount = entry.value("puddleAmount", profile.puddleAmount);
+    profile.surfaceDarkening = entry.value("surfaceDarkening", profile.surfaceDarkening);
+    if (auto surfaceTint = entry.find("surfaceTint"); surfaceTint != entry.end() && surfaceTint->is_array() && surfaceTint->size() == 3) {
+        profile.surfaceTint = glm::vec3((*surfaceTint)[0].get<float>(),
+                                        (*surfaceTint)[1].get<float>(),
+                                        (*surfaceTint)[2].get<float>());
+    } else {
+        profile.surfaceTint = glm::vec3(1.0f);
+    }
+    return profile;
+}
+
+WeatherState Game::ParseInitialWeather(const nlohmann::json& data) const {
+    WeatherState state{};
+    state.activeProfile = data.value("profile", state.activeProfile);
+    if (auto windIt = data.find("windDirection"); windIt != data.end() && windIt->is_array() && windIt->size() == 3) {
+        state.windDirection = glm::vec3((*windIt)[0].get<float>(),
+                                        (*windIt)[1].get<float>(),
+                                        (*windIt)[2].get<float>());
+    }
+    state.windSpeed = data.value("windSpeed", state.windSpeed);
+    state.surfaceWetness = data.value("surfaceWetness", state.surfaceWetness);
+    state.puddleAmount = data.value("puddleAmount", state.puddleAmount);
+    state.surfaceDarkening = data.value("surfaceDarkening", state.surfaceDarkening);
+    if (auto tintIt = data.find("surfaceTint"); tintIt != data.end() && tintIt->is_array() && tintIt->size() == 3) {
+        state.surfaceTint = glm::vec3((*tintIt)[0].get<float>(),
+                                      (*tintIt)[1].get<float>(),
+                                      (*tintIt)[2].get<float>());
+    }
+    return state;
+}
+
+const WeatherProfile& Game::ResolveWeatherProfile(const std::string& name) const {
+    auto it = m_weatherProfiles.find(name);
+    if (it != m_weatherProfiles.end()) {
+        return it->second;
+    }
+    auto defaultIt = m_weatherProfiles.find("default");
+    if (defaultIt != m_weatherProfiles.end()) {
+        return defaultIt->second;
+    }
+    static WeatherProfile fallback{};
+    return fallback;
+}
+
+void Game::BroadcastWeatherEvent() {
+    m_weatherEventPayload.state = m_weatherState;
+    gm::core::Event::TriggerWithData(gotmilked::GameEvents::WeatherStateChanged, &m_weatherEventPayload);
+}
+
+void Game::UpdateWeather(float dt) {
+    const WeatherProfile& targetProfile = ResolveWeatherProfile(m_weatherState.activeProfile);
+    auto damp = [dt](float current, float target, float rate) {
+        float t = 1.0f - std::exp(-rate * dt);
+        return glm::mix(current, target, t);
+    };
+
+    m_weatherState.surfaceWetness = damp(m_weatherState.surfaceWetness, targetProfile.surfaceWetness, 2.5f);
+    m_weatherState.puddleAmount = damp(m_weatherState.puddleAmount, targetProfile.puddleAmount, 2.0f);
+    m_weatherState.surfaceDarkening = damp(m_weatherState.surfaceDarkening, targetProfile.surfaceDarkening, 1.8f);
+    float tintBlend = 1.0f - std::exp(-dt * 1.5f);
+    m_weatherState.surfaceTint = glm::mix(m_weatherState.surfaceTint, targetProfile.surfaceTint, tintBlend);
+
+    m_weatherClock += dt;
+    const float gust = std::sin(m_weatherClock * 0.31f) * 0.25f;
+    const float sway = std::cos(m_weatherClock * 0.17f) * 0.2f;
+    glm::vec3 perturbation = glm::vec3(gust, 0.0f, sway);
+    glm::vec3 desired = glm::normalize(m_weatherState.windDirection + perturbation);
+    m_weatherState.windDirection = glm::normalize(glm::mix(m_weatherState.windDirection, desired, dt * 0.5f));
+
+    BroadcastWeatherEvent();
+}
+
+void Game::SetCelestialConfig(const gm::scene::CelestialConfig& config) {
+    m_timeOfDayController.SetConfig(config);
+    m_sunMoonState = m_timeOfDayController.Evaluate();
+    m_exposureAccumulator = config.exposureBias;
+    m_sunMoonState.exposureCompensation = m_exposureAccumulator;
+    UpdateExposure(0.0f);
+    UpdateCelestialLights();
+}
+
+void Game::SetTimeOfDayNormalized(float normalized) {
+    const auto& config = m_timeOfDayController.GetConfig();
+    const float dayLength = std::max(1.0f, config.dayLengthSeconds);
+    const float clamped = std::clamp(normalized, 0.0f, 1.0f);
+    m_timeOfDayController.SetTimeSeconds(clamped * dayLength);
+    m_sunMoonState = m_timeOfDayController.Evaluate();
+    UpdateExposure(0.0f);
+    UpdateCelestialLights();
+}
+
+void Game::SetWeatherProfile(const std::string& profileName) {
+    if (!m_weatherProfiles.contains(profileName)) {
+        gm::core::Logger::Warning("[Game] Weather profile '{}' not found", profileName);
+        return;
+    }
+    if (m_weatherState.activeProfile == profileName) {
+        return;
+    }
+    m_weatherState.activeProfile = profileName;
+    gm::core::Logger::Info("[Game] Weather profile set to '{}'", profileName);
+    BroadcastWeatherEvent();
+}
+
+void Game::UpdateShadowCascades(const gm::rendering::CascadeShadowMap& cascades) {
+    const auto& matrices = cascades.CascadeMatrices();
+    const auto& splits = cascades.CascadeSplits();
+    const int cascadeCount = std::min<int>(static_cast<int>(matrices.size()), 4);
+    m_sunMoonState.sunCascadeCount = cascadeCount;
+    for (int i = 0; i < cascadeCount; ++i) {
+        m_sunMoonState.sunCascadeMatrices[i] = matrices[i];
+        m_sunMoonState.sunCascadeSplits[i] = (i < static_cast<int>(splits.size())) ? splits[i] : 1.0f;
+    }
+    for (int i = cascadeCount; i < 4; ++i) {
+        m_sunMoonState.sunCascadeMatrices[i] = glm::mat4(1.0f);
+        m_sunMoonState.sunCascadeSplits[i] = 1.0f;
+    }
+    if (cascadeCount > 0) {
+        m_sunMoonState.sunViewProjection = matrices[0];
+    } else {
+        m_sunMoonState.sunViewProjection = glm::mat4(1.0f);
+    }
 }
 
 void Game::SetupInput() {
@@ -281,6 +579,70 @@ void Game::SetupGameplay() {
 
 void Game::SetupSaveSystem() {
     m_saveManager = std::make_unique<gm::save::SaveManager>(m_config.paths.saves);
+}
+
+void Game::CaptureCelestialLights() {
+    if (!m_gameScene) {
+        return;
+    }
+
+    if (auto sun = m_gameScene->FindGameObjectByName("Sun")) {
+        m_sunLight = sun->GetComponent<gm::LightComponent>();
+    }
+    if (auto moon = m_gameScene->FindGameObjectByName("Moon")) {
+        m_moonLight = moon->GetComponent<gm::LightComponent>();
+    }
+}
+
+void Game::UpdateCelestialLights() {
+    auto applyDirectional = [](const std::shared_ptr<gm::LightComponent>& light,
+                               const glm::vec3& direction,
+                               float intensity,
+                               const glm::vec3& color) {
+        if (!light) {
+            return;
+        }
+        glm::vec3 safeDir = direction;
+        if (glm::dot(safeDir, safeDir) < 1e-4f) {
+            safeDir = glm::vec3(0.0f, -1.0f, 0.0f);
+        }
+        light->SetType(gm::LightComponent::LightType::Directional);
+        light->SetDirection(glm::normalize(-safeDir));
+        light->SetIntensity(intensity);
+        light->SetColor(color);
+    };
+
+    const float sunScalar = glm::clamp(m_sunMoonState.sunIntensity, 0.0f, 1.0f);
+    const float sunElevationFactor = glm::clamp((m_sunMoonState.sunElevationDeg + 10.0f) / 80.0f, 0.0f, 1.0f);
+    const glm::vec3 sunriseColor(1.0f, 0.72f, 0.45f);
+    const glm::vec3 noonColor(1.0f, 0.97f, 0.92f);
+    const glm::vec3 sunColor = glm::mix(sunriseColor, noonColor, sunElevationFactor);
+    const float sunIntensity = glm::mix(0.05f, gotmilked::GameConstants::Light::SunIntensity, sunScalar);
+    applyDirectional(m_sunLight.lock(), m_sunMoonState.sunDirection, sunIntensity, sunColor);
+
+    const float moonScalar = glm::clamp(m_sunMoonState.moonIntensity, 0.0f, 1.0f);
+    const float moonIntensity = gotmilked::GameConstants::Light::MoonIntensity * moonScalar;
+    const glm::vec3 moonColor = gotmilked::GameConstants::Light::MoonColor;
+    applyDirectional(m_moonLight.lock(), m_sunMoonState.moonDirection, moonIntensity, moonColor);
+
+    if (m_gameScene) {
+        m_gameScene->SetCelestialLighting(m_sunMoonState, sunColor, sunIntensity, moonColor, moonIntensity);
+    }
+}
+
+void Game::UpdateExposure(float /*dt*/) {
+    const auto& config = m_timeOfDayController.GetConfig();
+    const float referenceLux = std::max(0.1f, config.exposureReferenceLux);
+    const float lux = std::max(0.1f, m_sunMoonState.sunIlluminanceLux);
+    const float ev = std::log2(lux / referenceLux);
+    const float targetEv = config.exposureTargetEv;
+    const float rawCompensation = std::pow(2.0f, targetEv - ev) * config.exposureBias;
+    const float minComp = std::max(0.01f, config.exposureMin);
+    const float maxComp = std::max(minComp, config.exposureMax);
+    const float compensation = glm::clamp(rawCompensation, minComp, maxComp);
+    const float smoothing = glm::clamp(config.exposureSmoothing, 0.0f, 0.999f);
+    m_exposureAccumulator = glm::mix(compensation, m_exposureAccumulator, smoothing);
+    m_sunMoonState.exposureCompensation = m_exposureAccumulator;
 }
 
 
@@ -374,6 +736,9 @@ void Game::SetupScene() {
 
     ApplyResourcesToScene();
 
+    CaptureCelestialLights();
+    UpdateCelestialLights();
+
     if (m_cameraRigSystem) {
         m_cameraRigSystem->SetSceneContext(m_gameScene);
     }
@@ -381,6 +746,12 @@ void Game::SetupScene() {
 
 void Game::Update(float dt) {
     gm::utils::Profiler::Instance().BeginFrame();
+    m_lastDeltaTime = dt;
+    m_timeOfDayController.Advance(dt);
+    m_sunMoonState = m_timeOfDayController.Evaluate();
+    UpdateExposure(dt);
+    UpdateCelestialLights();
+    UpdateWeather(dt);
     if (m_loopController) {
         m_loopController->Update(dt);
     }

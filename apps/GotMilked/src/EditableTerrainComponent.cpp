@@ -12,6 +12,7 @@
 #include "gm/rendering/Shader.hpp"
 #include "gm/rendering/Texture.hpp"
 #include "gm/scene/GameObject.hpp"
+#include "gm/scene/Scene.hpp"
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/core/Input.hpp"
 #include "gm/core/input/InputSystem.hpp"
@@ -354,59 +355,67 @@ void EditableTerrainComponent::Render() {
     // Render the mesh if we have all required resources
     if (m_mesh && m_shader) {
         auto* gameObject = GetOwner();
-        if (gameObject) {
-            auto transform = gameObject->EnsureTransform();
-            if (transform) {
-                const glm::mat4 model = transform->GetMatrix();
-                const glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(model)));
+        if (!gameObject) {
+            return;
+        }
+        auto* scene = gameObject->GetScene();
+        if (!scene || !scene->HasRenderContext()) {
+            return;
+        }
+        auto transform = gameObject->EnsureTransform();
+        if (transform) {
+            const glm::mat4 model = transform->GetMatrix();
+            const glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(model)));
+            const glm::mat4& view = scene->CurrentViewMatrix();
+            const glm::mat4& proj = scene->CurrentProjectionMatrix();
+            const glm::vec3& camPos = scene->CurrentCameraPosition();
 
-                m_shader->Use();
-                m_shader->SetMat4("uModel", model);
-                m_shader->SetMat3("uNormalMat", normalMat);
+            m_shader->Use();
+            m_shader->SetInt("uUseInstanceBuffers", 0);
+            m_shader->SetMat4("uModel", model);
+            m_shader->SetMat3("uNormalMat", normalMat);
+            m_shader->SetMat4("uView", view);
+            m_shader->SetMat4("uProj", proj);
+            m_shader->SetVec3("uViewPos", camPos);
 
-                if (m_camera) {
-                    m_shader->SetVec3("uViewPos", m_camera->Position());
+            if (m_material) {
+                if (m_baseTexture && m_material->GetDiffuseTexture() != m_baseTexture) {
+                    m_material->SetDiffuseTexture(m_baseTexture);
+                } else if (!m_baseTexture && m_material->GetDiffuseTexture() != nullptr) {
+                    m_material->SetDiffuseTexture(nullptr);
                 }
-
-                if (m_material) {
-                    if (m_baseTexture && m_material->GetDiffuseTexture() != m_baseTexture) {
-                        m_material->SetDiffuseTexture(m_baseTexture);
-                    } else if (!m_baseTexture && m_material->GetDiffuseTexture() != nullptr) {
-                        m_material->SetDiffuseTexture(nullptr);
-                    }
-                    m_material->Apply(*m_shader);
-                } else {
-                    if (m_baseTexture) {
-                        m_shader->SetInt("uUseTex", 1);
-                        m_baseTexture->bind(0);
-                        m_shader->SetInt("uTex", 0);
-                    } else {
-                        m_shader->SetInt("uUseTex", 0);
-                    }
-                }
-
-                m_shader->SetFloat("uTextureTiling", m_textureTiling);
-
-                m_shader->SetInt("uPaintLayerCount", m_paintLayerCount);
-                bool anyPaint = false;
-                for (int i = 0; i < kMaxPaintLayers; ++i) {
-                    std::string enabledUniform = "uPaintLayerEnabled[" + std::to_string(i) + "]";
-                    if (i < m_paintLayerCount && m_paintLayers[i].texture && m_paintLayers[i].enabled) {
-                        const int textureSlot = 8 + i;
-                        m_paintLayers[i].texture->bind(textureSlot);
-                        m_shader->SetInt(("uPaintLayers[" + std::to_string(i) + "]").c_str(), textureSlot);
-                        m_shader->SetInt(enabledUniform.c_str(), 1);
-                        if (m_paintLayers[i].hasPaint) {
-                            anyPaint = true;
-                        }
-                    } else {
-                        m_shader->SetInt(enabledUniform.c_str(), 0);
-                    }
-                }
-                m_shader->SetInt("uUsePaint", anyPaint ? 1 : 0);
-
-                m_mesh->Draw();
+                m_material->Apply(*m_shader);
             }
+
+            if (m_baseTexture) {
+                m_shader->SetInt("uUseTex", 1);
+                m_baseTexture->bind(0);
+                m_shader->SetInt("uTex", 0);
+            } else {
+                m_shader->SetInt("uUseTex", 0);
+            }
+
+            m_shader->SetFloat("uTextureTiling", m_textureTiling);
+
+            m_shader->SetInt("uPaintLayerCount", m_paintLayerCount);
+            bool anyPaint = false;
+            for (int i = 0; i < kMaxPaintLayers; ++i) {
+                std::string enabledUniform = "uPaintLayerEnabled[" + std::to_string(i) + "]";
+                if (i < m_paintLayerCount && m_paintLayers[i].texture && m_paintLayers[i].enabled) {
+                    const int textureSlot = 8 + i;
+                    m_paintLayers[i].texture->bind(textureSlot);
+                    m_shader->SetInt(("uPaintLayers[" + std::to_string(i) + "]").c_str(), textureSlot);
+                    m_shader->SetInt(enabledUniform.c_str(), 1);
+                    if (m_paintLayers[i].hasPaint) {
+                        anyPaint = true;
+                    }
+                } else {
+                    m_shader->SetInt(enabledUniform.c_str(), 0);
+                }
+            }
+            m_shader->SetInt("uUsePaint", anyPaint ? 1 : 0);
+
+            m_mesh->Draw();
         }
     }
 

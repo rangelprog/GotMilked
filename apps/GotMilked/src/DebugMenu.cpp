@@ -21,6 +21,9 @@
 #define NOMINMAX
 #endif
 #define WIN32_LEAN_AND_MEAN
+#ifdef APIENTRY
+#undef APIENTRY
+#endif
 #include <windows.h>
 #else
 #include <dlfcn.h>
@@ -190,6 +193,16 @@ void DebugMenu::Render(bool& menuVisible) {
 
     if (m_showContentValidation) {
         RenderContentValidationWindow();
+    }
+
+    if (m_showCelestialDebugger) {
+        RenderCelestialDebugger();
+    }
+    if (m_showFogDebugger) {
+        RenderFogDebugger();
+    }
+    if (m_showWeatherPanel && m_weatherDiagnosticsSystem) {
+        RenderWeatherPanel(*m_weatherDiagnosticsSystem);
     }
 
     RenderPluginWindows();

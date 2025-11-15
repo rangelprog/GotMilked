@@ -5,6 +5,7 @@
 #include "gm/rendering/Material.hpp"
 #include "gm/rendering/Camera.hpp"
 #include "gm/scene/GameObject.hpp"
+#include "gm/scene/Scene.hpp"
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/core/Logger.hpp"
 
@@ -18,26 +19,34 @@ StaticMeshComponent::StaticMeshComponent() {
 }
 
 void StaticMeshComponent::Render() {
-    if (!m_mesh || !m_shader || !GetOwner()) {
+    auto* ownerObject = GetOwner();
+    if (!m_mesh || !m_shader || !ownerObject) {
         return;
     }
 
-    auto transform = GetOwner()->GetTransform();
+    auto* scene = ownerObject->GetScene();
+    if (!scene || !scene->HasRenderContext()) {
+        return;
+    }
+
+    auto transform = ownerObject->GetTransform();
     if (!transform) {
-        transform = GetOwner()->EnsureTransform();
+        transform = ownerObject->EnsureTransform();
     }
 
     const glm::mat4 model = transform->GetMatrix();
     const glm::mat3 normalMat = glm::mat3(glm::transpose(glm::inverse(model)));
+    const glm::mat4& view = scene->CurrentViewMatrix();
+    const glm::mat4& proj = scene->CurrentProjectionMatrix();
+    const glm::vec3& camPos = scene->CurrentCameraPosition();
 
     m_shader->Use();
     m_shader->SetInt("uUseInstanceBuffers", 0);
     m_shader->SetMat4("uModel", model);
     m_shader->SetMat3("uNormalMat", normalMat);
-
-    if (m_camera) {
-        m_shader->SetVec3("uViewPos", m_camera->Position());
-    }
+    m_shader->SetMat4("uView", view);
+    m_shader->SetMat4("uProj", proj);
+    m_shader->SetVec3("uViewPos", camPos);
 
     if (m_material) {
         m_material->Apply(*m_shader);

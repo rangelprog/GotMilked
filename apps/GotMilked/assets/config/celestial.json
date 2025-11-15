@@ -1,0 +1,22 @@
+{
+  "latitudeDeg": 47.60,
+  "axialTiltDeg": 23.44,
+  "dayLengthSeconds": 480.0,
+  "timeOffsetSeconds": 0.0,
+  "startTimeHours": 8.0,
+  "moonPhaseOffsetSeconds": 120.0,
+  "moonlightIntensity": 0.35,
+  "turbidity": 3.0,
+  "groundAlbedo": [0.20, 0.23, 0.27],
+  "exposure": 1.2,
+  "airDensity": 1.0,
+  "useGradientSky": false,
+  "middayLux": 50000.0,
+  "exposureReferenceLux": 2500.0,
+  "exposureTargetEv": 10.0,
+  "exposureBias": 1.0,
+  "exposureSmoothing": 0.9,
+  "exposureMin": 0.1,
+  "exposureMax": 4.0
+}
+

@@ -5,11 +5,14 @@
 #include <string>
 #include <string_view>
 #include <cstdint>
+#include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
 #include "SceneSystem.hpp"
 #include "gm/rendering/LightManager.hpp"
 #include "gm/scene/GameObjectScheduler.hpp"
 #include "gm/scene/RenderBatcher.hpp"
 #include "gm/scene/SceneLifecycle.hpp"
+#include "gm/scene/TimeOfDayController.hpp"
 
 namespace gm {
 
@@ -54,7 +57,13 @@ public:
     virtual void Init();
     virtual void Update(float deltaTime);
     virtual void Cleanup();
-    void Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovDeg);
+    void Draw(Shader& shader,
+              const Camera& cam,
+              int fbw,
+              int fbh,
+              float fovDeg,
+              float nearPlane = 0.1f,
+              float farPlane = 100.0f);
 
     // Scene state
     const std::string& GetName() const { return sceneName; }
@@ -109,6 +118,24 @@ public:
     void SetInstancedRenderingEnabled(bool enabled) { m_renderBatcher.SetInstancedRenderingEnabled(enabled); }
     bool IsInstancedRenderingEnabled() const { return m_renderBatcher.IsInstancedRenderingEnabled(); }
 
+    bool HasRenderContext() const { return m_renderContextValid; }
+    const glm::mat4& CurrentViewMatrix() const { return m_renderView; }
+    const glm::mat4& CurrentProjectionMatrix() const { return m_renderProj; }
+    const glm::vec3& CurrentCameraPosition() const { return m_renderCameraPos; }
+
+    void SetCelestialLighting(const gm::scene::SunMoonState& state,
+                              const glm::vec3& sunColor,
+                              float sunIntensity,
+                              const glm::vec3& moonColor,
+                              float moonIntensity) {
+        m_lightManager.SetCelestialLights(state.sunDirection,
+                                          sunColor,
+                                          sunIntensity,
+                                          state.moonDirection,
+                                          moonColor,
+                                          moonIntensity);
+    }
+
 private:
     void UpdateGameObjects(float deltaTime);
     void CleanupDestroyedObjects();
@@ -124,12 +151,18 @@ private:
     void ClearObjectPool();
     void RemoveFromActiveLists(const std::shared_ptr<GameObject>& gameObject);
     std::string GenerateUniqueName();
+    void SetRenderContext(const glm::mat4& view, const glm::mat4& proj, const glm::vec3& camPos);
+    void ClearRenderContext();
 
     friend class GameObjectUpdateSystem;
     friend class GameObject;
 
     std::uint64_t m_unnamedObjectCounter = 0;
     std::uint64_t m_reloadVersion = 0;
+    glm::mat4 m_renderView{1.0f};
+    glm::mat4 m_renderProj{1.0f};
+    glm::vec3 m_renderCameraPos{0.0f, 0.0f, 0.0f};
+    bool m_renderContextValid = false;
 };
 
 }

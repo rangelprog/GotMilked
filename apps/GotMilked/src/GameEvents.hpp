@@ -43,6 +43,7 @@ constexpr const char* GameInitialized = "game.initialized";
 constexpr const char* GameShutdown = "game.shutdown";
 constexpr const char* GamePaused = "game.paused";
 constexpr const char* GameResumed = "game.resumed";
+constexpr const char* WeatherStateChanged = "weather.state.changed";
 
 } // namespace GameEvents
 

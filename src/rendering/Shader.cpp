@@ -232,6 +232,24 @@ void Shader::SetVec3(const char* name, const glm::vec3& v) const {
     glUniform3fv(record->location, 1, data);
 }
 
+void Shader::SetVec4(const char* name, const glm::vec4& v) const {
+    auto* record = GetUniformRecord(name);
+    if (!record || record->location < 0) {
+        return;
+    }
+
+    const auto* data = glm::value_ptr(v);
+    if (record->hasValue && record->type == UniformRecord::Type::Vec4 &&
+        std::memcmp(record->value.vec4Value, data, sizeof(float) * 4) == 0) {
+        return;
+    }
+
+    record->type = UniformRecord::Type::Vec4;
+    std::memcpy(record->value.vec4Value, data, sizeof(float) * 4);
+    record->hasValue = true;
+    glUniform4fv(record->location, 1, data);
+}
+
 void Shader::SetMat3(const char* name, const glm::mat3& m) const {
     auto* record = GetUniformRecord(name);
     if (!record || record->location < 0) {

@@ -29,6 +29,7 @@ public:
     void SetInt(const char* name, int value) const;
     void SetFloat(const char* name, float value) const;
     void SetVec3(const char* name, const glm::vec3& value) const;
+    void SetVec4(const char* name, const glm::vec4& value) const;
     void SetMat3(const char* name, const glm::mat3& mat) const;
     void SetMat4(const char* name, const glm::mat4& mat) const;
 
@@ -49,6 +50,7 @@ private:
             Int,
             Float,
             Vec3,
+            Vec4,
             Mat3,
             Mat4
         };
@@ -62,6 +64,7 @@ private:
             int intValue;
             float floatValue;
             float vec3Value[3];
+            float vec4Value[4];
             float mat3Value[9];
             float mat4Value[16];
         } value;

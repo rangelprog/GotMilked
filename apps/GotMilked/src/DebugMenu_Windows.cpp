@@ -13,6 +13,7 @@
 #include "gm/scene/SkinnedMeshComponent.hpp"
 #include "gm/scene/AnimatorComponent.hpp"
 #include "gm/scene/LightComponent.hpp"
+#include "gm/scene/VolumetricFogComponent.hpp"
 #include "gm/physics/RigidBodyComponent.hpp"
 #include "gm/animation/AnimationClip.hpp"
 #include "gm/animation/AnimationPoseEvaluator.hpp"
@@ -228,6 +229,11 @@ void DebugMenu::RenderGameObjectOverlay() {
     const glm::mat4 viewProj = proj * view;
 
     auto selected = m_selectedGameObject.lock();
+    const bool fogOverlayEnabled = m_fogDebug.overlayEnabled;
+    const bool fogOverlayOnlySelected = m_fogDebug.overlayOnlySelected;
+    const bool fogOverlayShowLabels = m_fogDebug.overlayShowLabels;
+    const float overlayOpacity = std::clamp(m_fogDebug.overlayOpacity, 0.05f, 1.0f);
+    const float densityScale = std::max(1.0f, m_fogDebug.densityColorScale);
 
     const float circleRadius = 6.0f;
     const float hoverRadius = circleRadius * 1.8f;
@@ -272,8 +278,57 @@ void DebugMenu::RenderGameObjectOverlay() {
         }
 
         ImVec2 screenPos{};
-        if (!projectToScreen(transform->GetPosition(), screenPos)) {
+        const glm::vec3 worldPos = transform->GetPosition();
+        if (!projectToScreen(worldPos, screenPos)) {
             continue;
+        }
+
+        if (fogOverlayEnabled) {
+            auto fogComponent = gameObject->GetComponent<gm::VolumetricFogComponent>();
+            bool drawFog = fogComponent && fogComponent->IsEnabled();
+            if (drawFog && fogOverlayOnlySelected) {
+                drawFog = (selected && selected == gameObject);
+            }
+
+            if (drawFog) {
+                const auto computeScreenRadius = [&](float radius) -> float {
+                    glm::vec3 offset = worldPos + glm::vec3(radius, 0.0f, 0.0f);
+                    ImVec2 edge{};
+                    if (!projectToScreen(offset, edge)) {
+                        offset = worldPos + glm::vec3(0.0f, radius, 0.0f);
+                        if (!projectToScreen(offset, edge)) {
+                            return 0.0f;
+                        }
+                    }
+                    const ImVec2 delta = ImVec2(edge.x - screenPos.x, edge.y - screenPos.y);
+                    return std::sqrt(delta.x * delta.x + delta.y * delta.y);
+                };
+
+                const glm::vec3 scale = transform->GetScale();
+                const float worldRadius = std::max({std::abs(scale.x), std::abs(scale.y), std::abs(scale.z), 0.25f});
+                float screenRadius = computeScreenRadius(worldRadius);
+                if (screenRadius > 0.5f) {
+                    screenRadius = std::clamp(screenRadius, 6.0f, 600.0f);
+                    float densityNorm = std::clamp(fogComponent->GetDensity() * densityScale, 0.0f, 1.0f);
+                    ImVec4 color = ImVec4(0.1f + densityNorm * 0.8f,
+                                          0.4f + densityNorm * 0.4f,
+                                          1.0f - densityNorm * 0.6f,
+                                          overlayOpacity);
+                    if (selected && selected == gameObject) {
+                        color.w = std::min(1.0f, color.w + 0.25f);
+                    }
+                    const ImU32 ringColor = ImGui::ColorConvertFloat4ToU32(color);
+                    drawList->AddCircle(screenPos, screenRadius, ringColor, 48, 2.0f);
+                    drawList->AddCircleFilled(screenPos, std::max(2.0f, screenRadius * 0.08f), ringColor);
+
+                    if (fogOverlayShowLabels) {
+                        const std::string label = fmt::format("{:.3f}", fogComponent->GetDensity());
+                        drawList->AddText(ImVec2(screenPos.x + 6.0f, screenPos.y - 6.0f),
+                                          IM_COL32(255, 255, 255, 220),
+                                          label.c_str());
+                    }
+                }
+            }
         }
 
         bool isHovered = (io.MousePos.x >= viewport->Pos.x && io.MousePos.x <= viewport->Pos.x + viewport->Size.x &&
@@ -850,6 +905,43 @@ void DebugMenu::RenderInspector() {
                         light->SetOuterConeAngle(outerDegrees);
                     }
                 }
+            } else if (auto fog = std::dynamic_pointer_cast<gm::VolumetricFogComponent>(component)) {
+                bool enabled = fog->IsEnabled();
+                if (ImGui::Checkbox("Enabled", &enabled)) {
+                    fog->SetEnabled(enabled);
+                }
+
+                float density = fog->GetDensity();
+                if (ImGui::SliderFloat("Density", &density, 0.0001f, 0.5f, "%.4f", ImGuiSliderFlags_Logarithmic)) {
+                    fog->SetDensity(density);
+                }
+
+                float falloff = fog->GetHeightFalloff();
+                if (ImGui::SliderFloat("Height Falloff", &falloff, 0.1f, 8.0f)) {
+                    fog->SetHeightFalloff(falloff);
+                }
+
+                float maxDistance = fog->GetMaxDistance();
+                if (ImGui::SliderFloat("Max Distance", &maxDistance, 1.0f, 500.0f)) {
+                    fog->SetMaxDistance(maxDistance);
+                }
+
+                glm::vec3 color = fog->GetColor();
+                if (ImGui::ColorEdit3("Tint", glm::value_ptr(color))) {
+                    fog->SetColor(color);
+                }
+
+                float noiseScale = fog->GetNoiseScale();
+                if (ImGui::SliderFloat("Noise Scale", &noiseScale, 0.05f, 5.0f)) {
+                    fog->SetNoiseScale(noiseScale);
+                }
+
+                float noiseSpeed = fog->GetNoiseSpeed();
+                if (ImGui::SliderFloat("Noise Speed", &noiseSpeed, 0.0f, 2.0f)) {
+                    fog->SetNoiseSpeed(noiseSpeed);
+                }
+
+                ImGui::TextWrapped("Fog volumes feed the volumetric renderer. Adjust density/falloff for desired opacity.");
             } else if (auto terrain = std::dynamic_pointer_cast<EditableTerrainComponent>(component)) {
                 bool editingEnabled = terrain->IsEditingEnabled();
                 if (ImGui::Checkbox("Enable Editing", &editingEnabled)) {

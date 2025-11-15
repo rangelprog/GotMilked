@@ -165,6 +165,15 @@ void DebugMenu::RenderMenuBar() {
         if (ImGui::Checkbox("Content Validation", &m_showContentValidation)) {
             MarkLayoutDirty();
         }
+        if (ImGui::Checkbox("Celestial Debugger", &m_showCelestialDebugger)) {
+            MarkLayoutDirty();
+        }
+        if (ImGui::Checkbox("Fog Debugger", &m_showFogDebugger)) {
+            MarkLayoutDirty();
+        }
+        if (ImGui::Checkbox("Weather Diagnostics", &m_showWeatherPanel)) {
+            MarkLayoutDirty();
+        }
 #if defined(IMGUI_HAS_DOCK)
         if (ImGui::MenuItem("Reset Layout")) {
             m_resetDockLayout = true;

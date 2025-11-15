@@ -92,6 +92,9 @@ namespace Light {
     constexpr glm::vec3 SunDirection = glm::vec3(-0.4f, -1.0f, -0.3f);
     constexpr glm::vec3 SunColor = glm::vec3(1.0f);
     constexpr float SunIntensity = 1.5f;
+
+    constexpr glm::vec3 MoonColor = glm::vec3(0.5f, 0.6f, 1.0f);
+    constexpr float MoonIntensity = 0.2f;
 } // namespace Light
 
 // ============================================================================

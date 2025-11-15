@@ -78,6 +78,8 @@ public:
     gm::Texture* GetDefaultTexture() const;
     gm::Mesh* GetDefaultMesh() const;
     std::shared_ptr<gm::Material> GetTerrainMaterial() const;
+    gm::Shader* GetSkyShader() const;
+    gm::Shader* GetSkyGradientShader() const;
 
     gm::Shader* GetShader() const { return GetDefaultShader(); }
     gm::Texture* GetTexture() const { return GetDefaultTexture(); }
@@ -124,6 +126,7 @@ private:
     bool LoadMaterialDefinition(const std::string& guid, const std::filesystem::path& path, const std::string& displayName = {});
     std::optional<gm::utils::ResourceManifest::MaterialEntry> ParseMaterialFile(const std::filesystem::path& path, const std::string& guid);
     void EnsureBuiltinShaders();
+    void EnsureSkyShader();
 
     struct ShaderSources {
         std::string vertPath;

@@ -15,6 +15,7 @@
 #include "gm/scene/LightComponent.hpp"
 #include "gm/scene/StaticMeshComponent.hpp"
 #include "gm/scene/Component.hpp"
+#include "gm/scene/WeatherEmitterComponent.hpp"
 #include "gm/core/Logger.hpp"
 
 #include <glm/vec3.hpp>
@@ -37,7 +38,7 @@ void PopulateInitialScene(
     (void)camera;
     (void)fovProvider;
 
-    // Directional light
+    // Primary directional light (Sun)
     auto sunLight = scene.CreateGameObject("Sun");
     auto sunTransform = sunLight->EnsureTransform();
     sunTransform->SetPosition(GameConstants::Light::SunPosition);
@@ -47,6 +48,19 @@ void PopulateInitialScene(
     sunLightComp->SetColor(GameConstants::Light::SunColor);
     sunLightComp->SetIntensity(GameConstants::Light::SunIntensity);
     sunLight->AddTag("lighting");
+    sunLight->AddTag("sun");
+
+    // Secondary directional light (Moon) disabled until controller updates
+    auto moonLight = scene.CreateGameObject("Moon");
+    auto moonTransform = moonLight->EnsureTransform();
+    moonTransform->SetPosition(GameConstants::Light::SunPosition);
+    auto moonLightComp = moonLight->AddComponent<gm::LightComponent>();
+    moonLightComp->SetType(gm::LightComponent::LightType::Directional);
+    moonLightComp->SetDirection(glm::vec3(0.4f, -1.0f, 0.2f));
+    moonLightComp->SetColor(glm::vec3(0.4f, 0.5f, 1.0f));
+    moonLightComp->SetIntensity(0.0f);
+    moonLight->AddTag("lighting");
+    moonLight->AddTag("moon");
 
     // Editable terrain
     auto terrainObject = scene.SpawnGameObject("Terrain");
@@ -77,6 +91,18 @@ void PopulateInitialScene(
     (void)resources;
 #endif
     (void)window;
+
+    auto weatherEmitter = scene.CreateGameObject("WeatherEmitter_Default");
+    auto weatherTransform = weatherEmitter->EnsureTransform();
+    weatherTransform->SetPosition(glm::vec3(0.0f, 8.0f, 0.0f));
+    auto weatherComponent = weatherEmitter->AddComponent<gm::WeatherEmitterComponent>();
+    weatherComponent->SetVolumeExtents(glm::vec3(10.0f, 6.0f, 10.0f));
+    weatherComponent->SetSpawnRate(350.0f);
+    weatherComponent->SetParticleLifetime(4.5f);
+    weatherComponent->SetParticleSpeed(11.0f);
+    weatherComponent->SetParticleSize(0.12f);
+    weatherComponent->SetProfileTag("light_rain");
+    weatherComponent->SetType(gm::WeatherEmitterComponent::ParticleType::Rain);
 
     gm::core::Logger::Info("[Game] Scene populated with editable terrain");
 }

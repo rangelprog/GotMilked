@@ -233,6 +233,37 @@ void DebugToolingController::ConfigureDebugMenu() {
                 width = 0;
                 height = 0;
             }
+        },
+        [this]() -> float {
+            return m_game.GetTimeOfDayNormalized();
+        },
+        [this](float normalized) {
+            m_game.SetTimeOfDayNormalized(normalized);
+        },
+        [this]() -> gm::scene::CelestialConfig {
+            return m_game.GetCelestialConfig();
+        },
+        [this](const gm::scene::CelestialConfig& config) {
+            m_game.SetCelestialConfig(config);
+        },
+        [this]() -> gm::scene::SunMoonState {
+            return m_game.GetSunMoonState();
+        },
+        [this]() -> WeatherState {
+            return m_game.GetWeatherState();
+        },
+        [this]() -> std::vector<std::string> {
+            std::vector<std::string> names;
+            const auto& profiles = m_game.GetWeatherProfiles();
+            names.reserve(profiles.size());
+            for (const auto& [name, _] : profiles) {
+                names.push_back(name);
+            }
+            std::sort(names.begin(), names.end());
+            return names;
+        },
+        [this](const std::string& profile) {
+            m_game.SetWeatherProfile(profile);
         }
     };
     m_game.m_debugMenu->SetCallbacks(std::move(callbacks));

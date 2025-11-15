@@ -2,6 +2,7 @@
 
 #include "gm/scene/AnimatorComponent.hpp"
 #include "gm/scene/GameObject.hpp"
+#include "gm/scene/Scene.hpp"
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/rendering/RenderStateCache.hpp"
 #include "gm/rendering/Texture.hpp"
@@ -205,11 +206,17 @@ void SkinnedMeshComponent::Init() {
 void SkinnedMeshComponent::Render() {
     RefreshHandles();
 
-    if (!m_mesh || !m_shader || !GetOwner()) {
+    auto* ownerObject = GetOwner();
+    if (!m_mesh || !m_shader || !ownerObject) {
         return;
     }
 
-    auto transform = GetOwner()->GetTransform();
+    auto* scene = ownerObject->GetScene();
+    if (!scene || !scene->HasRenderContext()) {
+        return;
+    }
+
+    auto transform = ownerObject->GetTransform();
     if (!transform) {
         return;
     }
@@ -248,6 +255,9 @@ void SkinnedMeshComponent::Render() {
     m_shader->Use();
     m_shader->SetMat4("uModel", model);
     m_shader->SetMat3("uNormalMat", normalMat);
+    m_shader->SetMat4("uView", scene->CurrentViewMatrix());
+    m_shader->SetMat4("uProj", scene->CurrentProjectionMatrix());
+    m_shader->SetVec3("uViewPos", scene->CurrentCameraPosition());
 
     if (m_material) {
         m_material->Apply(*m_shader);

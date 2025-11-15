@@ -32,6 +32,11 @@ public:
         AssetDescriptor descriptor;
     };
 
+    struct TextureRecord {
+        std::string guid;
+        AssetDescriptor descriptor;
+    };
+
     struct PrefabRecord {
         std::string guid;
         AssetDescriptor descriptor;
@@ -60,6 +65,7 @@ public:
 
     [[nodiscard]] std::vector<ShaderBatchRecord> GetShaderBatches() const;
     [[nodiscard]] std::vector<MeshRecord> GetMeshRecords() const;
+    [[nodiscard]] std::vector<TextureRecord> GetTextureRecords() const;
     [[nodiscard]] std::vector<PrefabRecord> GetPrefabRecords() const;
     [[nodiscard]] std::vector<ManifestRecord> GetManifestRecords() const;
 
@@ -92,6 +98,7 @@ private:
     mutable std::shared_mutex m_cacheMutex;
     std::vector<ShaderBatchRecord> m_shaderBatches;
     std::vector<MeshRecord> m_meshRecords;
+    std::vector<TextureRecord> m_textureRecords;
     std::vector<PrefabRecord> m_prefabRecords;
     std::vector<ManifestRecord> m_manifestRecords;
     std::unordered_map<std::string, AssetDescriptor> m_descriptorsByGuid;

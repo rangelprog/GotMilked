@@ -225,11 +225,25 @@ void SceneResourceController::ApplyResourcesToTerrain() {
         return;
     }
 
-    terrain->SetShader(m_game.m_resources.GetShader());
+    {
+        const std::string& shaderGuid = m_game.m_resources.GetShaderGuid();
+        terrain->SetShader(m_game.m_resources.GetShader());
+        gm::core::Logger::Info("[SceneResources] Terrain shader set to '{}'",
+            shaderGuid.empty() ? "<unset>" : shaderGuid);
+    }
     terrain->SetMaterial(m_game.m_resources.GetTerrainMaterial());
 
     const auto& textureMap = m_game.m_resources.GetTextureMap();
     std::string baseTextureGuid = terrain->GetBaseTextureGuid();
+    if (baseTextureGuid.empty()) {
+        gm::Texture* defaultTexture = m_game.m_resources.GetTexture();
+        const std::string& defaultGuid = m_game.m_resources.GetTextureGuid();
+        if (defaultTexture && !defaultGuid.empty()) {
+            terrain->SetBaseTexture(defaultGuid, defaultTexture);
+            baseTextureGuid = defaultGuid;
+            gm::core::Logger::Info("[SceneResources] Terrain base texture fallback to default '{}'", defaultGuid);
+        }
+    }
     if (!baseTextureGuid.empty()) {
         std::shared_ptr<gm::Texture> textureShared;
         if (auto it = textureMap.find(baseTextureGuid); it != textureMap.end() && it->second) {
@@ -239,6 +253,7 @@ void SceneResourceController::ApplyResourcesToTerrain() {
         }
         if (textureShared) {
             terrain->BindBaseTexture(textureShared.get());
+            gm::core::Logger::Info("[SceneResources] Terrain base texture set to '{}'", baseTextureGuid);
         }
     }
 

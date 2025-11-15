@@ -23,6 +23,10 @@
 #include "gm/animation/Skeleton.hpp"
 #include "gm/debug/EditorPlugin.hpp"
 #include "gm/content/ContentDatabase.hpp"
+#include "gm/scene/TimeOfDayController.hpp"
+#include "WeatherTypes.hpp"
+
+class WeatherParticleSystem;
 
 namespace gm {
 class Scene;
@@ -72,6 +76,16 @@ public:
         std::function<glm::mat4()> getViewMatrix;
         std::function<glm::mat4()> getProjectionMatrix;
         std::function<void(int&, int&)> getViewportSize;
+
+        // Celestial/time-of-day controls
+        std::function<float()> getTimeOfDayNormalized;
+        std::function<void(float)> setTimeOfDayNormalized;
+        std::function<gm::scene::CelestialConfig()> getCelestialConfig;
+        std::function<void(const gm::scene::CelestialConfig&)> setCelestialConfig;
+        std::function<gm::scene::SunMoonState()> getSunMoonState;
+        std::function<WeatherState()> getWeatherState;
+        std::function<std::vector<std::string>()> getWeatherProfileNames;
+        std::function<void(const std::string&)> setWeatherProfile;
     };
 
     void SetCallbacks(Callbacks callbacks) { m_callbacks = std::move(callbacks); }
@@ -84,6 +98,7 @@ public:
     void SetPrefabLibrary(gm::scene::PrefabLibrary* library) { m_prefabLibrary = library; }
     void SetGameResources(::GameResources* resources) { m_gameResources = resources; }
     void SetContentDatabase(gm::content::ContentDatabase* database) { m_contentDatabase = database; }
+    void SetWeatherDiagnosticsSource(const WeatherParticleSystem* system) { m_weatherDiagnosticsSystem = system; }
     void SetLayoutProfilePath(const std::filesystem::path& path);
     void SetPluginManifestPath(const std::filesystem::path& path);
     void SetApplyResourcesCallback(std::function<void()> callback) { m_applyResourcesCallback = std::move(callback); }
@@ -189,6 +204,9 @@ private:
     void RenderGameObjectOverlay();
     void RenderAnimationDebugger();
     void RenderContentValidationWindow();
+    void RenderCelestialDebugger();
+    void RenderFogDebugger();
+    void RenderWeatherPanel(const WeatherParticleSystem& system);
     void RenderDockspace();
     void HandleSaveAs();
     void HandleLoad();
@@ -274,6 +292,10 @@ private:
     bool m_showContentBrowser = false;
     bool m_showAnimationDebugger = false;
     bool m_showContentValidation = false;
+    bool m_showCelestialDebugger = false;
+    bool m_showFogDebugger = false;
+    bool m_showWeatherPanel = false;
+    const WeatherParticleSystem* m_weatherDiagnosticsSystem = nullptr;
 
     // Layout control
     bool m_resetDockLayout = false;
@@ -323,6 +345,15 @@ private:
     bool m_showBoneNames = false;
     bool m_boneOverlayAllObjects = false;
     bool m_showAnimationDebugOverlay = false;
+
+    struct FogDebugOptions {
+        bool overlayEnabled = true;
+        bool overlayShowLabels = true;
+        bool overlayOnlySelected = false;
+        float overlayOpacity = 0.55f;
+        float densityColorScale = 80.0f;
+        float densityMultiplier = 1.0f;
+    } m_fogDebug;
     float m_boneOverlayLineThickness = 2.0f;
     float m_boneOverlayNodeRadius = 4.0f;
 

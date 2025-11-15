@@ -7,9 +7,12 @@ set(GOTMILKED_TEST_SOURCES
     GameResourcesTests.cpp
     PhysicsWorldTests.cpp
     AnimationPipelineTests.cpp
+    CascadeShadowMapTests.cpp
+    HosekCoefficientsTests.cpp
     GameplayToolingTests.cpp
     TestAssetHelpers.cpp
     LoggerTests.cpp
+    TimeOfDayControllerTests.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/CowAnimationController.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/SceneSerializerExtensions.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/GameResources.cpp
@@ -31,6 +34,9 @@ if(GM_ENABLE_DEBUG_TOOLS)
         ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/DebugMenu_Windows.cpp
         ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/debug_menu/SceneOutlinerPanel.cpp
         ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/debug_menu/ContentValidationPanel.cpp
+        ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/debug_menu/CelestialPanel.cpp
+        ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/debug_menu/WeatherPanel.cpp
+        ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/debug_menu/FogPanel.cpp
         ${ImGuizmo_SOURCE_DIR}/ImGuizmo.cpp
     )
     if(MSVC)

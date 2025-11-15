@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -32,6 +33,41 @@ namespace {
 bool FileExists(const std::filesystem::path& path) {
     std::error_code ec;
     return std::filesystem::exists(path, ec);
+}
+
+bool EndsWithIgnoreCase(std::string_view value, std::string_view suffix) {
+    if (value.size() < suffix.size()) {
+        return false;
+    }
+    auto valueIt = value.end() - suffix.size();
+    for (std::size_t i = 0; i < suffix.size(); ++i) {
+        const unsigned char lhs = static_cast<unsigned char>(valueIt[i]);
+        const unsigned char rhs = static_cast<unsigned char>(suffix[i]);
+        if (std::tolower(lhs) != std::tolower(rhs)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool EqualIgnoreCase(std::string_view a, std::string_view b) {
+    if (a.size() != b.size()) {
+        return false;
+    }
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        if (std::tolower(static_cast<unsigned char>(a[i])) !=
+            std::tolower(static_cast<unsigned char>(b[i]))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool FilenameEquals(const std::string& path, std::string_view filename) {
+    std::error_code ec;
+    std::filesystem::path fsPath(path);
+    auto name = fsPath.filename().string();
+    return EqualIgnoreCase(name, filename);
 }
 
 std::shared_ptr<gm::core::Error> CloneError(const gm::core::Error& err) {
@@ -416,10 +452,12 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
 
     const auto shaderRecords = assetDatabase.GetShaderBatches();
     const auto meshRecords = assetDatabase.GetMeshRecords();
+    const auto textureRecords = assetDatabase.GetTextureRecords();
     const auto prefabRecords = assetDatabase.GetPrefabRecords();
 
     std::unordered_set<std::string> loadedShaderGuids;
     std::unordered_set<std::string> loadedMeshGuids;
+    std::unordered_set<std::string> loadedTextureGuids;
 
     m_prefabSources.clear();
     m_skinnedMeshSources.clear();
@@ -495,14 +533,80 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
                 throw gm::core::ResourceError("mesh", guid, "Loaded mesh handle is empty");
             }
 
-        gm::utils::ResourceManifest::MeshEntry entry;
-        entry.guid = guid;
-        entry.path = desc.path;
+            gm::utils::ResourceManifest::MeshEntry entry;
+            entry.guid = guid;
+            entry.path = desc.path;
 
-        m_meshes[guid] = mesh;
-        m_meshSources[guid] = entry;
-        registry.RegisterMesh(guid, entry.path);
-        loadedMeshGuids.insert(guid);
+            m_meshes[guid] = mesh;
+            m_meshSources[guid] = entry;
+            registry.RegisterMesh(guid, entry.path);
+            loadedMeshGuids.insert(guid);
+        }
+
+        std::string firstTextureGuid;
+        std::string preferredTerrainTextureGuid;
+        for (const auto& textureRecord : textureRecords) {
+            const auto& guid = textureRecord.guid;
+            if (guid.empty() || loadedTextureGuids.count(guid)) {
+                continue;
+            }
+
+            auto path = textureRecord.descriptor.absolutePath.lexically_normal();
+            if (!FileExists(path)) {
+                ReportIssue(fmt::format("Catalog texture '{}' missing file '{}'",
+                                        guid,
+                                        path.generic_string()), true);
+                continue;
+            }
+
+            gm::ResourceManager::TextureDescriptor desc{
+                guid,
+                path.string(),
+                true,   // generateMipmaps
+                true,   // srgb
+                true    // flipY
+            };
+
+            auto handle = gm::ResourceManager::LoadTexture(desc);
+            auto texture = handle.Lock();
+            if (!texture) {
+                throw gm::core::ResourceError("texture", guid, "Loaded texture handle is empty");
+            }
+
+            m_textures[guid] = texture;
+
+            gm::utils::ResourceManifest::TextureEntry entry;
+            entry.guid = guid;
+            entry.path = desc.path;
+            entry.generateMipmaps = desc.generateMipmaps;
+            entry.srgb = desc.srgb;
+            entry.flipY = desc.flipY;
+
+            m_textureSources[guid] = entry;
+            registry.RegisterTexture(guid, entry.path);
+            loadedTextureGuids.insert(guid);
+
+            if (firstTextureGuid.empty()) {
+                firstTextureGuid = guid;
+            }
+            if (preferredTerrainTextureGuid.empty()) {
+                const auto& relativePath = textureRecord.descriptor.relativePath;
+                if (relativePath.find("ground_mossy") != std::string::npos) {
+                    preferredTerrainTextureGuid = guid;
+                }
+            }
+        }
+
+        if (!preferredTerrainTextureGuid.empty()) {
+            m_defaultTextureGuid = preferredTerrainTextureGuid;
+            if (auto it = m_textureSources.find(preferredTerrainTextureGuid); it != m_textureSources.end()) {
+                m_defaultTexturePath = it->second.path;
+            }
+        } else if (!firstTextureGuid.empty()) {
+            m_defaultTextureGuid = firstTextureGuid;
+            if (auto it = m_textureSources.find(firstTextureGuid); it != m_textureSources.end()) {
+                m_defaultTexturePath = it->second.path;
+            }
         }
 
         for (const auto& prefabRecord : prefabRecords) {
@@ -521,6 +625,9 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
 
         if (GetDefaultMesh()) {
             gm::core::Event::Trigger(gotmilked::GameEvents::ResourceMeshLoaded);
+        }
+        if (GetDefaultTexture()) {
+            gm::core::Event::Trigger(gotmilked::GameEvents::ResourceTextureLoaded);
         }
         LoadAnimationAssetManifests();
         success = true;
@@ -544,43 +651,41 @@ bool GameResources::LoadInternal(const std::filesystem::path& assetsDir) {
 
 void GameResources::EnsureBuiltinShaders() {
     static constexpr const char* kSimpleSkinnedGuid = "shader::simple_skinned";
-    if (m_shaders.count(kSimpleSkinnedGuid)) {
-        return;
-    }
+    if (!m_shaders.count(kSimpleSkinnedGuid)) {
+        const std::filesystem::path vertPath = (m_assetsDir / "shaders/simple_skinned.vert.glsl").lexically_normal();
+        const std::filesystem::path fragPath = (m_assetsDir / "shaders/simple.frag.glsl").lexically_normal();
 
-    const std::filesystem::path vertPath = (m_assetsDir / "shaders/simple_skinned.vert.glsl").lexically_normal();
-    const std::filesystem::path fragPath = (m_assetsDir / "shaders/simple.frag.glsl").lexically_normal();
+        if (!FileExists(vertPath) || !FileExists(fragPath)) {
+            ReportIssue(
+                fmt::format("Built-in skinned shader missing files ({} / {})",
+                            vertPath.generic_string(),
+                            fragPath.generic_string()),
+                true);
+        } else {
+            try {
+                gm::ResourceManager::ShaderDescriptor descriptor{
+                    kSimpleSkinnedGuid,
+                    vertPath.string(),
+                    fragPath.string()};
+                auto handle = gm::ResourceManager::LoadShader(descriptor);
+                auto shader = handle.Lock();
+                if (!shader) {
+                    ReportIssue("Failed to load built-in skinned shader: empty handle", true);
+                } else {
+                    shader->Use();
+                    shader->SetInt("uTex", 0);
 
-    if (!FileExists(vertPath) || !FileExists(fragPath)) {
-        ReportIssue(
-            fmt::format("Built-in skinned shader missing files ({} / {})",
-                        vertPath.generic_string(),
-                        fragPath.generic_string()),
-            true);
-        return;
-    }
-
-    try {
-        gm::ResourceManager::ShaderDescriptor descriptor{
-            kSimpleSkinnedGuid,
-            vertPath.string(),
-            fragPath.string()};
-        auto handle = gm::ResourceManager::LoadShader(descriptor);
-        auto shader = handle.Lock();
-        if (!shader) {
-            ReportIssue("Failed to load built-in skinned shader: empty handle", true);
-            return;
+                    m_shaders[kSimpleSkinnedGuid] = shader;
+                    m_shaderSources[kSimpleSkinnedGuid] = ShaderSources{descriptor.vertexPath, descriptor.fragmentPath};
+                    gm::ResourceRegistry::Instance().RegisterShader(kSimpleSkinnedGuid, descriptor.vertexPath, descriptor.fragmentPath);
+                }
+            } catch (const std::exception& ex) {
+                ReportIssue(fmt::format("Failed to compile built-in skinned shader: {}", ex.what()), true);
+            }
         }
-        shader->Use();
-        shader->SetInt("uTex", 0);
-
-        m_shaders[kSimpleSkinnedGuid] = shader;
-        m_shaderSources[kSimpleSkinnedGuid] = ShaderSources{descriptor.vertexPath, descriptor.fragmentPath};
-        gm::ResourceRegistry::Instance().RegisterShader(kSimpleSkinnedGuid, descriptor.vertexPath, descriptor.fragmentPath);
-
-    } catch (const std::exception& ex) {
-        ReportIssue(fmt::format("Failed to compile built-in skinned shader: {}", ex.what()), true);
     }
+
+    EnsureSkyShader();
 }
 
 void GameResources::RegisterCatalogListener() {
@@ -664,7 +769,33 @@ void GameResources::RegisterDefaults() {
         return {};
     };
 
-    m_defaultShaderGuid = chooseGuid(m_shaders);
+    auto findShaderGuidByFilename = [&](std::string_view vertName,
+                                        std::string_view fragName) -> std::string {
+        for (const auto& [guid, src] : m_shaderSources) {
+            if (FilenameEquals(src.vertPath, vertName) &&
+                FilenameEquals(src.fragPath, fragName)) {
+                return guid;
+            }
+        }
+        return {};
+    };
+
+    auto findTextureGuidByFilename = [&](std::string_view name) -> std::string {
+        for (const auto& [guid, entry] : m_textureSources) {
+            if (FilenameEquals(entry.path, name)) {
+                return guid;
+            }
+        }
+        return {};
+    };
+
+    if (m_defaultShaderGuid.empty()) {
+        const std::string preferredSimpleGuid =
+            findShaderGuidByFilename("simple.vert.glsl", "simple.frag.glsl");
+        m_defaultShaderGuid = !preferredSimpleGuid.empty()
+            ? preferredSimpleGuid
+            : chooseGuid(m_shaders);
+    }
     if (auto it = m_shaderSources.find(m_defaultShaderGuid); it != m_shaderSources.end()) {
         m_defaultShaderVertPath = it->second.vertPath;
         m_defaultShaderFragPath = it->second.fragPath;
@@ -673,10 +804,22 @@ void GameResources::RegisterDefaults() {
         m_defaultShaderFragPath.clear();
     }
 
-    m_defaultTextureGuid.clear();
-    m_defaultTexturePath.clear();
+    if (m_defaultTextureGuid.empty()) {
+        const std::string preferredTextureGuid =
+            findTextureGuidByFilename("ground_mossy.png");
+        m_defaultTextureGuid = !preferredTextureGuid.empty()
+            ? preferredTextureGuid
+            : chooseGuid(m_textures);
+    }
+    if (auto it = m_textureSources.find(m_defaultTextureGuid); it != m_textureSources.end()) {
+        m_defaultTexturePath = it->second.path;
+    } else {
+        m_defaultTexturePath.clear();
+    }
 
-    m_defaultMeshGuid = chooseGuid(m_meshes);
+    if (m_defaultMeshGuid.empty()) {
+        m_defaultMeshGuid = chooseGuid(m_meshes);
+    }
     if (auto it = m_meshSources.find(m_defaultMeshGuid); it != m_meshSources.end()) {
         m_defaultMeshPath = it->second.path;
     } else {
@@ -684,6 +827,79 @@ void GameResources::RegisterDefaults() {
     }
 
     m_defaultTerrainMaterialGuid.clear();
+
+    gm::core::Logger::Info(
+        "[GameResources] Defaults -> shader='{}', texture='{}', mesh='{}'",
+        m_defaultShaderGuid.empty() ? "<unset>" : m_defaultShaderGuid,
+        m_defaultTextureGuid.empty() ? "<unset>" : m_defaultTextureGuid,
+        m_defaultMeshGuid.empty() ? "<unset>" : m_defaultMeshGuid);
+}
+
+void GameResources::EnsureSkyShader() {
+    static constexpr const char* kSkyShaderGuid = "shader::sky";
+    static constexpr const char* kSkyGradientGuid = "shader::sky_gradient";
+    if (m_shaders.count(kSkyShaderGuid)) {
+    } else {
+        const std::filesystem::path vertPath = (m_assetsDir / "shaders/sky.vert.glsl").lexically_normal();
+        const std::filesystem::path fragPath = (m_assetsDir / "shaders/sky.frag.glsl").lexically_normal();
+
+        if (!FileExists(vertPath) || !FileExists(fragPath)) {
+            ReportIssue(
+                fmt::format("Sky shader missing files ({} / {})",
+                            vertPath.generic_string(),
+                            fragPath.generic_string()),
+                true);
+        } else {
+            try {
+                gm::ResourceManager::ShaderDescriptor descriptor{
+                    kSkyShaderGuid,
+                    vertPath.string(),
+                    fragPath.string()};
+                auto handle = gm::ResourceManager::LoadShader(descriptor);
+                auto shader = handle.Lock();
+                if (!shader) {
+                    ReportIssue("Failed to load sky shader: empty handle", true);
+                } else {
+                    m_shaders[kSkyShaderGuid] = shader;
+                    m_shaderSources[kSkyShaderGuid] = ShaderSources{descriptor.vertexPath, descriptor.fragmentPath};
+                    gm::ResourceRegistry::Instance().RegisterShader(kSkyShaderGuid, descriptor.vertexPath, descriptor.fragmentPath);
+                }
+            } catch (const std::exception& ex) {
+                ReportIssue(fmt::format("Failed to compile sky shader: {}", ex.what()), true);
+            }
+        }
+    }
+
+    if (!m_shaders.count(kSkyGradientGuid)) {
+        const std::filesystem::path vertPath = (m_assetsDir / "shaders/sky_gradient.vert.glsl").lexically_normal();
+        const std::filesystem::path fragPath = (m_assetsDir / "shaders/sky_gradient.frag.glsl").lexically_normal();
+
+        if (!FileExists(vertPath) || !FileExists(fragPath)) {
+            ReportIssue(
+                fmt::format("Sky gradient shader missing files ({} / {})",
+                            vertPath.generic_string(),
+                            fragPath.generic_string()),
+                true);
+        } else {
+            try {
+                gm::ResourceManager::ShaderDescriptor descriptor{
+                    kSkyGradientGuid,
+                    vertPath.string(),
+                    fragPath.string()};
+                auto handle = gm::ResourceManager::LoadShader(descriptor);
+                auto shader = handle.Lock();
+                if (!shader) {
+                    ReportIssue("Failed to load sky gradient shader: empty handle", true);
+                } else {
+                    m_shaders[kSkyGradientGuid] = shader;
+                    m_shaderSources[kSkyGradientGuid] = ShaderSources{descriptor.vertexPath, descriptor.fragmentPath};
+                    gm::ResourceRegistry::Instance().RegisterShader(kSkyGradientGuid, descriptor.vertexPath, descriptor.fragmentPath);
+                }
+            } catch (const std::exception& ex) {
+                ReportIssue(fmt::format("Failed to compile sky gradient shader: {}", ex.what()), true);
+            }
+        }
+    }
 }
 
 void GameResources::EnsureTextureRegistered(const std::string& guid, std::shared_ptr<gm::Texture> texture) {
@@ -851,6 +1067,14 @@ gm::Mesh* GameResources::GetDefaultMesh() const {
 
 std::shared_ptr<gm::Material> GameResources::GetTerrainMaterial() const {
     return GetMaterial(m_defaultTerrainMaterialGuid);
+}
+
+gm::Shader* GameResources::GetSkyShader() const {
+    return GetShader("shader::sky");
+}
+
+gm::Shader* GameResources::GetSkyGradientShader() const {
+    return GetShader("shader::sky_gradient");
 }
 
 std::optional<gm::utils::ResourceManifest::ShaderEntry> GameResources::GetShaderSource(const std::string& guid) const {

@@ -137,6 +137,11 @@ std::vector<AssetDatabase::ShaderBatchRecord> AssetDatabase::GetShaderBatches() 
     return m_shaderBatches;
 }
 
+std::vector<AssetDatabase::TextureRecord> AssetDatabase::GetTextureRecords() const {
+    std::shared_lock lock(m_cacheMutex);
+    return m_textureRecords;
+}
+
 std::vector<AssetDatabase::MeshRecord> AssetDatabase::GetMeshRecords() const {
     std::shared_lock lock(m_cacheMutex);
     return m_meshRecords;
@@ -242,6 +247,7 @@ void AssetDatabase::RebuildIndexes() {
 
     std::unordered_map<std::string, ShaderFilePair> shaderFilePairs;
     std::vector<MeshRecord> meshRecords;
+    std::vector<TextureRecord> textureRecords;
     std::vector<PrefabRecord> prefabRecords;
     std::vector<ManifestRecord> manifestRecords;
     std::unordered_map<std::string, AssetDescriptor> descriptorsByGuid;
@@ -273,6 +279,9 @@ void AssetDatabase::RebuildIndexes() {
             if (IsUnderDirectory(asset.relativePath, "models/")) {
                 meshRecords.push_back({asset.guid, asset});
             }
+            break;
+        case AssetType::Texture:
+            textureRecords.push_back({asset.guid, asset});
             break;
         case AssetType::Prefab:
             if (IsUnderDirectory(asset.relativePath, "prefabs/")) {
@@ -316,6 +325,7 @@ void AssetDatabase::RebuildIndexes() {
         std::unique_lock cacheLock(m_cacheMutex);
         m_shaderBatches = std::move(shaderBatches);
         m_meshRecords = std::move(meshRecords);
+        m_textureRecords = std::move(textureRecords);
         m_prefabRecords = std::move(prefabRecords);
         m_manifestRecords = std::move(manifestRecords);
         m_descriptorsByGuid = std::move(descriptorsByGuid);

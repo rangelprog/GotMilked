@@ -1,8 +1,11 @@
 set(GOTMILKED_SOURCES
   src/main.cpp
   src/Game.cpp
-  src/GameBootstrapper.cpp
   src/GameRenderer.cpp
+  src/VolumetricFogRenderer.cpp
+  src/WeatherParticleSystem.cpp
+  src/SkyRenderer.cpp
+  src/GameBootstrapper.cpp
   src/DebugToolingController.cpp
   src/SceneResourceController.cpp
   src/GameShutdownController.cpp
@@ -30,6 +33,9 @@ if(GM_ENABLE_DEBUG_TOOLS)
     src/DebugMenu_RecentFiles.cpp
     src/debug_menu/SceneOutlinerPanel.cpp
     src/debug_menu/ContentValidationPanel.cpp
+    src/debug_menu/CelestialPanel.cpp
+    src/debug_menu/WeatherPanel.cpp
+    src/debug_menu/FogPanel.cpp
     ${ImGuizmo_SOURCE_DIR}/ImGuizmo.cpp
   )
 endif()

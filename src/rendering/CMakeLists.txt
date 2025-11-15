@@ -1,5 +1,6 @@
 set(GM_RENDERING_SOURCES
     Camera.cpp
+    CascadeShadowMap.cpp
     LightManager.cpp
     Material.cpp
     Mesh.cpp

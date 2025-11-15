@@ -149,7 +149,13 @@ void Scene::ClearSystems() {
     RegisterSystem(std::make_shared<scene::AnimationSystem>());
 }
 
-void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovDeg) {
+void Scene::Draw(Shader& shader,
+                 const Camera& cam,
+                 int fbw,
+                 int fbh,
+                 float fovDeg,
+                 float nearPlane,
+                 float farPlane) {
     if (fbw <= 0 || fbh <= 0) {
         core::Logger::Warning("[Scene] Invalid framebuffer size ({} x {})", fbw, fbh);
         return;
@@ -160,9 +166,17 @@ void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovD
         return;
     }
 
+    if (nearPlane <= 0.0f || nearPlane >= farPlane) {
+        core::Logger::Warning("[Scene] Invalid clip distances: near={}, far={}", nearPlane, farPlane);
+        nearPlane = 0.1f;
+        farPlane = 100.0f;
+    }
+
     const float aspect = static_cast<float>(fbw) / static_cast<float>(fbh);
-    glm::mat4 proj = glm::perspective(glm::radians(fovDeg), aspect, 0.1f, 100.0f);
+    glm::mat4 proj = glm::perspective(glm::radians(fovDeg), aspect, nearPlane, farPlane);
     glm::mat4 view = cam.View();
+
+    SetRenderContext(view, proj, cam.Position());
 
     shader.Use();
     shader.SetMat4("uView", view);
@@ -173,6 +187,23 @@ void Scene::Draw(Shader& shader, const Camera& cam, int fbw, int fbh, float fovD
     m_lightManager.ApplyLights(shader, cam.Position());
 
     m_renderBatcher.Draw(cam, view, proj, m_reloadVersion);
+    ClearRenderContext();
+}
+
+void Scene::SetRenderContext(const glm::mat4& view,
+                             const glm::mat4& proj,
+                             const glm::vec3& camPos) {
+    m_renderView = view;
+    m_renderProj = proj;
+    m_renderCameraPos = camPos;
+    m_renderContextValid = true;
+}
+
+void Scene::ClearRenderContext() {
+    m_renderContextValid = false;
+    m_renderView = glm::mat4(1.0f);
+    m_renderProj = glm::mat4(1.0f);
+    m_renderCameraPos = glm::vec3(0.0f);
 }
 
 bool Scene::SaveToFile(const std::string& filepath) {
