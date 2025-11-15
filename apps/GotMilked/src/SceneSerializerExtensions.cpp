@@ -15,6 +15,7 @@
 #include "gm/core/Logger.hpp"
 #include "gameplay/CameraRigComponent.hpp"
 #include "gameplay/QuestTriggerComponent.hpp"
+#include "gameplay/DialogueTriggerComponent.hpp"
 #include <nlohmann/json.hpp>
 #include <glm/vec3.hpp>
 #include <algorithm>
@@ -32,6 +33,9 @@ void RegisterSerializers() {
     }
     if (!factory.Register<gm::gameplay::QuestTriggerComponent>("QuestTriggerComponent")) {
         gm::core::Logger::Warning("[SceneSerializerExtensions] QuestTriggerComponent already registered in factory");
+    }
+    if (!factory.Register<gm::gameplay::DialogueTriggerComponent>("DialogueTriggerComponent")) {
+        gm::core::Logger::Warning("[SceneSerializerExtensions] DialogueTriggerComponent already registered in factory");
     }
 
     #if GM_DEBUG_TOOLS
@@ -173,6 +177,61 @@ void RegisterSerializers() {
             }
 
             return quest.get();
+        });
+
+    gm::SceneSerializer::RegisterComponentSerializer(
+        "DialogueTriggerComponent",
+        [](gm::Component* component) -> nlohmann::json {
+            auto* dialogue = dynamic_cast<gm::gameplay::DialogueTriggerComponent*>(component);
+            if (!dialogue) {
+                return nlohmann::json();
+            }
+            nlohmann::json data;
+            data["dialogueId"] = dialogue->GetDialogueId();
+            data["activationRadius"] = dialogue->GetActivationRadius();
+            data["triggerOnSceneLoad"] = dialogue->TriggerOnSceneLoad();
+            data["triggerOnInteract"] = dialogue->TriggerOnInteract();
+            data["repeatable"] = dialogue->IsRepeatable();
+            data["autoStart"] = dialogue->AutoStart();
+            data["activationAction"] = dialogue->GetActivationAction();
+            return data;
+        },
+        [](gm::GameObject* obj, const nlohmann::json& data) -> gm::Component* {
+            if (!data.is_object()) {
+                return nullptr;
+            }
+
+            auto& factory = gm::scene::ComponentFactory::Instance();
+            auto dialogue = std::dynamic_pointer_cast<gm::gameplay::DialogueTriggerComponent>(
+                factory.Create("DialogueTriggerComponent", obj));
+            if (!dialogue) {
+                gm::core::Logger::Error("[SceneSerializer] Failed to create DialogueTriggerComponent");
+                return nullptr;
+            }
+
+            if (data.contains("dialogueId") && data["dialogueId"].is_string()) {
+                dialogue->SetDialogueId(data["dialogueId"].get<std::string>());
+            }
+            if (data.contains("activationRadius") && data["activationRadius"].is_number()) {
+                dialogue->SetActivationRadius(data["activationRadius"].get<float>());
+            }
+            if (data.contains("triggerOnSceneLoad") && data["triggerOnSceneLoad"].is_boolean()) {
+                dialogue->SetTriggerOnSceneLoad(data["triggerOnSceneLoad"].get<bool>());
+            }
+            if (data.contains("triggerOnInteract") && data["triggerOnInteract"].is_boolean()) {
+                dialogue->SetTriggerOnInteract(data["triggerOnInteract"].get<bool>());
+            }
+            if (data.contains("repeatable") && data["repeatable"].is_boolean()) {
+                dialogue->SetRepeatable(data["repeatable"].get<bool>());
+            }
+            if (data.contains("autoStart") && data["autoStart"].is_boolean()) {
+                dialogue->SetAutoStart(data["autoStart"].get<bool>());
+            }
+            if (data.contains("activationAction") && data["activationAction"].is_string()) {
+                dialogue->SetActivationAction(data["activationAction"].get<std::string>());
+            }
+
+            return dialogue.get();
         });
 
     #if GM_DEBUG_TOOLS

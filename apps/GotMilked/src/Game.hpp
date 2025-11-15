@@ -8,6 +8,9 @@
 #include <glm/mat4x4.hpp>
 #include <unordered_set>
 #include <unordered_map>
+#include <cstdint>
+#include <limits>
+#include <string_view>
 struct GLFWwindow;
 
 namespace gm {
@@ -38,6 +41,7 @@ namespace gm::debug {
 #include "GameConstants.hpp"
 #include "gameplay/CameraRigSystem.hpp"
 #include "gameplay/QuestTriggerSystem.hpp"
+#include "gameplay/DialogueTriggerSystem.hpp"
 #include "gm/utils/HotReloader.hpp"
 #include "gm/utils/ImGuiManager.hpp"
 #include "gm/tooling/Overlay.hpp"
@@ -49,6 +53,7 @@ namespace gm::debug {
 #include "gm/scene/LightComponent.hpp"
 #include "gm/core/Event.hpp"
 #include "WeatherTypes.hpp"
+#include "ScriptingHooks.hpp"
 #include <nlohmann/json_fwd.hpp>
 #if GM_DEBUG_TOOLS
 #include "DebugMenu.hpp"
@@ -62,6 +67,29 @@ class GameShutdownController;
 class ToolingFacade;
 class EventRouter;
 class GameLoopController;
+class WeatherService;
+class NarrativeScriptingLog;
+
+enum class EnvironmentCaptureFlags : std::uint32_t {
+    None = 0,
+    Reflection = 1 << 0,
+    LightProbe = 1 << 1
+};
+
+inline EnvironmentCaptureFlags operator|(EnvironmentCaptureFlags lhs, EnvironmentCaptureFlags rhs) {
+    return static_cast<EnvironmentCaptureFlags>(static_cast<std::uint32_t>(lhs) |
+                                                static_cast<std::uint32_t>(rhs));
+}
+
+inline bool HasEnvironmentCaptureFlag(EnvironmentCaptureFlags value, EnvironmentCaptureFlags flag) {
+    return (static_cast<std::uint32_t>(value) & static_cast<std::uint32_t>(flag)) != 0;
+}
+
+enum class ProfilingPreset {
+    SunnyMidday,
+    StormyMidday,
+    DuskClear
+};
 
 #if GM_DEBUG_TOOLS
 namespace gm::gameplay {
@@ -107,6 +135,10 @@ public:
     float GetTimeOfDayNormalized() const { return m_timeOfDayController.GetNormalizedTime(); }
     const WeatherState& GetWeatherState() const { return m_weatherState; }
     const std::unordered_map<std::string, WeatherProfile>& GetWeatherProfiles() const { return m_weatherProfiles; }
+    const WeatherForecast& GetWeatherForecast() const { return m_weatherForecast; }
+    std::shared_ptr<WeatherService> GetWeatherService() const { return m_weatherService; }
+    std::shared_ptr<ScriptingHooks> GetScriptingHooks() const { return m_scriptingHooks; }
+    std::shared_ptr<NarrativeScriptingLog> GetNarrativeLog() const { return m_narrativeLog; }
     WeatherQuality GetWeatherQuality() const { return m_weatherQuality; }
     float GetLastDeltaTime() const { return m_lastDeltaTime; }
     void SetCelestialConfig(const gm::scene::CelestialConfig& config);
@@ -119,6 +151,10 @@ public:
     void SetDebugViewportCameraActive(bool enabled);
     bool IsDebugViewportCameraActive() const;
     void UpdateViewportCamera(float deltaTime, bool inputSuppressed);
+    void ApplyWeatherStateDebug(const WeatherState& state, bool broadcastEvent);
+    void OverrideWeatherForecastDebug(const WeatherForecast& forecast);
+    void TriggerWeatherStateEventDebug();
+    void RequestEnvironmentCaptureDebug(EnvironmentCaptureFlags flags);
 #endif
 
 private:
@@ -136,6 +172,7 @@ private:
     std::unique_ptr<gm::Camera> m_camera;
     std::shared_ptr<gm::gameplay::CameraRigSystem> m_cameraRigSystem;
     std::shared_ptr<gm::gameplay::QuestTriggerSystem> m_questSystem;
+    std::shared_ptr<gm::gameplay::DialogueTriggerSystem> m_dialogueSystem;
     std::unique_ptr<gm::save::SaveManager> m_saveManager;
     std::unique_ptr<gm::utils::ImGuiManager> m_imgui;
     std::unique_ptr<gm::tooling::Overlay> m_tooling;
@@ -158,12 +195,29 @@ private:
     bool m_gridVisible = false;
 #endif
     std::unordered_set<std::string> m_completedQuests;
+    std::unordered_set<std::string> m_completedDialogues;
     WeatherQuality m_weatherQuality = WeatherQuality::High;
     WeatherState m_weatherState{};
+    WeatherForecast m_weatherForecast{};
     std::unordered_map<std::string, WeatherProfile> m_weatherProfiles;
     float m_lastDeltaTime = 0.016f;
     float m_weatherClock = 0.0f;
     WeatherStateEventPayload m_weatherEventPayload;
+    std::shared_ptr<WeatherService> m_weatherService;
+    std::shared_ptr<ScriptingHooks> m_scriptingHooks;
+    std::shared_ptr<NarrativeScriptingLog> m_narrativeLog;
+    float m_accumulatedSunlightHours = 0.0f;
+    float m_accumulatedRainfallMm = 0.0f;
+    float m_accumulatedWetness = 0.0f;
+    float m_lastAmbientTemperatureC = 20.0f;
+    float m_lastPrecipitationRate = 0.0f;
+    float m_shadowCascadeBias = 0.0f;
+    EnvironmentCaptureFlags m_pendingEnvironmentCaptures = EnvironmentCaptureFlags::None;
+    float m_timeSinceLastEnvironmentCapture = std::numeric_limits<float>::max();
+    float m_lastCaptureSunElevation = 0.0f;
+    std::string m_lastCaptureWeatherProfile;
+    float m_lastCaptureWetness = 0.0f;
+    float m_environmentCaptureCooldown = 20.0f;
     gm::SceneManager* m_sceneManager = nullptr;
     std::unique_ptr<GameBootstrapper> m_bootstrapper;
     std::unique_ptr<GameRenderer> m_renderer;
@@ -195,8 +249,22 @@ private:
     void UpdateWeather(float dt);
     WeatherProfile ParseProfile(const nlohmann::json& entry) const;
     WeatherState ParseInitialWeather(const nlohmann::json& data) const;
+    WeatherForecast ParseForecast(const nlohmann::json& data) const;
     const WeatherProfile& ResolveWeatherProfile(const std::string& name) const;
     void BroadcastWeatherEvent();
+    void SyncWeatherService();
+    nlohmann::json BuildNarrativeSaveState() const;
+    void RestoreNarrativeState(const nlohmann::json& saveJson);
+    void UpdateWeatherAccumulation(float dt);
+    void ResetWeatherAccumulation();
+    float ComputeAmbientTemperatureC() const;
+    float ComputePrecipitationRate() const;
+    void UpdateShadowCascadeBias();
+    void RequestEnvironmentCapture(EnvironmentCaptureFlags flags);
+    EnvironmentCaptureFlags ConsumeEnvironmentCaptureFlags();
+    void NotifyEnvironmentCapturePerformed(EnvironmentCaptureFlags flags);
+    void ApplyProfilingPreset(ProfilingPreset preset);
+    bool ApplyProfilingPreset(std::string_view presetName);
     
     // Helper methods
     void SetupScene();

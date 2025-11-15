@@ -1,35 +1,33 @@
-#include "QuestTriggerSystem.hpp"
+#include "DialogueTriggerSystem.hpp"
 
-#include "QuestTriggerComponent.hpp"
+#include "DialogueTriggerComponent.hpp"
 #include "gm/core/Input.hpp"
-#include "gm/core/Logger.hpp"
-#include "gm/scene/Scene.hpp"
 #include "gm/scene/GameObject.hpp"
+#include "gm/scene/Scene.hpp"
 #include "gm/scene/TransformComponent.hpp"
 
 #include <algorithm>
 #include <glm/glm.hpp>
-#include <utility>
 
 namespace gm::gameplay {
 
-void QuestTriggerSystem::OnRegister(gm::Scene& scene) {
+void DialogueTriggerSystem::OnRegister(gm::Scene& scene) {
     m_lastSceneVersion = scene.CurrentReloadVersion();
     CollectTriggers(scene);
     ProcessSceneLoadTriggers();
 }
 
-void QuestTriggerSystem::OnSceneInit(gm::Scene& scene) {
+void DialogueTriggerSystem::OnSceneInit(gm::Scene& scene) {
     m_lastSceneVersion = scene.CurrentReloadVersion();
     CollectTriggers(scene);
     ProcessSceneLoadTriggers();
 }
 
-void QuestTriggerSystem::OnSceneShutdown(gm::Scene&) {
+void DialogueTriggerSystem::OnSceneShutdown(gm::Scene&) {
     m_triggers.clear();
 }
 
-void QuestTriggerSystem::Update(gm::Scene& scene, float /*deltaTime*/) {
+void DialogueTriggerSystem::Update(gm::Scene& scene, float /*deltaTime*/) {
     if (scene.CurrentReloadVersion() != m_lastSceneVersion) {
         m_lastSceneVersion = scene.CurrentReloadVersion();
         CollectTriggers(scene);
@@ -40,15 +38,15 @@ void QuestTriggerSystem::Update(gm::Scene& scene, float /*deltaTime*/) {
     ProcessInteractionTriggers();
 }
 
-void QuestTriggerSystem::SetPlayerPositionProvider(std::function<glm::vec3()> provider) {
+void DialogueTriggerSystem::SetPlayerPositionProvider(std::function<glm::vec3()> provider) {
     m_playerPositionProvider = std::move(provider);
 }
 
-void QuestTriggerSystem::SetTriggerCallback(TriggerCallback callback) {
+void DialogueTriggerSystem::SetTriggerCallback(TriggerCallback callback) {
     m_triggerCallback = std::move(callback);
 }
 
-void QuestTriggerSystem::SetSceneContext(const std::shared_ptr<gm::Scene>& scene) {
+void DialogueTriggerSystem::SetSceneContext(const std::shared_ptr<gm::Scene>& scene) {
     m_sceneWeak = scene;
     if (auto shared = m_sceneWeak.lock()) {
         m_lastSceneVersion = shared->CurrentReloadVersion();
@@ -57,11 +55,11 @@ void QuestTriggerSystem::SetSceneContext(const std::shared_ptr<gm::Scene>& scene
     }
 }
 
-void QuestTriggerSystem::SetInputSuppressed(bool suppressed) {
+void DialogueTriggerSystem::SetInputSuppressed(bool suppressed) {
     m_inputSuppressed = suppressed;
 }
 
-void QuestTriggerSystem::CollectTriggers(gm::Scene& scene) {
+void DialogueTriggerSystem::CollectTriggers(gm::Scene& scene) {
     m_triggers.clear();
     auto& objects = scene.GetAllGameObjects();
     for (auto& object : objects) {
@@ -72,20 +70,20 @@ void QuestTriggerSystem::CollectTriggers(gm::Scene& scene) {
             if (!component) {
                 continue;
             }
-            if (auto trigger = std::dynamic_pointer_cast<QuestTriggerComponent>(component)) {
+            if (auto trigger = std::dynamic_pointer_cast<DialogueTriggerComponent>(component)) {
                 m_triggers.push_back(TriggerHandle{trigger});
             }
         }
     }
 }
 
-void QuestTriggerSystem::RefreshHandles() {
+void DialogueTriggerSystem::RefreshHandles() {
     auto it = std::remove_if(m_triggers.begin(), m_triggers.end(),
         [](const TriggerHandle& handle) { return handle.component.expired(); });
     m_triggers.erase(it, m_triggers.end());
 }
 
-void QuestTriggerSystem::ProcessSceneLoadTriggers() {
+void DialogueTriggerSystem::ProcessSceneLoadTriggers() {
     for (auto& handle : m_triggers) {
         auto trigger = handle.component.lock();
         if (!trigger) {
@@ -104,7 +102,7 @@ void QuestTriggerSystem::ProcessSceneLoadTriggers() {
     }
 }
 
-void QuestTriggerSystem::ProcessInteractionTriggers() {
+void DialogueTriggerSystem::ProcessInteractionTriggers() {
     if (m_inputSuppressed) {
         return;
     }
@@ -133,7 +131,7 @@ void QuestTriggerSystem::ProcessInteractionTriggers() {
     }
 }
 
-bool QuestTriggerSystem::EvaluateInteraction(const std::shared_ptr<QuestTriggerComponent>& trigger) const {
+bool DialogueTriggerSystem::EvaluateInteraction(const std::shared_ptr<DialogueTriggerComponent>& trigger) const {
     auto owner = trigger->GetOwner();
     if (!owner) {
         return false;
@@ -148,7 +146,7 @@ bool QuestTriggerSystem::EvaluateInteraction(const std::shared_ptr<QuestTriggerC
     return glm::distance(playerPos, triggerPos) <= radius;
 }
 
-glm::vec3 QuestTriggerSystem::GetPlayerPositionSafe() const {
+glm::vec3 DialogueTriggerSystem::GetPlayerPositionSafe() const {
     if (m_playerPositionProvider) {
         return m_playerPositionProvider();
     }

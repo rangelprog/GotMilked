@@ -15,6 +15,8 @@
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <fmt/format.h>
+#include <vector>
 
 GameRenderer::GameRenderer(Game& game)
     : m_game(game) {
@@ -31,6 +33,8 @@ void GameRenderer::Render() {
         gm::core::Logger::Warning("[Game] Cannot render - shader not loaded");
         return;
     }
+
+    ProcessEnvironmentCaptureRequests();
 
     if (!m_skyInitialized) {
         m_skyInitialized = m_skyRenderer.Initialize(m_game.m_resources);
@@ -145,5 +149,34 @@ void GameRenderer::Render() {
         gm::utils::Profiler::ScopedTimer toolingUiTimer("GameRenderer::ToolingUI");
         m_game.m_toolingFacade->RenderUI();
     }
+}
+
+void GameRenderer::ProcessEnvironmentCaptureRequests() {
+    auto flags = m_game.ConsumeEnvironmentCaptureFlags();
+    if (flags == EnvironmentCaptureFlags::None) {
+        return;
+    }
+
+    std::vector<const char*> tasks;
+    if (HasEnvironmentCaptureFlag(flags, EnvironmentCaptureFlags::Reflection)) {
+        tasks.push_back("reflection captures");
+    }
+    if (HasEnvironmentCaptureFlag(flags, EnvironmentCaptureFlags::LightProbe)) {
+        tasks.push_back("light probes");
+    }
+
+    if (!tasks.empty()) {
+        std::string summary = fmt::format("Refreshing {}", tasks[0]);
+        for (size_t i = 1; i < tasks.size(); ++i) {
+            summary += fmt::format(" & {}", tasks[i]);
+        }
+        gm::core::Logger::Info("[Renderer] {}", summary);
+        if (auto* tooling = m_game.GetToolingFacade()) {
+            tooling->AddNotification(summary);
+        }
+    }
+
+    // TODO: Integrate with actual probe/reflection capture subsystems when available.
+    m_game.NotifyEnvironmentCapturePerformed(flags);
 }
 

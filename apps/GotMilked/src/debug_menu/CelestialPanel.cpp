@@ -2,12 +2,67 @@
 
 #include "../DebugMenu.hpp"
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <fmt/format.h>
 
 namespace {
 constexpr int kCurveSamples = 128;
+
+using TimelineKeyframe = gm::debug::DebugMenu::TimeOfDayTimelineKeyframe;
+using TimelineState = gm::debug::DebugMenu::TimeOfDayTimelineState;
+
+void EnsureTimelineDefaults(TimelineState& state) {
+    if (state.keyframes.size() < 2) {
+        state.keyframes.clear();
+        state.keyframes.push_back({0.0f, 0.0f});
+        state.keyframes.push_back({state.durationSeconds, 1.0f});
+        state.needsSort = false;
+    }
 }
+
+void SortTimeline(TimelineState& state) {
+    if (!state.needsSort) {
+        return;
+    }
+    std::sort(state.keyframes.begin(), state.keyframes.end(), [](const TimelineKeyframe& a, const TimelineKeyframe& b) {
+        return a.timeSeconds < b.timeSeconds;
+    });
+    state.needsSort = false;
+}
+
+float EvaluateTimeline(const TimelineState& state, float cursorSeconds) {
+    if (state.keyframes.empty() || state.durationSeconds <= 0.0f) {
+        float normalized = std::clamp(cursorSeconds / std::max(0.001f, state.durationSeconds), 0.0f, 1.0f);
+        return normalized;
+    }
+
+    const auto& keys = state.keyframes;
+    if (cursorSeconds <= keys.front().timeSeconds) {
+        return keys.front().normalizedValue;
+    }
+    if (cursorSeconds >= keys.back().timeSeconds) {
+        return keys.back().normalizedValue;
+    }
+
+    for (size_t i = 1; i < keys.size(); ++i) {
+        if (cursorSeconds <= keys[i].timeSeconds) {
+            const auto& prev = keys[i - 1];
+            const auto& next = keys[i];
+            float denom = std::max(0.0001f, next.timeSeconds - prev.timeSeconds);
+            float t = std::clamp((cursorSeconds - prev.timeSeconds) / denom, 0.0f, 1.0f);
+#if __cpp_lib_interpolate
+            return std::lerp(prev.normalizedValue, next.normalizedValue, t);
+#else
+            return prev.normalizedValue + (next.normalizedValue - prev.normalizedValue) * t;
+#endif
+        }
+    }
+    return keys.back().normalizedValue;
+}
+
+} // namespace
 
 namespace gm::debug {
 
@@ -59,6 +114,8 @@ void DebugMenu::RenderCelestialDebugger() {
             }
         }
     }
+
+    normalizedTime = RenderTimeOfDayTimeline(normalizedTime);
 
     if (ImGui::CollapsingHeader("Celestial Config", ImGuiTreeNodeFlags_DefaultOpen)) {
         bool dirty = false;
@@ -154,6 +211,148 @@ void DebugMenu::RenderCelestialDebugger() {
     }
 
     ImGui::End();
+}
+
+float DebugMenu::RenderTimeOfDayTimeline(float normalizedTime) {
+    auto& state = m_timeOfDayTimeline;
+    constexpr float kMinDuration = 10.0f;
+    state.durationSeconds = std::max(state.durationSeconds, kMinDuration);
+    state.playbackCursor = std::clamp(state.playbackCursor, 0.0f, state.durationSeconds);
+
+    EnsureTimelineDefaults(state);
+    SortTimeline(state);
+
+    auto applyTime = [&](float value) {
+        normalizedTime = value;
+        if (m_callbacks.setTimeOfDayNormalized) {
+            m_callbacks.setTimeOfDayNormalized(value);
+        }
+    };
+
+    if (state.playing && state.keyframes.size() >= 2) {
+        state.playbackCursor += ImGui::GetIO().DeltaTime;
+        if (state.playbackCursor > state.durationSeconds) {
+            if (state.loop) {
+                state.playbackCursor = std::fmod(state.playbackCursor, state.durationSeconds);
+            } else {
+                state.playbackCursor = state.durationSeconds;
+                state.playing = false;
+            }
+        }
+        applyTime(EvaluateTimeline(state, state.playbackCursor));
+    }
+
+    if (!ImGui::CollapsingHeader("Time-of-Day Timeline", ImGuiTreeNodeFlags_DefaultOpen)) {
+        return normalizedTime;
+    }
+
+    ImGui::Checkbox("Play Timeline", &state.playing);
+    ImGui::SameLine();
+    ImGui::Checkbox("Loop", &state.loop);
+    ImGui::SameLine();
+    if (ImGui::Button("Sync Cursor From Scene")) {
+        state.playbackCursor = std::clamp(normalizedTime, 0.0f, 1.0f) * state.durationSeconds;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset Curve")) {
+        state.keyframes = {
+            TimeOfDayTimelineKeyframe{0.0f, 0.0f},
+            TimeOfDayTimelineKeyframe{state.durationSeconds, 1.0f}
+        };
+        state.needsSort = false;
+        SortTimeline(state);
+    }
+
+    float previousDuration = state.durationSeconds;
+    if (ImGui::DragFloat("Timeline Duration (s)", &state.durationSeconds, 1.0f, kMinDuration, 14400.0f, "%.1f")) {
+        state.durationSeconds = std::max(state.durationSeconds, kMinDuration);
+        float scale = state.durationSeconds / std::max(previousDuration, 0.001f);
+        for (auto& key : state.keyframes) {
+            key.timeSeconds = std::clamp(key.timeSeconds * scale, 0.0f, state.durationSeconds);
+        }
+        state.playbackCursor = std::clamp(state.playbackCursor * scale, 0.0f, state.durationSeconds);
+        state.needsSort = true;
+    }
+
+    if (ImGui::Button("Add Keyframe At Cursor")) {
+        state.keyframes.push_back({state.playbackCursor, normalizedTime});
+        state.selectedIndex = static_cast<int>(state.keyframes.size()) - 1;
+        state.needsSort = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Add Keyframe From Scene")) {
+        state.keyframes.push_back({std::clamp(normalizedTime, 0.0f, 1.0f) * state.durationSeconds, normalizedTime});
+        state.selectedIndex = static_cast<int>(state.keyframes.size()) - 1;
+        state.needsSort = true;
+    }
+
+    SortTimeline(state);
+
+    constexpr int kTimelineSamples = 256;
+    std::array<float, kTimelineSamples> samples{};
+    for (int i = 0; i < kTimelineSamples; ++i) {
+        float t = (static_cast<float>(i) / (kTimelineSamples - 1)) * state.durationSeconds;
+        samples[i] = EvaluateTimeline(state, t);
+    }
+    ImGui::PlotLines("Timeline Curve", samples.data(), kTimelineSamples, 0, nullptr, 0.0f, 1.0f, ImVec2(0, 120));
+
+    float cursorNormalized = state.durationSeconds <= 0.0f ? 0.0f : state.playbackCursor / state.durationSeconds;
+    if (ImGui::SliderFloat("Playback Cursor", &cursorNormalized, 0.0f, 1.0f, "%.3f")) {
+        state.playbackCursor = cursorNormalized * state.durationSeconds;
+        applyTime(EvaluateTimeline(state, state.playbackCursor));
+    }
+
+    if (ImGui::BeginTable("TimelineKeyframes", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
+        ImGui::TableSetupColumn("Index", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+        ImGui::TableSetupColumn("Time (s)");
+        ImGui::TableSetupColumn("Normalized");
+        ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+        ImGui::TableHeadersRow();
+
+        for (int i = 0; i < static_cast<int>(state.keyframes.size()); ++i) {
+            auto& key = state.keyframes[i];
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            bool selected = (state.selectedIndex == i);
+            std::string rowLabel = fmt::format("Key {}", i);
+            if (ImGui::Selectable(rowLabel.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns)) {
+                state.selectedIndex = i;
+            }
+
+            ImGui::TableSetColumnIndex(1);
+            std::string timeLabel = fmt::format("##time{}", i);
+            if (ImGui::DragFloat(timeLabel.c_str(), &key.timeSeconds, 0.1f, 0.0f, state.durationSeconds, "%.2f")) {
+                key.timeSeconds = std::clamp(key.timeSeconds, 0.0f, state.durationSeconds);
+                state.needsSort = true;
+            }
+
+            ImGui::TableSetColumnIndex(2);
+            std::string normLabel = fmt::format("##norm{}", i);
+            if (ImGui::DragFloat(normLabel.c_str(), &key.normalizedValue, 0.01f, 0.0f, 1.0f, "%.3f")) {
+                key.normalizedValue = std::clamp(key.normalizedValue, 0.0f, 1.0f);
+            }
+
+            ImGui::TableSetColumnIndex(3);
+            bool canDelete = state.keyframes.size() > 2;
+            if (!canDelete) {
+                ImGui::BeginDisabled();
+            }
+            std::string deleteLabel = fmt::format("Delete##{}", i);
+            if (ImGui::SmallButton(deleteLabel.c_str()) && canDelete) {
+                state.keyframes.erase(state.keyframes.begin() + i);
+                state.selectedIndex = std::min(state.selectedIndex, static_cast<int>(state.keyframes.size()) - 1);
+                state.needsSort = true;
+                break;
+            }
+            if (!canDelete) {
+                ImGui::EndDisabled();
+            }
+        }
+        ImGui::EndTable();
+    }
+
+    SortTimeline(state);
+    return normalizedTime;
 }
 
 } // namespace gm::debug

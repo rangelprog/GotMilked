@@ -22,6 +22,9 @@ set(GOTMILKED_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/gameplay/CameraRigSystem.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/gameplay/QuestTriggerComponent.cpp
     ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/gameplay/QuestTriggerSystem.cpp
+    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/gameplay/DialogueTriggerComponent.cpp
+    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/gameplay/DialogueTriggerSystem.cpp
+    ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/WeatherService.cpp
     TestMain.cpp
 )
 
@@ -37,6 +40,7 @@ if(GM_ENABLE_DEBUG_TOOLS)
         ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/debug_menu/CelestialPanel.cpp
         ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/debug_menu/WeatherPanel.cpp
         ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/debug_menu/FogPanel.cpp
+        ${CMAKE_SOURCE_DIR}/apps/GotMilked/src/debug_menu/WeatherScenarioPanel.cpp
         ${ImGuizmo_SOURCE_DIR}/ImGuizmo.cpp
     )
     if(MSVC)

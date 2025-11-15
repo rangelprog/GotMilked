@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <nlohmann/json.hpp>
 
@@ -87,6 +88,40 @@ std::vector<std::string> DiffQuestStates(const QuestStateMap& previous, const Qu
     return changes;
 }
 
+std::unordered_set<std::string> BuildIdSet(const nlohmann::json& array) {
+    std::unordered_set<std::string> ids;
+    if (!array.is_array()) {
+        return ids;
+    }
+    for (const auto& value : array) {
+        if (value.is_string()) {
+            ids.insert(value.get<std::string>());
+        }
+    }
+    return ids;
+}
+
+std::vector<std::string> DiffIdSets(const nlohmann::json& previous,
+                                    const nlohmann::json& next,
+                                    std::string_view label) {
+    auto prevSet = BuildIdSet(previous);
+    auto nextSet = BuildIdSet(next);
+    std::vector<std::string> changes;
+
+    for (const auto& id : prevSet) {
+        if (!nextSet.contains(id)) {
+            changes.push_back(std::string(label) + " removed: " + id);
+        }
+    }
+    for (const auto& id : nextSet) {
+        if (!prevSet.contains(id)) {
+            changes.push_back(std::string(label) + " added: " + id);
+        }
+    }
+
+    return changes;
+}
+
 } // namespace
 
 SaveDiffSummary ComputeSaveDiff(const nlohmann::json& previous, const nlohmann::json& next) {
@@ -116,6 +151,25 @@ SaveDiffSummary ComputeSaveDiff(const nlohmann::json& previous, const nlohmann::
     const auto nextQuests = ExtractQuestStates(next);
     summary.questChanges = DiffQuestStates(prevQuests, nextQuests);
     summary.questStateChanged = !summary.questChanges.empty();
+
+    const nlohmann::json& prevNarrative = previous.contains("narrative") ? previous["narrative"] : nlohmann::json::object();
+    const nlohmann::json& nextNarrative = next.contains("narrative") ? next["narrative"] : nlohmann::json::object();
+    if (!prevNarrative.empty() || !nextNarrative.empty()) {
+        const auto questListDiff = DiffIdSets(
+            prevNarrative.value("completedQuests", nlohmann::json::array()),
+            nextNarrative.value("completedQuests", nlohmann::json::array()),
+            "Quest");
+        if (!questListDiff.empty()) {
+            summary.questStateChanged = true;
+            summary.questChanges.insert(summary.questChanges.end(), questListDiff.begin(), questListDiff.end());
+        }
+
+        summary.dialogueChanges = DiffIdSets(
+            prevNarrative.value("completedDialogues", nlohmann::json::array()),
+            nextNarrative.value("completedDialogues", nlohmann::json::array()),
+            "Dialogue");
+        summary.dialogueStateChanged = !summary.dialogueChanges.empty();
+    }
 
     return summary;
 }

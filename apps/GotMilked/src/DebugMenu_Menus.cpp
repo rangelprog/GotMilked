@@ -174,6 +174,9 @@ void DebugMenu::RenderMenuBar() {
         if (ImGui::Checkbox("Weather Diagnostics", &m_showWeatherPanel)) {
             MarkLayoutDirty();
         }
+        if (ImGui::Checkbox("Weather Scenario Editor", &m_showWeatherScenarioEditor)) {
+            MarkLayoutDirty();
+        }
 #if defined(IMGUI_HAS_DOCK)
         if (ImGui::MenuItem("Reset Layout")) {
             m_resetDockLayout = true;

@@ -120,3 +120,16 @@ jobs:
         run: |
           npm install --global markdownlint-cli@0.39.0
           markdownlint "README.md" "docs/**/*.md"
+
+  perf-presets:
+    name: Perf Capture Plan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Generate perf capture plan
+        run: |
+          python scripts/capture_perf_presets.py --dry-run --output perf_plans/perf_plan.json

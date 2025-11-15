@@ -4,6 +4,7 @@
 #include "gm/scene/GameObject.hpp"
 #include "gm/scene/TransformComponent.hpp"
 #include "gm/core/Logger.hpp"
+#include "WeatherService.hpp"
 
 #include <glm/glm.hpp>
 #include <algorithm>
@@ -62,7 +63,9 @@ void CowAnimationController::Update(float deltaTime) {
     m_lastPosition = position;
 
     const float speed = glm::length(delta) / std::max(deltaTime, 1e-4f);
-    const float targetWalkWeight = (speed >= m_speedThreshold) ? 1.0f : 0.0f;
+    const float moodFactor = ComputeMoodFactor();
+    const float baseTarget = (speed >= m_speedThreshold) ? 1.0f : 0.0f;
+    const float targetWalkWeight = baseTarget * moodFactor + (1.0f - moodFactor) * 0.15f;
     const float lerpFactor = std::clamp(m_blendRate * deltaTime, 0.0f, 1.0f);
     m_currentWalkWeight = glm::mix(m_currentWalkWeight, targetWalkWeight, lerpFactor);
 
@@ -78,6 +81,30 @@ void CowAnimationController::ApplyWeights(float walkWeight) {
     const float idleWeight = std::clamp(1.0f - walkWeight, 0.0f, 1.0f);
     animator->SetWeight(m_walkSlot, std::clamp(walkWeight, 0.0f, 1.0f));
     animator->SetWeight(m_idleSlot, idleWeight);
+}
+
+float CowAnimationController::ComputeMoodFactor() const {
+    auto weatherService = WeatherService::GlobalInstance();
+    if (!weatherService) {
+        return 1.0f;
+    }
+    const auto env = weatherService->GetEnvironment();
+    const float temp = env.ambientTemperatureC;
+    const float precip = env.precipitationRate;
+
+    float tempFactor = 1.0f;
+    if (temp < m_comfortMinC) {
+        tempFactor = std::clamp(1.0f - (m_comfortMinC - temp) / 15.0f, 0.2f, 1.0f);
+    } else if (temp > m_comfortMaxC) {
+        tempFactor = std::clamp(1.0f - (temp - m_comfortMaxC) / 15.0f, 0.2f, 1.0f);
+    }
+
+    float rainFactor = 1.0f;
+    if (precip > m_rainTolerance) {
+        rainFactor = std::clamp(1.0f - (precip - m_rainTolerance) / (m_rainTolerance * 3.0f), 0.15f, 1.0f);
+    }
+
+    return std::clamp((tempFactor + rainFactor) * 0.5f, 0.1f, 1.0f);
 }
 
 } // namespace gotmilked

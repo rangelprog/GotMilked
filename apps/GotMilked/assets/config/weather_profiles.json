@@ -50,6 +50,26 @@
     "profile": "light_rain",
     "windDirection": [0.2, 0.0, -0.8],
     "windSpeed": 7.0
-  }
+  },
+  "forecast": [
+    {
+      "profile": "light_rain",
+      "startHour": 6.0,
+      "durationHours": 6.0,
+      "description": "Morning drizzle transitioning from the current system."
+    },
+    {
+      "profile": "heavy_rain",
+      "startHour": 12.0,
+      "durationHours": 4.0,
+      "description": "Front intensifies around noon with heavier rainfall."
+    },
+    {
+      "profile": "default",
+      "startHour": 18.0,
+      "durationHours": 6.0,
+      "description": "Skies clear gradually into a calm evening."
+    }
+  ]
 }
 

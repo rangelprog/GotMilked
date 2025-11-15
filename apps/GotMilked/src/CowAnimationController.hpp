@@ -32,9 +32,12 @@ public:
     [[nodiscard]] const std::string& WalkSlot() const { return m_walkSlot; }
     [[nodiscard]] float SpeedThreshold() const { return m_speedThreshold; }
     [[nodiscard]] float BlendRate() const { return m_blendRate; }
+    void SetTemperatureComfortRange(float minC, float maxC) { m_comfortMinC = minC; m_comfortMaxC = maxC; }
+    void SetRainTolerance(float tolerance) { m_rainTolerance = tolerance; }
 
 private:
     void ApplyWeights(float walkWeight);
+    float ComputeMoodFactor() const;
 
     std::weak_ptr<gm::scene::AnimatorComponent> m_animator;
     std::weak_ptr<gm::TransformComponent> m_transform;
@@ -48,6 +51,9 @@ private:
 
     std::string m_idleSlot = "Idle";
     std::string m_walkSlot = "Walk";
+    float m_comfortMinC = 5.0f;
+    float m_comfortMaxC = 25.0f;
+    float m_rainTolerance = 2.0f;
 };
 
 } // namespace gotmilked

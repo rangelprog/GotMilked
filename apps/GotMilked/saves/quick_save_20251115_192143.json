@@ -1,15 +1,15 @@
 {
   "camera": {
     "forward": [
-      0.7054952383041382,
-      -0.3993337154388428,
-      0.5854989886283875
+      0.5913636684417725,
+      -0.48384296894073486,
+      0.6451240181922913
     ],
     "fov": 60.0,
     "position": [
-      -19.711910247802734,
-      17.670928955078125,
-      -4.1875386238098145
+      8.787349700927734,
+      3.6288223266601563,
+      13.005483627319336
     ]
   },
   "gameObjects": [
@@ -42,16 +42,16 @@
           "data": {
             "color": [
               1.0,
-              1.0,
-              1.0
+              0.7200000286102295,
+              0.44999998807907104
             ],
             "direction": [
-              -0.3577708899974823,
-              -0.8944271802902222,
-              -0.26832816004753113
+              0.7172698378562927,
+              0.6484188437461853,
+              0.25510209798812866
             ],
             "enabled": true,
-            "intensity": 1.5,
+            "intensity": 0.30489635467529297,
             "type": 0
           },
           "type": "LightComponent"
@@ -91,7 +91,7 @@
           "data": {
             "activePaintLayer": 0,
             "baseTextureGuid": "864da4f9e69cb656",
-            "editingEnabled": true,
+            "editingEnabled": false,
             "editorWindowVisible": false,
             "heights": [
               0.0,
@@ -2285,7 +2285,7 @@
             ],
             "resolution": 33,
             "size": 40.0,
-            "textureTiling": 1.0
+            "textureTiling": 11.739999771118164
           },
           "type": "EditableTerrainComponent"
         }
@@ -2300,23 +2300,76 @@
       "components": [],
       "name": "CameraRig",
       "tags": []
+    },
+    {
+      "active": true,
+      "components": [
+        {
+          "active": true,
+          "data": {
+            "position": [
+              13.222577095031738,
+              0.0,
+              17.843914031982422
+            ],
+            "rotation": [
+              0.0,
+              -0.0,
+              0.0
+            ],
+            "scale": [
+              0.1600000262260437,
+              0.1600000262260437,
+              0.1600000262260437
+            ]
+          },
+          "type": "Transform"
+        },
+        {
+          "active": true,
+          "data": {
+            "materialGuid": "cow_mat0",
+            "meshGuid": "5921fbb494a68f0b",
+            "shaderGuid": "shader::simple_skinned",
+            "version": 1
+          },
+          "type": "SkinnedMeshComponent"
+        },
+        {
+          "active": true,
+          "data": {
+            "layers": [
+              {
+                "clipGuid": "d5ad897412497a46",
+                "loop": true,
+                "playing": true,
+                "slot": "idle",
+                "timeSeconds": 0.0,
+                "weight": 0.0
+              },
+              {
+                "clipGuid": "6066953347f130ae",
+                "loop": true,
+                "playing": true,
+                "slot": "eating",
+                "timeSeconds": 797.8271565837786,
+                "weight": 1.0
+              }
+            ],
+            "skeletonGuid": "58f8fdb494838d5d",
+            "version": 1
+          },
+          "type": "AnimatorComponent"
+        }
+      ],
+      "name": "Cow",
+      "tags": [
+        "prop"
+      ]
     }
   ],
   "isPaused": false,
   "metadata": {
-    "diff": {
-      "questStateChanged": false,
-      "terrainChanged": true,
-      "terrainDiff": [
-        {
-          "op": "replace",
-          "path": "/baseTextureGuid",
-          "value": "864da4f9e69cb656"
-        }
-      ],
-      "terrainFallbackApplied": false,
-      "versionChanged": false
-    },
     "runtimeVersion": {
       "major": 1,
       "minor": 1,
@@ -2326,6 +2379,10 @@
     "versionString": "1.1.0"
   },
   "name": "GameScene",
+  "narrative": {
+    "completedDialogues": [],
+    "completedQuests": []
+  },
   "sceneName": "GameScene",
   "terrain": {
     "activePaintLayer": 0,
@@ -4522,7 +4579,7 @@
     ],
     "resolution": 33,
     "size": 40.0,
-    "textureTiling": 1.0
+    "textureTiling": 11.739999771118164
   },
   "version": {
     "major": 1,
@@ -4530,5 +4587,32 @@
     "patch": 0,
     "prerelease": ""
   },
-  "worldTime": 785.9515327566678
+  "weatherAccumulation": {
+    "ambientTempC": 10.636858940124512,
+    "precipRate": 1.75,
+    "rainfallMm": 0.10991256684064865,
+    "sunlightHours": 0.010107666254043579,
+    "wetness": 0.02198253571987152
+  },
+  "weatherForecast": [
+    {
+      "description": "Morning drizzle transitioning from the current system.",
+      "durationHours": 6.0,
+      "profile": "light_rain",
+      "startHour": 6.0
+    },
+    {
+      "description": "Front intensifies around noon with heavier rainfall.",
+      "durationHours": 4.0,
+      "profile": "heavy_rain",
+      "startHour": 12.0
+    },
+    {
+      "description": "Skies clear gradually into a calm evening.",
+      "durationHours": 6.0,
+      "profile": "default",
+      "startHour": 18.0
+    }
+  ],
+  "worldTime": 452.20375252374924
 }

@@ -3,6 +3,7 @@
 #include <glm/vec3.hpp>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 struct WeatherProfile {
     std::string name;
@@ -34,6 +35,18 @@ enum class WeatherQuality : std::uint32_t {
 
 struct WeatherStateEventPayload {
     WeatherState state;
+};
+
+struct WeatherForecastEntry {
+    std::string profile;
+    float startHour = 0.0f;      ///< Hour within the current day [0, 24)
+    float durationHours = 1.0f;  ///< Duration of this forecast window in hours
+    std::string description;
+};
+
+struct WeatherForecast {
+    float generatedAtNormalizedTime = 0.0f;
+    std::vector<WeatherForecastEntry> entries;
 };
 
 

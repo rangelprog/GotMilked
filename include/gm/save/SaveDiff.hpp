@@ -11,7 +11,9 @@ struct SaveDiffSummary {
     bool versionChanged = false;
     bool terrainChanged = false;
     bool questStateChanged = false;
+    bool dialogueStateChanged = false;
     std::vector<std::string> questChanges;
+    std::vector<std::string> dialogueChanges;
     nlohmann::json terrainDiff;
 };
 

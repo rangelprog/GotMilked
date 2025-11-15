@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <glm/vec3.hpp>
 
 namespace gotmilked {
 
@@ -44,8 +45,26 @@ constexpr const char* GameShutdown = "game.shutdown";
 constexpr const char* GamePaused = "game.paused";
 constexpr const char* GameResumed = "game.resumed";
 constexpr const char* WeatherStateChanged = "weather.state.changed";
+constexpr const char* QuestTriggered = "gameplay.quest.triggered";
+constexpr const char* DialogueTriggered = "gameplay.dialogue.triggered";
 
 } // namespace GameEvents
 
+struct QuestTriggerEventPayload {
+    std::string questId;
+    std::string triggerObject;
+    glm::vec3 location{0.0f};
+    bool sceneLoad = false;
+};
+
+struct DialogueTriggerEventPayload {
+    std::string dialogueId;
+    std::string triggerObject;
+    glm::vec3 location{0.0f};
+    bool sceneLoad = false;
+    bool autoStart = true;
+};
+
 } // namespace gotmilked
+
 

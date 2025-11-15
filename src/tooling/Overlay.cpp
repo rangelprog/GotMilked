@@ -4,6 +4,7 @@
 #include <ctime>
 #include <iomanip>
 #include <sstream>
+#include <cmath>
 
 #include "imgui.h"
 #include "gm/rendering/Camera.hpp"
@@ -68,6 +69,9 @@ void Overlay::Render(bool& overlayOpen) {
     RenderHotReloadSection();
     RenderSaveSection();
     RenderWorldSection();
+    RenderNarrativeSection();
+    RenderWeatherSection();
+    RenderProfilingSection();
     RenderPhysicsSection();
     RenderNotifications();
 
@@ -216,6 +220,147 @@ void Overlay::RenderPhysicsSection() {
     const int unaccounted = stats.dynamicBodies - (stats.activeDynamicBodies + stats.sleepingDynamicBodies);
     if (unaccounted > 0) {
         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.2f, 1.0f), "    Unaccounted (locked): %d", unaccounted);
+    }
+}
+
+void Overlay::RenderNarrativeSection() {
+    if (!m_narrativeProvider) {
+        return;
+    }
+    if (!ImGui::CollapsingHeader("Narrative Events", ImGuiTreeNodeFlags_DefaultOpen)) {
+        return;
+    }
+
+    const auto entries = m_narrativeProvider();
+    if (entries.empty()) {
+        ImGui::TextUnformatted("No narrative events recorded.");
+        return;
+    }
+
+    constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchSame;
+    if (ImGui::BeginTable("NarrativeTable", 4, flags)) {
+        ImGui::TableSetupColumn("When", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn("Type / ID");
+        ImGui::TableSetupColumn("Subject");
+        ImGui::TableSetupColumn("Details");
+        ImGui::TableHeadersRow();
+
+        for (const auto& entry : entries) {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted(FormatTimestamp(entry.timestamp).c_str());
+
+            ImGui::TableSetColumnIndex(1);
+            const char* typeLabel = entry.type == NarrativeEntry::Type::Quest ? "Quest" : "Dialogue";
+            ImGui::Text("%s: %s", typeLabel, entry.identifier.c_str());
+
+            ImGui::TableSetColumnIndex(2);
+            if (entry.subject.empty()) {
+                ImGui::TextUnformatted("-");
+            } else {
+                ImGui::TextUnformatted(entry.subject.c_str());
+            }
+
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("Pos: %.1f, %.1f, %.1f", entry.location.x, entry.location.y, entry.location.z);
+            if (entry.sceneLoad) {
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.8f, 0.7f, 0.2f, 1.0f), "[scene load]");
+            }
+            if (entry.repeatable) {
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.6f, 0.9f, 0.6f, 1.0f), "[repeatable]");
+            }
+            if (entry.type == NarrativeEntry::Type::Dialogue && entry.autoStart) {
+                ImGui::SameLine();
+                ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), "[auto-start]");
+            }
+        }
+
+        ImGui::EndTable();
+    }
+}
+
+void Overlay::RenderWeatherSection() {
+    if (!m_weatherProvider) {
+        return;
+    }
+    if (!ImGui::CollapsingHeader("Time & Weather", ImGuiTreeNodeFlags_DefaultOpen)) {
+        return;
+    }
+
+    auto snapshot = m_weatherProvider();
+    if (!snapshot) {
+        ImGui::TextUnformatted("Weather service unavailable.");
+        return;
+    }
+    const auto& info = *snapshot;
+
+    const float hours = std::fmod(info.normalizedTime * 24.0f, 24.0f);
+    const int hour = static_cast<int>(std::floor(hours));
+    const int minutes = static_cast<int>(std::round((hours - hour) * 60.0f));
+    ImGui::Text("Local Time: %02d:%02d", hour, minutes);
+    if (info.dayLengthSeconds > 0.0f) {
+        ImGui::SameLine();
+        ImGui::Text("(Day %.0fs)", info.dayLengthSeconds);
+    }
+
+    ImGui::Text("Profile: %s", info.activeProfile.c_str());
+    ImGui::Text("Wind: %.1f m/s (%.2f, %.2f, %.2f)",
+                info.windSpeed,
+                info.windDirection.x,
+                info.windDirection.y,
+                info.windDirection.z);
+    ImGui::Text("Surface wetness: %.2f   Puddles: %.2f   Darkening: %.2f",
+                info.surfaceWetness,
+                info.puddleAmount,
+                info.surfaceDarkening);
+
+    if (!info.alerts.empty()) {
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Alerts:");
+        for (const auto& alert : info.alerts) {
+            ImGui::BulletText("%s", alert.c_str());
+        }
+    }
+
+    if (!info.forecast.empty()) {
+        if (ImGui::BeginTable("ForecastTable", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+            ImGui::TableSetupColumn("Start (hr)");
+            ImGui::TableSetupColumn("Profile");
+            ImGui::TableSetupColumn("Notes");
+            ImGui::TableHeadersRow();
+            for (const auto& entry : info.forecast) {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::Text("%.1f (%.1fh)", entry.startHour, entry.durationHours);
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextUnformatted(entry.profile.c_str());
+                ImGui::TableSetColumnIndex(2);
+                ImGui::TextUnformatted(entry.description.c_str());
+            }
+            ImGui::EndTable();
+        }
+    }
+}
+
+void Overlay::RenderProfilingSection() {
+    if (!m_callbacks.applyProfilingPreset) {
+        return;
+    }
+    if (!ImGui::CollapsingHeader("Profiling Presets", ImGuiTreeNodeFlags_DefaultOpen)) {
+        return;
+    }
+
+    if (ImGui::Button("Sunny Midday")) {
+        m_callbacks.applyProfilingPreset("sunny");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Stormy Midday")) {
+        m_callbacks.applyProfilingPreset("stormy");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Dusk Clear")) {
+        m_callbacks.applyProfilingPreset("dusk");
     }
 }
 

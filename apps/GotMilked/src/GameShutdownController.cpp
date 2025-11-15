@@ -41,7 +41,11 @@ void GameShutdownController::Shutdown() {
     m_game.m_terrainEditingSystem.reset();
 #endif
     m_game.m_questSystem.reset();
+    m_game.m_dialogueSystem.reset();
     m_game.m_completedQuests.clear();
+    m_game.m_completedDialogues.clear();
+    m_game.m_narrativeLog.reset();
+    m_game.m_scriptingHooks.reset();
 
     gm::core::Logger::Info("[Game] Shutdown complete");
 

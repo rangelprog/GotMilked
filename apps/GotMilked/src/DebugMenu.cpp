@@ -107,6 +107,10 @@ using json = nlohmann::json;
 
 DebugMenu::DebugMenu() {
     InitializeShortcutDefaults();
+    m_timeOfDayTimeline.durationSeconds = 120.0f;
+    m_timeOfDayTimeline.keyframes.push_back({0.0f, 0.0f});
+    m_timeOfDayTimeline.keyframes.push_back({m_timeOfDayTimeline.durationSeconds, 1.0f});
+    EnsureWeatherScenarioDefaults();
 }
 
 DebugMenu::~DebugMenu() {
@@ -203,6 +207,9 @@ void DebugMenu::Render(bool& menuVisible) {
     }
     if (m_showWeatherPanel && m_weatherDiagnosticsSystem) {
         RenderWeatherPanel(*m_weatherDiagnosticsSystem);
+    }
+    if (m_showWeatherScenarioEditor) {
+        RenderWeatherScenarioEditor();
     }
 
     RenderPluginWindows();
@@ -497,7 +504,10 @@ std::vector<std::pair<std::string, bool*>> DebugMenu::GetWindowBindings() {
         {"prefabBrowser", &m_showPrefabBrowser},
         {"contentBrowser", &m_showContentBrowser},
         {"animationDebugger", &m_showAnimationDebugger},
-        {"debugConsole", &m_showDebugConsole}
+        {"debugConsole", &m_showDebugConsole},
+        {"weatherScenarioEditor", &m_showWeatherScenarioEditor},
+        {"weatherDiagnostics", &m_showWeatherPanel},
+        {"celestialDebugger", &m_showCelestialDebugger}
     };
 }
 

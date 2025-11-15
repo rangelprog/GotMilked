@@ -160,6 +160,9 @@ void GameLoopController::UpdateGameplay(float dt) {
     if (m_game.m_questSystem) {
         m_game.m_questSystem->SetInputSuppressed(imguiWantsInput || overlayActive);
     }
+    if (m_game.m_dialogueSystem) {
+        m_game.m_dialogueSystem->SetInputSuppressed(imguiWantsInput || overlayActive);
+    }
 
     if (m_game.m_gameScene) {
         m_game.m_gameScene->Update(dt);

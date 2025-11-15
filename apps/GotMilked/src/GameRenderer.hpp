@@ -14,6 +14,8 @@ public:
     void Render();
 
 private:
+    void ProcessEnvironmentCaptureRequests();
+
     Game& m_game;
     gm::rendering::CascadeShadowMap m_shadowCascades;
     SkyRenderer m_skyRenderer;

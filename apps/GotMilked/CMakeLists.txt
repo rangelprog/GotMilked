@@ -16,11 +16,16 @@ set(GOTMILKED_SOURCES
   src/GameResources.cpp
   src/GameSceneHelpers.cpp
   src/CowAnimationController.cpp
+  src/NarrativeScriptingLog.cpp
+  src/ScriptingHooks.cpp
+  src/WeatherService.cpp
   src/gameplay/FlyCameraController.cpp
   src/gameplay/CameraRigComponent.cpp
   src/gameplay/CameraRigSystem.cpp
   src/gameplay/QuestTriggerComponent.cpp
   src/gameplay/QuestTriggerSystem.cpp
+  src/gameplay/DialogueTriggerComponent.cpp
+  src/gameplay/DialogueTriggerSystem.cpp
 )
 
 if(GM_ENABLE_DEBUG_TOOLS)
@@ -36,6 +41,7 @@ if(GM_ENABLE_DEBUG_TOOLS)
     src/debug_menu/CelestialPanel.cpp
     src/debug_menu/WeatherPanel.cpp
     src/debug_menu/FogPanel.cpp
+    src/debug_menu/WeatherScenarioPanel.cpp
     ${ImGuizmo_SOURCE_DIR}/ImGuizmo.cpp
   )
 endif()

@@ -4,24 +4,20 @@
 
 #include <functional>
 #include <memory>
-#include <string>
+#include <string_view>
 #include <vector>
 
 #include <glm/vec3.hpp>
 
 namespace gm {
 class Scene;
-class Component;
 }
 
 namespace gm::gameplay {
 
-class QuestTriggerComponent;
+class DialogueTriggerComponent;
 
-/**
- * @brief Scene system that evaluates quest trigger components and dispatches callbacks.
- */
-class QuestTriggerSystem : public gm::SceneSystem {
+class DialogueTriggerSystem : public gm::SceneSystem {
 public:
     enum class TriggerSource {
         SceneLoad,
@@ -32,12 +28,12 @@ public:
         TriggerSource source;
     };
 
-    using TriggerCallback = std::function<void(const QuestTriggerComponent&, const TriggerContext&)>;
+    using TriggerCallback = std::function<void(const DialogueTriggerComponent&, const TriggerContext&)>;
 
-    QuestTriggerSystem() = default;
-    ~QuestTriggerSystem() override = default;
+    DialogueTriggerSystem() = default;
+    ~DialogueTriggerSystem() override = default;
 
-    std::string_view GetName() const override { return "QuestTriggerSystem"; }
+    std::string_view GetName() const override { return "DialogueTriggerSystem"; }
 
     void OnRegister(gm::Scene& scene) override;
     void OnSceneInit(gm::Scene& scene) override;
@@ -51,14 +47,14 @@ public:
 
 private:
     struct TriggerHandle {
-        std::weak_ptr<QuestTriggerComponent> component;
+        std::weak_ptr<DialogueTriggerComponent> component;
     };
 
     void CollectTriggers(gm::Scene& scene);
     void RefreshHandles();
     void ProcessSceneLoadTriggers();
     void ProcessInteractionTriggers();
-    bool EvaluateInteraction(const std::shared_ptr<QuestTriggerComponent>& trigger) const;
+    bool EvaluateInteraction(const std::shared_ptr<DialogueTriggerComponent>& trigger) const;
     glm::vec3 GetPlayerPositionSafe() const;
 
     std::function<glm::vec3()> m_playerPositionProvider;

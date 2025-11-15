@@ -10,6 +10,8 @@
 #include "gm/physics/PhysicsWorld.hpp"
 #include "gm/core/Logger.hpp"
 #include "GameConstants.hpp"
+#include "WeatherTypes.hpp"
+#include "NarrativeScriptingLog.hpp"
 
 #if GM_DEBUG_TOOLS
 #include "DebugMenu.hpp"
@@ -85,6 +87,80 @@ bool DebugToolingController::Initialize() {
             info.cameraPosition = activeCam->Position();
             info.cameraDirection = activeCam->Front();
             return info;
+        });
+        m_game.m_tooling->SetNarrativeLogProvider([weakLog = std::weak_ptr<NarrativeScriptingLog>(m_game.GetNarrativeLog())]() {
+            std::vector<gm::tooling::Overlay::NarrativeEntry> converted;
+            if (auto log = weakLog.lock()) {
+                const auto& entries = log->Entries();
+                converted.reserve(entries.size());
+                for (const auto& entry : entries) {
+                    gm::tooling::Overlay::NarrativeEntry out;
+                    out.timestamp = entry.timestamp;
+                    out.identifier = entry.identifier;
+                    out.subject = entry.subject;
+                    out.location = entry.location;
+                    out.repeatable = entry.repeatable;
+                    out.sceneLoad = entry.sceneLoad;
+                    out.autoStart = entry.autoStart;
+                    out.type = (entry.type == NarrativeScriptingLog::Entry::Type::Quest)
+                        ? gm::tooling::Overlay::NarrativeEntry::Type::Quest
+                        : gm::tooling::Overlay::NarrativeEntry::Type::Dialogue;
+                    converted.push_back(std::move(out));
+                }
+            }
+            return converted;
+        });
+        m_game.m_tooling->SetWeatherInfoProvider([this]() -> std::optional<gm::tooling::Overlay::WeatherInfo> {
+            const auto weatherService = m_game.GetWeatherService();
+            if (!weatherService) {
+                return std::nullopt;
+            }
+            gm::tooling::Overlay::WeatherInfo info;
+            info.normalizedTime = m_game.GetTimeOfDayNormalized();
+            info.dayLengthSeconds = m_game.GetCelestialConfig().dayLengthSeconds;
+
+            const WeatherState& state = m_game.GetWeatherState();
+            info.activeProfile = state.activeProfile;
+            info.windSpeed = state.windSpeed;
+            info.windDirection = state.windDirection;
+            info.surfaceWetness = state.surfaceWetness;
+            info.puddleAmount = state.puddleAmount;
+            info.surfaceDarkening = state.surfaceDarkening;
+            info.surfaceTint = state.surfaceTint;
+
+            const auto& forecast = m_game.GetWeatherForecast();
+            const std::size_t limit = std::min<std::size_t>(forecast.entries.size(), 4);
+            for (std::size_t i = 0; i < limit; ++i) {
+                const auto& entry = forecast.entries[i];
+                gm::tooling::Overlay::WeatherForecastEntry view;
+                view.profile = entry.profile;
+                view.startHour = entry.startHour;
+                view.durationHours = entry.durationHours;
+                view.description = entry.description;
+                info.forecast.push_back(std::move(view));
+            }
+
+            auto addAlert = [&](const std::string& message) {
+                info.alerts.push_back(message);
+            };
+            if (state.surfaceWetness > 0.7f) {
+                addAlert("Roads slick");
+            }
+            if (state.puddleAmount > 0.4f) {
+                addAlert("Standing water forming");
+            }
+            if (state.windSpeed > 10.0f) {
+                addAlert("High winds");
+            }
+            if (state.surfaceDarkening > 0.45f) {
+                addAlert("Low visibility on ground");
+            }
+            return info;
+        });
+        m_game.m_tooling->SetProfilingPresetCallback([this](const std::string& preset) {
+            if (!m_game.ApplyProfilingPreset(preset)) {
+                gm::core::Logger::Warning("[Tooling] Unknown profiling preset '{}'", preset);
+            }
         });
         m_game.m_tooling->AddNotification("Tooling overlay ready");
     }
@@ -264,6 +340,28 @@ void DebugToolingController::ConfigureDebugMenu() {
         },
         [this](const std::string& profile) {
             m_game.SetWeatherProfile(profile);
+        },
+        [this]() -> WeatherForecast {
+            return m_game.GetWeatherForecast();
+        },
+        [this](const WeatherForecast& forecast) {
+            m_game.OverrideWeatherForecastDebug(forecast);
+        },
+        [this](const WeatherState& state, bool broadcastEvent) {
+            m_game.ApplyWeatherStateDebug(state, broadcastEvent);
+        },
+        [this](bool captureLightProbes, bool captureReflections) {
+            EnvironmentCaptureFlags flags = EnvironmentCaptureFlags::None;
+            if (captureLightProbes) {
+                flags = flags | EnvironmentCaptureFlags::LightProbe;
+            }
+            if (captureReflections) {
+                flags = flags | EnvironmentCaptureFlags::Reflection;
+            }
+            m_game.RequestEnvironmentCaptureDebug(flags);
+        },
+        [this]() {
+            m_game.TriggerWeatherStateEventDebug();
         }
     };
     m_game.m_debugMenu->SetCallbacks(std::move(callbacks));

@@ -86,6 +86,58 @@ public:
         std::function<WeatherState()> getWeatherState;
         std::function<std::vector<std::string>()> getWeatherProfileNames;
         std::function<void(const std::string&)> setWeatherProfile;
+        std::function<WeatherForecast()> getWeatherForecast;
+        std::function<void(const WeatherForecast&)> setWeatherForecast;
+        std::function<void(const WeatherState&, bool broadcastEvent)> setWeatherState;
+        std::function<void(bool captureLightProbes, bool captureReflections)> requestEnvironmentCapture;
+        std::function<void()> triggerWeatherEvent;
+    };
+
+    struct WeatherScenarioStep {
+        std::string label{"Step"};
+        std::string profile{"default"};
+        float durationSeconds = 15.0f;
+        float wetness = 0.0f;
+        float puddles = 0.0f;
+        float darkening = 0.0f;
+        float windSpeed = 4.0f;
+        glm::vec3 windDirection{0.2f, 0.0f, 0.8f};
+        bool triggerWeatherEvent = true;
+        bool requestLightProbes = false;
+        bool requestReflections = false;
+        std::vector<std::string> customEvents;
+    };
+
+    struct WeatherScenario {
+        std::string name{"Scenario"};
+        std::string description;
+        std::vector<WeatherScenarioStep> steps;
+        bool loopPlayback = true;
+        bool pendingStepApply = false;
+        bool playbackActive = false;
+        int currentStep = 0;
+        float stepElapsed = 0.0f;
+    };
+
+    struct WeatherScenarioHarnessState {
+        char customEvent[128] = "";
+        bool captureLightProbes = true;
+        bool captureReflections = false;
+    };
+
+    struct TimeOfDayTimelineKeyframe {
+        float timeSeconds = 0.0f;
+        float normalizedValue = 0.0f;
+    };
+
+    struct TimeOfDayTimelineState {
+        std::vector<TimeOfDayTimelineKeyframe> keyframes;
+        float durationSeconds = 120.0f;
+        float playbackCursor = 0.0f;
+        bool playing = false;
+        bool loop = true;
+        int selectedIndex = -1;
+        bool needsSort = false;
     };
 
     void SetCallbacks(Callbacks callbacks) { m_callbacks = std::move(callbacks); }
@@ -205,6 +257,8 @@ private:
     void RenderAnimationDebugger();
     void RenderContentValidationWindow();
     void RenderCelestialDebugger();
+    float RenderTimeOfDayTimeline(float normalizedTime);
+    void RenderWeatherScenarioEditor();
     void RenderFogDebugger();
     void RenderWeatherPanel(const WeatherParticleSystem& system);
     void RenderDockspace();
@@ -229,6 +283,9 @@ private:
     void DrawPrefabDetails(const gm::scene::PrefabDefinition& prefab);
     std::filesystem::path ResolveAssimpImporterExecutable() const;
     void TriggerGlbReimport(const std::string& meshGuid);
+    void EnsureWeatherScenarioDefaults();
+    void AdvanceWeatherScenarioPlayback(WeatherScenario& scenario, float deltaTime);
+    void ApplyWeatherScenarioStep(WeatherScenario& scenario, WeatherScenarioStep& step, bool fromPlayback);
 public:
     void HandleFileDrop(const std::vector<std::string>& paths);
 private:
@@ -295,7 +352,13 @@ private:
     bool m_showCelestialDebugger = false;
     bool m_showFogDebugger = false;
     bool m_showWeatherPanel = false;
+    bool m_showWeatherScenarioEditor = false;
     const WeatherParticleSystem* m_weatherDiagnosticsSystem = nullptr;
+    std::vector<WeatherScenario> m_weatherScenarios;
+    int m_selectedWeatherScenario = 0;
+    WeatherScenarioHarnessState m_weatherHarness{};
+
+    TimeOfDayTimelineState m_timeOfDayTimeline;
 
     // Layout control
     bool m_resetDockLayout = false;
